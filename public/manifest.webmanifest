@@ -1,0 +1,17 @@
+{
+  "name": "Turnero Pilates",
+  "short_name": "Turnero",
+  "description": "Reservá tu turno de pilates",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#1f2937",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
