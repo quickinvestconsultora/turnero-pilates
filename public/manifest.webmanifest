@@ -1,11 +1,11 @@
 {
-  "name": "Turnero Pilates",
-  "short_name": "Turnero",
-  "description": "Reservá tu turno de pilates",
+  "name": "FORTEVA Studio",
+  "short_name": "FORTEVA",
+  "description": "Reservá tu clase de Pilates & Strength en FORTEVA Studio",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#1f2937",
+  "background_color": "#f5f1e8",
+  "theme_color": "#f5f1e8",
   "icons": [
     {
       "src": "/favicon.svg",

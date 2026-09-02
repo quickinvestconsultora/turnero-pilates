@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Perfil } from '../tipos'
 import { cerrarSesion } from '../servicios/perfil'
+import CabeceraApp from './CabeceraApp'
 import AgendaStaff from './AgendaStaff'
 import PlantillasStaff from './PlantillasStaff'
 
@@ -11,15 +12,19 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
 
   return (
     <div className="app">
-      <header className="barra-superior">
-        <div>
-          <strong>{perfil.nombre || 'Staff'}</strong>
-          <span className="etiqueta-rol">Administración</span>
-        </div>
-        <button type="button" className="link-secundario" onClick={cerrarSesion}>
-          Salir
-        </button>
-      </header>
+      <CabeceraApp
+        titulo={
+          <strong>
+            {perfil.nombre || 'Staff'}
+            <span className="etiqueta-rol">Administración</span>
+          </strong>
+        }
+        acciones={
+          <button type="button" className="link-secundario" onClick={cerrarSesion}>
+            Salir
+          </button>
+        }
+      />
 
       <nav className="tabs">
         <button

@@ -64,7 +64,9 @@ function traducirError(mensaje: string): string {
   if (m.includes('invalid login credentials')) return 'El correo o la contraseña no son correctos.'
   if (m.includes('user already registered')) return 'Ya existe una cuenta con ese correo.'
   if (m.includes('password should be at least')) return 'La contraseña es demasiado corta (mínimo 6).'
-  if (m.includes('unable to validate email')) return 'Revisá el correo, no parece válido.'
+  if (m.includes('unable to validate email') || m.includes('email address') || m.includes('is invalid')) {
+    return 'Revisá el correo, no parece válido.'
+  }
   if (m.includes('email rate limit') || m.includes('over_email_send_rate_limit')) {
     return (
       'Supabase bloqueó el envío de correos por unos minutos (límite del servidor de mails ' +

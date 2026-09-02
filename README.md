@@ -1,6 +1,6 @@
-# Turnero Pilates
+# FORTEVA Studio — turnero
 
-App de reservas para un estudio de pilates.
+App de reservas para FORTEVA Studio (Pilates & Strength).
 
 - **Alumno**: se registra, ve los turnos de los próximos 14 días y se anota (o se pone en lista de espera si está completo). Puede cancelar.
 - **Staff**: arma la agenda con turnos sueltos y/o turnos fijos semanales, ve quién se anotó en cada turno y puede cancelar un turno o sacar a alguien.
@@ -48,12 +48,13 @@ Para que los alumnos entren sin tener que confirmar el mail:
 
 ## Cambiar el logo
 
-El logo vive en **`src/assets/logo.svg`** (se ve en la pantalla de login/registro) y **`public/favicon.svg`** (ícono de la pestaña y de la app instalada). Reemplazá esos dos archivos por los reales:
+La marca vive en tres archivos:
 
-- `logo.svg`: SVG cuadrado, o cambialo por `logo.png` (512×512, fondo transparente) y actualizá el `import` en `src/componentes/Auth.tsx`.
-- `favicon.svg`: mismo dibujo, versión simple.
+- **`src/assets/forteva-logo.jpg`** — lockup completo, en el login. Con fondo casi blanco: se funde con la tarjeta crema por `mix-blend-mode: multiply`.
+- **`src/assets/forteva-marca.jpg`** — solo el isotipo, en la cabecera de la app (`src/componentes/CabeceraApp.tsx`).
+- **`public/favicon.svg`** — ícono de pestaña / app instalada.
 
-El nombre del estudio se cambia en la constante `NOMBRE_ESTUDIO` de `src/componentes/Auth.tsx`.
+Si reemplazás los JPG, dejá el fondo blanco puro (no transparente) para que el multiply siga funcionando. El nombre se cambia en `NOMBRE_ESTUDIO` de `src/componentes/Auth.tsx`.
 
 ## Correos de confirmación de registro
 

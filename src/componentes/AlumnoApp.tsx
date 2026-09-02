@@ -3,6 +3,7 @@ import type { Perfil, TurnoDisponible } from '../tipos'
 import { cerrarSesion } from '../servicios/perfil'
 import { cancelar, listarTurnos, reservar, DIAS_VISIBLES } from '../servicios/turnos'
 import { encabezadoDia, horaCorta, yaPaso } from '../fechas'
+import CabeceraApp from './CabeceraApp'
 import EditarPerfil from './EditarPerfil'
 
 type Vista = 'disponibles' | 'mios'
@@ -62,19 +63,23 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
 
   return (
     <div className="app">
-      <header className="barra-superior">
-        <div>
-          <strong>Hola, {perfil.nombre || 'alumno'}</strong>
-        </div>
-        <div className="barra-acciones">
-          <button type="button" className="link-secundario" onClick={() => setEditandoPerfil(true)}>
-            Mis datos
-          </button>
-          <button type="button" className="link-secundario" onClick={cerrarSesion}>
-            Salir
-          </button>
-        </div>
-      </header>
+      <CabeceraApp
+        titulo={<strong>Hola, {perfil.nombre || 'alumno'}</strong>}
+        acciones={
+          <>
+            <button
+              type="button"
+              className="link-secundario"
+              onClick={() => setEditandoPerfil(true)}
+            >
+              Mis datos
+            </button>
+            <button type="button" className="link-secundario" onClick={cerrarSesion}>
+              Salir
+            </button>
+          </>
+        }
+      />
 
       <nav className="tabs">
         <button

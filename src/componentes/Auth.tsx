@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { iniciarSesion, registrarse } from '../servicios/perfil'
-import logo from '../assets/logo.svg'
+import logo from '../assets/forteva-logo.jpg'
 
 // Nombre del estudio: cambialo acá y aparece en el login y en los correos que
 // configures en Supabase.
-const NOMBRE_ESTUDIO = 'Turnero Pilates'
+const NOMBRE_ESTUDIO = 'FORTEVA Studio'
 
 type Modo = 'login' | 'registro'
 
@@ -47,8 +47,8 @@ export default function Auth() {
   return (
     <main className="centro-pantalla">
       <section className="tarjeta-auth">
+        <h1 className="oculto-visualmente">{NOMBRE_ESTUDIO}</h1>
         <img className="logo-auth" src={logo} alt={NOMBRE_ESTUDIO} />
-        <h1>{NOMBRE_ESTUDIO}</h1>
         <p className="subtitulo">
           {modo === 'login' ? 'Entrá para reservar tu turno' : 'Creá tu cuenta'}
         </p>
