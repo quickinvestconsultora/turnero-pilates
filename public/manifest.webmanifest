@@ -2,7 +2,7 @@
   "name": "FORTEVA Studio",
   "short_name": "FORTEVA",
   "description": "Reservá tu clase de Pilates & Strength en FORTEVA Studio",
-  "start_url": "/",
+  "start_url": "/app/",
   "display": "standalone",
   "background_color": "#f5f1e8",
   "theme_color": "#f5f1e8",

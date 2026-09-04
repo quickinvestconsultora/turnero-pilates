@@ -7,6 +7,15 @@ App de reservas para FORTEVA Studio (Pilates & Strength).
 
 Stack: React + Vite + TypeScript + Supabase (auth + Postgres + RLS). No hay backend propio: toda la lógica sensible (reservar sin sobrecupo, generar turnos) vive en funciones de Postgres.
 
+## Rutas
+
+Es un sitio de dos páginas:
+
+- **`/`** — la presentación (estática, sin React): `index.html` en la raíz del proyecto.
+- **`/app`** — la aplicación (login, reservas, agenda): `app/index.html`, que carga `src/main.tsx`.
+
+`vite.config.ts` declara los dos como entradas del build. `public/presentacion.html` quedó como un redirect a `/` por si alguien tiene guardado el link viejo.
+
 ## Puesta en marcha
 
 ### 1. Crear el proyecto de Supabase
@@ -34,6 +43,8 @@ Completá `.env` con la URL y la anon key del paso 1.
 npm install
 npm run dev
 ```
+
+Abrí **`/app`** (no la raíz, que es la presentación) para llegar al login.
 
 ### 5. Crear el primer usuario staff
 
