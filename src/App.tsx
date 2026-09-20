@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { cerrarSesion, obtenerMiPerfil } from './servicios/perfil'
+import { generarYSubirDeslinde } from './servicios/deslinde'
 import type { Perfil } from './tipos'
 import Auth from './componentes/Auth'
 import CrearPassword from './componentes/CrearPassword'
@@ -75,6 +76,30 @@ export default function App() {
     }
     void cargarPerfil()
   }, [session, cargarPerfil])
+
+  // El PDF del deslinde se genera y sube en segundo plano la primera vez que
+  // hay sesión con el perfil ya creado. Si en su momento faltaba confirmar
+  // el mail (sin sesión todavía), queda pendiente y se sube acá, la primera
+  // vez que entra. No bloquea la pantalla: si falla, se reintenta solo.
+  useEffect(() => {
+    if (perfilState.estado !== 'listo') return
+    const perfil = perfilState.perfil
+    if (perfil.rol !== 'alumno' || perfil.deslinde_pdf_subido) return
+
+    let cancelado = false
+    generarYSubirDeslinde(perfil)
+      .then(() => {
+        if (!cancelado) {
+          setPerfilState({ estado: 'listo', perfil: { ...perfil, deslinde_pdf_subido: true } })
+        }
+      })
+      .catch(() => {
+        // Sin drama: se vuelve a intentar en el próximo login.
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [perfilState])
 
   if (cargandoSesion) return <Cargando />
   if (!session) return <Auth />

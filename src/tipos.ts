@@ -5,6 +5,8 @@ export type EstadoCuenta = 'prueba' | 'al_dia' | 'pendiente'
 export type Perfil = {
   id: string
   nombre: string
+  apellido: string
+  dni: string | null
   telefono: string | null
   rol: Rol
   nivel: Nivel | null
@@ -13,6 +15,8 @@ export type Perfil = {
   contacto_emergencia_telefono: string | null
   estado_cuenta: EstadoCuenta
   pago_actualizado_en: string | null
+  deslinde_aceptado_en: string | null
+  deslinde_pdf_subido: boolean
   creado_en: string
 }
 
@@ -59,7 +63,12 @@ export type TurnoConReservas = {
     estado: EstadoReserva
     creado_en: string
     asistencia: EstadoAsistencia | null
-    perfiles: { nombre: string; telefono: string | null; lesiones: string | null } | null
+    perfiles: {
+      nombre: string
+      apellido: string
+      telefono: string | null
+      lesiones: string | null
+    } | null
   }[]
 }
 

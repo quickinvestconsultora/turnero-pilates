@@ -10,6 +10,7 @@ import {
   quitarReserva,
 } from '../servicios/agenda'
 import { encabezadoDia, horaCorta, hoyIso, sumarDias, yaPaso } from '../fechas'
+import { nombreCompleto } from '../personas'
 
 export default function AgendaStaff() {
   const [turnos, setTurnos] = useState<TurnoConReservas[]>([])
@@ -176,7 +177,7 @@ function TurnoStaff({
             <li key={r.id}>
               <div className="fila-anotada">
                 <span>
-                  {r.perfiles?.nombre || 'Sin nombre'}
+                  {r.perfiles ? nombreCompleto(r.perfiles) : 'Sin nombre'}
                   {r.perfiles?.telefono ? ` · ${r.perfiles.telefono}` : ''}
                 </span>
                 {pasado ? (
@@ -212,7 +213,8 @@ function TurnoStaff({
                     className="link-peligro"
                     disabled={ocupado}
                     onClick={() => {
-                      if (confirm(`¿Sacar a ${r.perfiles?.nombre ?? 'esta persona'} del turno?`)) {
+                      const nombre = r.perfiles ? nombreCompleto(r.perfiles) : 'esta persona'
+                      if (confirm(`¿Sacar a ${nombre} del turno?`)) {
                         conManejo(() => quitarReserva(r.id))
                       }
                     }}
@@ -230,7 +232,7 @@ function TurnoStaff({
           ))}
           {espera.map((r) => (
             <li key={r.id} className="en-espera">
-              <span>{r.perfiles?.nombre || 'Sin nombre'} — en espera</span>
+              <span>{r.perfiles ? nombreCompleto(r.perfiles) : 'Sin nombre'} — en espera</span>
               {!pasado && (
                 <button
                   type="button"

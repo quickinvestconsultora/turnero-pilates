@@ -117,7 +117,7 @@ where u.id = p.id and u.email = 'MAIL@EJEMPLO.COM';
 
 | Tabla | Qué guarda |
 |---|---|
-| `perfiles` | 1 fila por usuario. `rol`: `alumno` \| `staff`. Ficha (opcional, se completa desde "Mis datos"): `nivel`, `lesiones`, `contacto_emergencia_nombre`, `contacto_emergencia_telefono`. Las lesiones se muestran al staff en la lista de anotadas de cada turno. `estado_cuenta`: `prueba` \| `al_dia` \| `pendiente` — lo cambia el staff a mano desde **Clientes**, nunca la propia alumna. |
+| `perfiles` | 1 fila por usuario. `rol`: `alumno` \| `staff`. Identidad, obligatoria desde el registro: `apellido`, `dni`. Ficha (opcional, se completa desde "Mis datos"): `nivel`, `lesiones`, `contacto_emergencia_nombre`, `contacto_emergencia_telefono`. Las lesiones se muestran al staff en la lista de anotadas de cada turno. `estado_cuenta`: `prueba` \| `al_dia` \| `pendiente` — lo cambia el staff a mano desde **Clientes**, nunca la propia alumna. `deslinde_aceptado_en` / `deslinde_pdf_subido`: ver más abajo. |
 | `plantillas_turno` | Turno fijo semanal (día, hora, cupo, instructor). |
 | `turnos` | Turno concreto en una fecha. Se crea a mano o generado desde una plantilla. |
 | `reservas` | 1 fila por (turno, alumno). `estado`: `reservada` \| `lista_espera` \| `cancelada`. `asistencia`: `asistio` \| `ausente` \| null (se carga después de la clase, la pone el staff). |
@@ -139,8 +139,21 @@ export const WHATSAPP_NUMERO = ''         // con código de país, ej. 549229123
 
 Cada botón aparece solo si su dato está cargado — no hay nada inventado ni de relleno. No es un cobro automático (no hay integración con la API de Mercado Pago ni webhooks): la alumna paga por su cuenta y el staff la pasa a `Al día` desde Clientes cuando lo confirma.
 
+## Registro y deslinde de responsabilidad
+
+El registro pide **nombre, apellido, DNI y teléfono**, y obliga a tildar "Leí y acepto el deslinde de responsabilidad" (texto en **`src/config/deslinde.ts`**) para poder crear la cuenta.
+
+⚠️ **El texto del deslinde es un borrador mío, no de un abogado.** Sirve como punto de partida razonable, pero antes de confiar en él como protección legal real hace falta que lo revise un abogado y lo ajuste a la situación puntual del estudio.
+
+Al aceptar, la app genera un **PDF** (datos + texto del deslinde + fecha de aceptación) y lo sube a un bucket privado de Supabase Storage (`deslindes`, un archivo por alumna en `<id>/deslinde.pdf`). Si en ese momento todavía no hay sesión activa (falta confirmar el mail), queda pendiente y se sube solo la primera vez que la alumna entra con sesión ya confirmada — ver el efecto en `App.tsx`.
+
+El staff lo descarga por cada alumna desde **Clientes → Ver deslinde firmado**. No hay envío automático por mail (no hay backend ni SMTP confiable para adjuntar archivos todavía).
+
+La generación de PDF usa `jsPDF`, cargado en un chunk aparte (no suma peso al resto de la app: solo se descarga cuando hace falta generar un PDF).
+
 ## Pendiente (fuera del MVP)
 
 - Bonos / paquetes de clases con vencimiento (por ahora el estado de cuenta es binario: al día o debe, sin "cuántas clases le quedan").
 - Cobro real con Mercado Pago (API + webhook) en vez del link manual.
 - Avisos automáticos por WhatsApp/mail cuando se cancela un turno.
+- Mandar el PDF del deslinde por mail al administrador (hoy se descarga a demanda desde Clientes).

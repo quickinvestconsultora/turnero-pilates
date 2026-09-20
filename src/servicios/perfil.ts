@@ -5,14 +5,27 @@ export async function registrarse(datos: {
   email: string
   password: string
   nombre: string
+  apellido: string
+  dni: string
   telefono: string
+  aceptaDeslinde: boolean
 }): Promise<void> {
+  if (!datos.aceptaDeslinde) {
+    throw new Error('Tenés que leer y aceptar el deslinde de responsabilidad para registrarte.')
+  }
+
   const { error } = await supabase.auth.signUp({
     email: datos.email.trim(),
     password: datos.password,
     options: {
       // El trigger crear_perfil_para_usuario_nuevo lee estos campos.
-      data: { nombre: datos.nombre.trim(), telefono: datos.telefono.trim() },
+      data: {
+        nombre: datos.nombre.trim(),
+        apellido: datos.apellido.trim(),
+        dni: datos.dni.trim(),
+        telefono: datos.telefono.trim(),
+        acepta_deslinde: 'true',
+      },
     },
   })
   if (error) throw new Error(traducirError(error.message))

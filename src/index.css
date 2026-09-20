@@ -318,6 +318,48 @@ label {
   margin-top: 4px;
 }
 
+.deslinde {
+  margin: 4px 0 14px;
+}
+
+.deslinde-texto {
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--texto-suave);
+}
+
+.deslinde-texto summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--texto);
+  font-size: 13px;
+}
+
+.deslinde-texto p {
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+
+.deslinde-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--texto-suave);
+  cursor: pointer;
+}
+
+.deslinde-check input {
+  width: auto;
+  margin: 3px 0 0;
+}
+
 /* ---- Listas de turnos ---- */
 .contenido {
   display: block;
@@ -562,9 +604,16 @@ label {
 .cliente-datos {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 2px;
   flex: 1 1 180px;
   min-width: 0;
+}
+
+.enlace-deslinde {
+  padding: 2px 0;
+  font-size: 12px;
+  text-decoration: underline;
 }
 
 .cliente-acciones {

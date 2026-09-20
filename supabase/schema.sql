@@ -39,8 +39,20 @@ alter table public.perfiles
     check (estado_cuenta in ('prueba', 'al_dia', 'pendiente')),
   add column if not exists pago_actualizado_en timestamptz;
 
--- Cuando alguien se registra, le creamos el perfil automáticamente con el
--- nombre y teléfono que mandó en el formulario (van en raw_user_meta_data).
+-- Datos de identidad + deslinde de responsabilidad, obligatorios desde el
+-- registro. deslinde_pdf_subido queda en false hasta que la app suba el PDF
+-- a Storage (puede demorar si falta confirmar el mail: se reintenta solo la
+-- próxima vez que la alumna entre con sesión activa).
+alter table public.perfiles
+  add column if not exists apellido text not null default '',
+  add column if not exists dni text,
+  add column if not exists deslinde_aceptado_en timestamptz,
+  add column if not exists deslinde_pdf_subido boolean not null default false;
+
+-- Cuando alguien se registra, le creamos el perfil automáticamente con los
+-- datos que mandó en el formulario (van en raw_user_meta_data). Si vino con
+-- 'acepta_deslinde', queda marcado el momento de la aceptación — el
+-- formulario de registro no deja enviar sin tildar esa casilla.
 create or replace function public.crear_perfil_para_usuario_nuevo()
 returns trigger
 language plpgsql
@@ -48,11 +60,14 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.perfiles (id, nombre, telefono)
+  insert into public.perfiles (id, nombre, apellido, dni, telefono, deslinde_aceptado_en)
   values (
     new.id,
     coalesce(new.raw_user_meta_data ->> 'nombre', ''),
-    nullif(new.raw_user_meta_data ->> 'telefono', '')
+    coalesce(new.raw_user_meta_data ->> 'apellido', ''),
+    nullif(new.raw_user_meta_data ->> 'dni', ''),
+    nullif(new.raw_user_meta_data ->> 'telefono', ''),
+    case when new.raw_user_meta_data ->> 'acepta_deslinde' = 'true' then now() end
   )
   on conflict (id) do nothing;
   return new;
@@ -219,7 +234,40 @@ create policy reservas_staff_escribe on public.reservas
   for all using (public.es_staff()) with check (public.es_staff());
 
 -- ============================================================================
--- 6. Funciones de negocio
+-- 6. Storage: PDF del deslinde de responsabilidad
+-- ----------------------------------------------------------------------------
+-- Bucket privado. Cada PDF se guarda en "<id-de-la-alumna>/deslinde.pdf", así
+-- que el primer segmento de la ruta identifica de quién es el archivo.
+-- ============================================================================
+insert into storage.buckets (id, name, public)
+values ('deslindes', 'deslindes', false)
+on conflict (id) do nothing;
+
+drop policy if exists deslindes_alumna_sube on storage.objects;
+create policy deslindes_alumna_sube on storage.objects
+  for insert with check (
+    bucket_id = 'deslindes' and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- Update además de insert: si el primer intento de subida falla (por ej. se
+-- pierde la conexión) el reintento sube con upsert, que es un update.
+drop policy if exists deslindes_alumna_actualiza on storage.objects;
+create policy deslindes_alumna_actualiza on storage.objects
+  for update using (
+    bucket_id = 'deslindes' and (storage.foldername(name))[1] = auth.uid()::text
+  ) with check (
+    bucket_id = 'deslindes' and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists deslindes_ver on storage.objects;
+create policy deslindes_ver on storage.objects
+  for select using (
+    bucket_id = 'deslindes'
+    and ((storage.foldername(name))[1] = auth.uid()::text or public.es_staff())
+  );
+
+-- ============================================================================
+-- 7. Funciones de negocio
 -- ============================================================================
 
 -- --- Reservar un turno ------------------------------------------------------
@@ -473,12 +521,12 @@ begin
     ),
     'ausencias_por_alumna', (
       select coalesce(json_agg(y order by y.ausencias desc), '[]'::json) from (
-        select p.nombre, count(*) as ausencias
+        select btrim(p.nombre || ' ' || p.apellido) as nombre, count(*) as ausencias
         from reservas r
         join turnos t on t.id = r.turno_id
         join perfiles p on p.id = r.alumno_id
         where t.fecha between p_desde and p_hasta and r.asistencia = 'ausente'
-        group by p.nombre
+        group by p.nombre, p.apellido
         order by count(*) desc
         limit 10
       ) y

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { EstadoCuenta, Perfil } from '../tipos'
 import { actualizarEstadoCuenta, listarClientes } from '../servicios/clientes'
+import { obtenerUrlDeslinde } from '../servicios/deslinde'
 import { fechaCorta } from '../fechas'
+import { nombreCompleto } from '../personas'
 
 const ETIQUETA_ESTADO: Record<EstadoCuenta, string> = {
   prueba: 'Prueba',
@@ -40,7 +42,10 @@ export default function Clientes() {
     const q = busqueda.trim().toLowerCase()
     if (!q) return clientes
     return clientes.filter(
-      (c) => c.nombre.toLowerCase().includes(q) || (c.telefono ?? '').includes(q),
+      (c) =>
+        nombreCompleto(c).toLowerCase().includes(q) ||
+        (c.telefono ?? '').includes(q) ||
+        (c.dni ?? '').includes(q),
     )
   }, [clientes, busqueda])
 
@@ -87,6 +92,7 @@ function ClienteItem({
   onError: (m: string) => void
 }) {
   const [ocupado, setOcupado] = useState(false)
+  const [errorDeslinde, setErrorDeslinde] = useState('')
 
   const cambiarEstado = async (estado: EstadoCuenta) => {
     if (estado === cliente.estado_cuenta) return
@@ -102,16 +108,31 @@ function ClienteItem({
     }
   }
 
+  const verDeslinde = async () => {
+    setErrorDeslinde('')
+    try {
+      const url = await obtenerUrlDeslinde(cliente.id)
+      window.open(url, '_blank', 'noopener')
+    } catch {
+      setErrorDeslinde('Todavía no tiene el PDF subido.')
+    }
+  }
+
   return (
     <li className="cliente">
       <div className="cliente-datos">
-        <strong>{cliente.nombre || 'Sin nombre'}</strong>
+        <strong>{nombreCompleto(cliente)}</strong>
         <span className="turno-detalle">
+          {cliente.dni ? `DNI ${cliente.dni} · ` : ''}
           {cliente.telefono || 'Sin teléfono'}
           {cliente.nivel ? ` · ${ETIQUETA_NIVEL[cliente.nivel]}` : ''}
           {' · Desde '}
           {fechaCorta(cliente.creado_en.slice(0, 10))}
         </span>
+        <button type="button" className="link-secundario enlace-deslinde" onClick={verDeslinde}>
+          Ver deslinde firmado
+        </button>
+        {errorDeslinde && <span className="mensaje-error">{errorDeslinde}</span>}
       </div>
 
       <div className={`estado-cuenta estado-cuenta--${cliente.estado_cuenta}`}>
