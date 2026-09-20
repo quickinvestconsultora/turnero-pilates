@@ -85,7 +85,12 @@ Necesitás un dominio para el remitente (`turnos@tudominio.com`) y cargar los re
 
 ### 2. Site URL y redirect
 
-**Authentication → URL Configuration**: poné en *Site URL* la dirección donde publiques la app (ej. `https://turnos-pilates.vercel.app`). Es a donde vuelve el link de confirmación.
+**Authentication → URL Configuration**:
+
+- **Site URL**: `https://tu-dominio/app/` (con `/app/`, no la raíz — ahí vive el login, la raíz es la presentación pública).
+- **Redirect URLs**: agregá `https://tu-dominio/app/**`.
+
+Ahí es a donde vuelven los links de confirmación de registro y de **"Olvidé mi contraseña"**. Si esto queda mal (o en un `localhost` de otra compu, que es el valor por defecto), el link no lleva a ningún lado.
 
 ### 3. Plantilla del mail
 

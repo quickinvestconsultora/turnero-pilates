@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase'
 import { cerrarSesion, obtenerMiPerfil } from './servicios/perfil'
 import type { Perfil } from './tipos'
 import Auth from './componentes/Auth'
+import CrearPassword from './componentes/CrearPassword'
 import AlumnoApp from './componentes/AlumnoApp'
 import AdminApp from './componentes/AdminApp'
 import Cargando from './componentes/Cargando'
@@ -18,6 +19,16 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [cargandoSesion, setCargandoSesion] = useState(true)
   const [perfilState, setPerfilState] = useState<EstadoPerfil>({ estado: 'cargando' })
+
+  // Los links de invitación/recuperación de Supabase loguean directo, pero
+  // nunca definen una contraseña con eso — sin esto, la próxima vez no hay
+  // con qué entrar. Detectamos el link (type=invite o type=recovery en el
+  // hash de la URL) para pedirla una sola vez.
+  const [debeCrearPassword, setDebeCrearPassword] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const hash = window.location.hash
+    return hash.includes('type=invite') || hash.includes('type=recovery')
+  })
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -67,6 +78,19 @@ export default function App() {
 
   if (cargandoSesion) return <Cargando />
   if (!session) return <Auth />
+
+  if (debeCrearPassword) {
+    return (
+      <CrearPassword
+        onListo={() => {
+          // Limpiamos el hash con el token para que un refresh no vuelva a
+          // pedir la contraseña ni deje el token viejo dando vueltas.
+          window.history.replaceState(null, '', window.location.pathname)
+          setDebeCrearPassword(false)
+        }}
+      />
+    )
+  }
 
   if (perfilState.estado === 'cargando') return <Cargando />
 

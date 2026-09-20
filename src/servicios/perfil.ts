@@ -30,6 +30,20 @@ export async function cerrarSesion(): Promise<void> {
   await supabase.auth.signOut()
 }
 
+// Manda el correo de "elegir contraseña nueva". El link vuelve acá mismo
+// (/app/), donde App.tsx detecta el token en la URL y muestra CrearPassword.
+export async function pedirRecuperacion(email: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: `${window.location.origin}/app/`,
+  })
+  if (error) throw new Error(traducirError(error.message))
+}
+
+export async function cambiarMiPassword(password: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) throw new Error(traducirError(error.message))
+}
+
 export async function obtenerMiPerfil(): Promise<Perfil | null> {
   const { data: sesion } = await supabase.auth.getUser()
   if (!sesion.user) return null
