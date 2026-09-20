@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import marca from '../assets/forteva-marca.jpg'
+import marca from '../assets/forteva-marca.png'
 
 type Props = {
   titulo: ReactNode

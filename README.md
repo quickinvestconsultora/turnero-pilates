@@ -59,13 +59,14 @@ Para que los alumnos entren sin tener que confirmar el mail:
 
 ## Cambiar el logo
 
-La marca vive en tres archivos:
+Los archivos de marca salen del kit oficial (`REDES/LOGOTIPO` y `REDES/ISOTIPORESUMIDO`, PNG con transparencia real), recortados al contenido:
 
-- **`src/assets/forteva-logo.jpg`** — lockup completo, en el login. Con fondo casi blanco: se funde con la tarjeta crema por `mix-blend-mode: multiply`.
-- **`src/assets/forteva-marca.jpg`** — solo el isotipo, en la cabecera de la app (`src/componentes/CabeceraApp.tsx`).
-- **`public/favicon.svg`** — ícono de pestaña / app instalada.
+- **`src/assets/forteva-logo.png`** — logotipo + isotipo completo, en el login.
+- **`src/assets/forteva-marca.png`** — isotipo resumido (solo la flor, sin hojas), en la cabecera de la app (`src/componentes/CabeceraApp.tsx`).
+- **`public/favicon.png`**, **`public/icon-512.png`**, **`public/apple-touch-icon.png`** — ícono de pestaña, PWA y iOS.
+- La presentación (`index.html`, raíz del sitio) lleva su propia copia embebida en base64 del logotipo, en color y en blanco (para el pie en modo oscuro).
 
-Si reemplazás los JPG, dejá el fondo blanco puro (no transparente) para que el multiply siga funcionando. El nombre se cambia en `NOMBRE_ESTUDIO` de `src/componentes/Auth.tsx`.
+Como ahora son PNG con canal alfa de verdad, no hace falta ningún truco de `mix-blend-mode`: cualquier reemplazo solo necesita fondo transparente. El color de marca es **`#948077`** (taupe), documentado en `FORTEVAMUESTRA.jpg` del kit. El nombre se cambia en `NOMBRE_ESTUDIO` de `src/componentes/Auth.tsx`.
 
 ## Correos de confirmación de registro
 

@@ -1,7 +1,8 @@
 /* ============================================================================
    FORTEVA Studio — turnero
-   Paleta crema + dorado y tipografía Cormorant / Mulish, para que el sistema
-   (que es simple a propósito) se sienta cuidado.
+   Paleta crema + el taupe de marca (#948077, de la guía oficial) y
+   tipografía Cormorant / Mulish, para que el sistema (que es simple a
+   propósito) se sienta cuidado.
    ============================================================================ */
 :root {
   --fondo: #f5f1e8;
@@ -12,8 +13,8 @@
   --texto-suave: #6d6455;
   --primario: #1c1813;
   --primario-texto: #f7f3ea;
-  --acento: #a98c54;
-  --acento-oscuro: #856a34;
+  --acento: #948077;
+  --acento-oscuro: #60534d;
   --error: #b4472e;
   --ok: #4d7c4a;
   --radio: 10px;
@@ -155,7 +156,6 @@ label {
   width: 46px;
   height: 46px;
   object-fit: contain;
-  mix-blend-mode: multiply;
 }
 
 .cabecera-fila {
@@ -241,11 +241,10 @@ label {
 }
 
 .logo-auth {
-  width: 190px;
-  max-width: 70%;
+  width: 240px;
+  max-width: 78%;
   height: auto;
-  margin: 0 auto 4px;
-  mix-blend-mode: multiply;
+  margin: 4px auto 6px;
 }
 
 .subtitulo {

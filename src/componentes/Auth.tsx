@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { iniciarSesion, registrarse } from '../servicios/perfil'
-import logo from '../assets/forteva-logo.jpg'
+import logo from '../assets/forteva-logo.png'
 
 // Nombre del estudio: cambialo acá y aparece en el login y en los correos que
 // configures en Supabase.
