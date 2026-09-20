@@ -59,3 +59,21 @@ export type TurnoConReservas = {
     perfiles: { nombre: string; telefono: string | null; lesiones: string | null } | null
   }[]
 }
+
+// Lo que devuelve la función estadisticas(desde, hasta).
+export type Estadisticas = {
+  turnos_dictados: number
+  cupo_total: number
+  reservas_totales: number
+  alumnas_activas: number
+  asistieron: number
+  ausentes: number
+  por_horario: {
+    dia_semana: number
+    hora: string
+    turnos: number
+    cupo_total: number
+    reservas: number
+  }[]
+  ausencias_por_alumna: { nombre: string; ausencias: number }[]
+}

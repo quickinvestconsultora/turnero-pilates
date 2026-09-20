@@ -505,6 +505,84 @@ label {
   gap: 2px;
 }
 
+/* ---- Estadísticas ---- */
+.subtitulo-seccion {
+  font-size: 18px;
+  margin: 28px 0 12px;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.kpi {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kpi-valor {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-etiqueta {
+  font-size: 12px;
+  color: var(--texto-suave);
+}
+
+.lista-estadistica {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lista-estadistica li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.lista-estadistica-etiqueta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lista-estadistica-valor {
+  flex: none;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.barra-ocupacion {
+  flex: 1 1 80px;
+  max-width: 120px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--borde);
+  overflow: hidden;
+}
+
+.barra-ocupacion-relleno {
+  display: block;
+  height: 100%;
+  background: var(--acento);
+}
+
 /* ---- Formularios en caja ---- */
 .form-caja {
   background: var(--superficie-2);

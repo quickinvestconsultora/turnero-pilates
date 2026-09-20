@@ -385,9 +385,96 @@ begin
 end;
 $$;
 
+-- --- Estadísticas del período (staff) --------------------------------------
+-- Un solo viaje a la base: junta ocupación, ausentismo y el detalle por
+-- horario y por alumna en un JSON. Solo mira turnos que ya pasaron (a uno
+-- que todavía no se dio no le corresponde "ocupación final" ni asistencia).
+create or replace function public.estadisticas(p_desde date, p_hasta date)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  resultado json;
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede ver estadísticas.';
+  end if;
+
+  select json_build_object(
+    'turnos_dictados', (
+      select count(*) from turnos
+      where fecha between p_desde and p_hasta and cancelado = false
+        and (fecha + hora) < now()
+    ),
+    'cupo_total', (
+      select coalesce(sum(cupo), 0) from turnos
+      where fecha between p_desde and p_hasta and cancelado = false
+        and (fecha + hora) < now()
+    ),
+    'reservas_totales', (
+      select count(*) from reservas r
+      join turnos t on t.id = r.turno_id
+      where t.fecha between p_desde and p_hasta and t.cancelado = false
+        and (t.fecha + t.hora) < now()
+        and r.estado = 'reservada'
+    ),
+    'alumnas_activas', (
+      select count(distinct r.alumno_id) from reservas r
+      join turnos t on t.id = r.turno_id
+      where t.fecha between p_desde and p_hasta and t.cancelado = false
+        and r.estado = 'reservada'
+    ),
+    'asistieron', (
+      select count(*) from reservas r
+      join turnos t on t.id = r.turno_id
+      where t.fecha between p_desde and p_hasta and r.asistencia = 'asistio'
+    ),
+    'ausentes', (
+      select count(*) from reservas r
+      join turnos t on t.id = r.turno_id
+      where t.fecha between p_desde and p_hasta and r.asistencia = 'ausente'
+    ),
+    'por_horario', (
+      select coalesce(json_agg(x order by x.dia_semana, x.hora), '[]'::json) from (
+        select dia_semana, hora, count(*) as turnos, sum(cupo) as cupo_total, sum(reservas) as reservas
+        from (
+          select
+            extract(dow from t.fecha)::int as dia_semana,
+            t.hora,
+            t.cupo,
+            (select count(*) from reservas r
+               where r.turno_id = t.id and r.estado = 'reservada') as reservas
+          from turnos t
+          where t.fecha between p_desde and p_hasta and t.cancelado = false
+            and (t.fecha + t.hora) < now()
+        ) por_turno
+        group by dia_semana, hora
+      ) x
+    ),
+    'ausencias_por_alumna', (
+      select coalesce(json_agg(y order by y.ausencias desc), '[]'::json) from (
+        select p.nombre, count(*) as ausencias
+        from reservas r
+        join turnos t on t.id = r.turno_id
+        join perfiles p on p.id = r.alumno_id
+        where t.fecha between p_desde and p_hasta and r.asistencia = 'ausente'
+        group by p.nombre
+        order by count(*) desc
+        limit 10
+      ) y
+    )
+  ) into resultado;
+
+  return resultado;
+end;
+$$;
+
 -- Permisos de ejecución (authenticated ya puede ejecutar funciones public
 -- por defecto en Supabase, pero lo dejamos explícito).
 grant execute on function public.reservar_turno(uuid)          to authenticated;
 grant execute on function public.cancelar_reserva(uuid)        to authenticated;
 grant execute on function public.listar_turnos(date, date)     to authenticated;
 grant execute on function public.generar_turnos(uuid, date, date) to authenticated;
+grant execute on function public.estadisticas(date, date)      to authenticated;

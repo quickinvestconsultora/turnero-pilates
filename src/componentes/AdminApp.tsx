@@ -4,8 +4,9 @@ import { cerrarSesion } from '../servicios/perfil'
 import CabeceraApp from './CabeceraApp'
 import AgendaStaff from './AgendaStaff'
 import PlantillasStaff from './PlantillasStaff'
+import Estadisticas from './Estadisticas'
 
-type Vista = 'agenda' | 'plantillas'
+type Vista = 'agenda' | 'plantillas' | 'estadisticas'
 
 export default function AdminApp({ perfil }: { perfil: Perfil }) {
   const [vista, setVista] = useState<Vista>('agenda')
@@ -41,10 +42,19 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
         >
           Turnos fijos
         </button>
+        <button
+          type="button"
+          className={vista === 'estadisticas' ? 'tab activa' : 'tab'}
+          onClick={() => setVista('estadisticas')}
+        >
+          Estadísticas
+        </button>
       </nav>
 
       <main className="contenido">
-        {vista === 'agenda' ? <AgendaStaff /> : <PlantillasStaff />}
+        {vista === 'agenda' && <AgendaStaff />}
+        {vista === 'plantillas' && <PlantillasStaff />}
+        {vista === 'estadisticas' && <Estadisticas />}
       </main>
     </div>
   )
