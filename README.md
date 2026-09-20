@@ -165,5 +165,9 @@ La generación de PDF usa `jsPDF`, cargado en un chunk aparte (no suma peso al r
 
 - Bonos / paquetes de clases con vencimiento (por ahora el estado de cuenta es binario: al día o debe, sin "cuántas clases le quedan").
 - Cobro real con Mercado Pago (API + webhook) en vez del link manual.
-- Avisos automáticos por WhatsApp/mail cuando se cancela un turno.
-- Mandar el PDF del deslinde por mail al administrador (hoy se descarga a demanda desde Clientes).
+
+**En pausa hasta tener mail propio del estudio** (dominio + cuenta en Resend/Brevo con API key — ver "Correos de confirmación de registro" más arriba). Ninguna de las tres se puede armar con lo que manda Supabase hoy, porque necesitan mandar contenido propio (adjuntos, disparadas por eventos), no solo los mails fijos de login:
+
+- Mandar el PDF del deslinde por mail a la administradora apenas se registra una alumna (hoy se descarga a demanda desde Clientes → Ver deslinde firmado).
+- Recordatorio por mail antes de cada clase (baja el ausentismo).
+- Avisar por mail a la alumna cuando se libera un lugar de la lista de espera (hoy sube sola en el sistema pero no se entera hasta que entra a mirar).
