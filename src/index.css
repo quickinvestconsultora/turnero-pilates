@@ -215,6 +215,24 @@ label {
   margin: 0;
 }
 
+/* ---- Precios (aviso de clase de prueba y modal de pago) ---- */
+.precios-info {
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 10px 14px;
+  margin: 4px 0 14px;
+}
+
+.precios-info p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.precios-info p + p {
+  margin-top: 4px;
+}
+
 /* ---- Tabs ---- */
 .tabs {
   display: flex;

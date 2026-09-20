@@ -18,11 +18,16 @@ export async function listarTurnos(): Promise<TurnoDisponible[]> {
   return (data ?? []) as TurnoDisponible[]
 }
 
-// Devuelve el estado final: 'reservada' o 'lista_espera'.
-export async function reservar(turnoId: string): Promise<'reservada' | 'lista_espera'> {
+export type ResultadoReserva = {
+  estado: 'reservada' | 'lista_espera'
+  primeraClase: boolean
+}
+
+export async function reservar(turnoId: string): Promise<ResultadoReserva> {
   const { data, error } = await supabase.rpc('reservar_turno', { p_turno_id: turnoId })
   if (error) throw new Error(limpiarError(error.message))
-  return data as 'reservada' | 'lista_espera'
+  const resultado = data as { estado: 'reservada' | 'lista_espera'; primera_clase: boolean }
+  return { estado: resultado.estado, primeraClase: resultado.primera_clase }
 }
 
 export async function cancelar(turnoId: string): Promise<void> {

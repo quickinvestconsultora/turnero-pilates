@@ -1,5 +1,6 @@
 import type { Perfil } from '../tipos'
 import OpcionesPago from './OpcionesPago'
+import PreciosInfo from './PreciosInfo'
 
 type Props = {
   perfil: Perfil
@@ -16,6 +17,7 @@ export default function ModalPago({ perfil, onCerrar }: Props) {
         <p className="subtitulo">
           Para reservar este turno tenés que regularizar el pago primero. Podés hacerlo así:
         </p>
+        <PreciosInfo />
         <OpcionesPago perfil={perfil} />
         <p className="ayuda">
           En cuanto el estudio confirme tu pago vas a poder elegir turnos con normalidad.

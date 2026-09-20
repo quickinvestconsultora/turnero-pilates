@@ -279,9 +279,13 @@ create policy deslindes_ver on storage.objects
 -- ============================================================================
 
 -- --- Reservar un turno ------------------------------------------------------
--- Devuelve el estado final: 'reservada' o 'lista_espera'.
-create or replace function public.reservar_turno(p_turno_id uuid)
-returns text
+-- Devuelve { estado: 'reservada' | 'lista_espera', primera_clase: boolean }.
+-- primera_clase = true cuando esta reserva es la primera que hace la alumna
+-- (la clase de prueba gratis): el frontend usa eso para mostrarle el aviso
+-- de bienvenida con lo que tiene que abonar para la próxima.
+drop function if exists public.reservar_turno(uuid);
+create function public.reservar_turno(p_turno_id uuid)
+returns json
 language plpgsql
 security definer
 set search_path = public
@@ -294,6 +298,7 @@ declare
   v_rol           text;
   v_estado_cuenta text;
   v_reservas_previas int;
+  v_primera_clase boolean := false;
 begin
   if auth.uid() is null then
     raise exception 'Necesitás iniciar sesión.';
@@ -319,7 +324,8 @@ begin
   where turno_id = p_turno_id and alumno_id = auth.uid();
 
   if v_estado_actual in ('reservada', 'lista_espera') then
-    return v_estado_actual; -- no hacemos nada, ya tiene lugar/está esperando
+    -- no hacemos nada, ya tiene lugar/está esperando
+    return json_build_object('estado', v_estado_actual, 'primera_clase', false);
   end if;
 
   -- Regla de pago (solo alumnas): la primera reserva es gratis (prueba).
@@ -343,6 +349,8 @@ begin
       if v_reservas_previas >= 1 then
         raise exception 'PAGO_REQUERIDO';
       end if;
+
+      v_primera_clase := true; -- esta va a ser su primera reserva: la de prueba
     end if;
   end if;
 
@@ -357,7 +365,7 @@ begin
   on conflict (turno_id, alumno_id)
     do update set estado = excluded.estado, creado_en = now();
 
-  return v_estado;
+  return json_build_object('estado', v_estado, 'primera_clase', v_primera_clase);
 end;
 $$;
 

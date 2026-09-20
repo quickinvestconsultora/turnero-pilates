@@ -7,6 +7,7 @@ import CabeceraApp from './CabeceraApp'
 import EditarPerfil from './EditarPerfil'
 import AvisoPago from './AvisoPago'
 import ModalPago from './ModalPago'
+import ModalClasePrueba from './ModalClasePrueba'
 
 type Vista = 'disponibles' | 'mios'
 
@@ -23,6 +24,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   const [ocupadoId, setOcupadoId] = useState<string | null>(null)
   const [editandoPerfil, setEditandoPerfil] = useState(false)
   const [pagoRequerido, setPagoRequerido] = useState(false)
+  const [mostrarClasePrueba, setMostrarClasePrueba] = useState(false)
 
   const cargar = useCallback(async () => {
     setError('')
@@ -43,8 +45,12 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
     setOcupadoId(turno.id)
     setError('')
     try {
-      if (quiere === 'reservar') await reservar(turno.id)
-      else await cancelar(turno.id)
+      if (quiere === 'reservar') {
+        const resultado = await reservar(turno.id)
+        if (resultado.primeraClase) setMostrarClasePrueba(true)
+      } else {
+        await cancelar(turno.id)
+      }
       await cargar()
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : 'No se pudo completar la acción.'
@@ -138,6 +144,10 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       )}
 
       {pagoRequerido && <ModalPago perfil={perfil} onCerrar={() => setPagoRequerido(false)} />}
+
+      {mostrarClasePrueba && (
+        <ModalClasePrueba perfil={perfil} onCerrar={() => setMostrarClasePrueba(false)} />
+      )}
     </div>
   )
 }
