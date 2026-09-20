@@ -11,7 +11,7 @@ Stack: React + Vite + TypeScript + Supabase (auth + Postgres + RLS). No hay back
 
 Es un sitio de dos páginas:
 
-- **`/`** — la presentación (estática, sin React): `index.html` en la raíz del proyecto.
+- **`/`** — sitio público del estudio (estático, sin React): `index.html` en la raíz del proyecto. Habla de Pilates & Strength y de FORTEVA, para quien piensa en anotarse — nada de features de la app ni de lo que ve el staff.
 - **`/app`** — la aplicación (login, reservas, agenda): `app/index.html`, que carga `src/main.tsx`.
 
 `vite.config.ts` declara los dos como entradas del build. `public/presentacion.html` quedó como un redirect a `/` por si alguien tiene guardado el link viejo.
