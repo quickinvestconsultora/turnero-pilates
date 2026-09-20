@@ -147,6 +147,8 @@ export const WHATSAPP_NUMERO = ''         // con código de país, ej. 549229123
 
 Cada botón aparece solo si su dato está cargado — no hay nada inventado ni de relleno. No es un cobro automático (no hay integración con la API de Mercado Pago ni webhooks): la alumna paga por su cuenta y el staff la pasa a `Al día` desde Clientes cuando lo confirma.
 
+La misma ventana muestra la lista de precios cargada en **`src/config/precios.ts`** (clase suelta y los abonos mensuales por cantidad de clases por semana) — se edita ahí, sin tocar código.
+
 ## Registro y deslinde de responsabilidad
 
 El registro pide **nombre, apellido, DNI y teléfono**, y obliga a tildar "Leí y acepto el deslinde de responsabilidad" (texto en **`src/config/deslinde.ts`**) para poder crear la cuenta.

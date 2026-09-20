@@ -1,8 +1,8 @@
-import { PRECIO_CLASE_SUELTA, PRECIO_MES } from '../config/precios'
+import { PRECIO_CLASE_SUELTA, PRECIOS_MENSUALES } from '../config/precios'
 
 // Se muestra solo si el estudio ya cargó algún valor en config/precios.ts.
 export default function PreciosInfo() {
-  if (!PRECIO_CLASE_SUELTA && !PRECIO_MES) return null
+  if (!PRECIO_CLASE_SUELTA && PRECIOS_MENSUALES.length === 0) return null
 
   return (
     <div className="precios-info">
@@ -11,11 +11,12 @@ export default function PreciosInfo() {
           Clase suelta: <strong>{PRECIO_CLASE_SUELTA}</strong>
         </p>
       )}
-      {PRECIO_MES && (
-        <p>
-          Mes completo: <strong>{PRECIO_MES}</strong>
+      {PRECIOS_MENSUALES.map(({ clasesPorSemana, precio }) => (
+        <p key={clasesPorSemana}>
+          {clasesPorSemana} clase{clasesPorSemana === 1 ? '' : 's'} por semana:{' '}
+          <strong>{precio}</strong> por mes
         </p>
-      )}
+      ))}
     </div>
   )
 }
