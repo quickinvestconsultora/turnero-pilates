@@ -11,7 +11,7 @@ type Props = {
 
 export default function EditarPerfil({ perfil, onCerrar, onGuardado }: Props) {
   const [nombre, setNombre] = useState(perfil.nombre)
-  const [telefono, setTelefono] = useState(perfil.telefono ?? '')
+  const [telefono, setTelefono] = useState(perfil.telefono)
   const [nivel, setNivel] = useState<Nivel | ''>(perfil.nivel ?? '')
   const [lesiones, setLesiones] = useState(perfil.lesiones ?? '')
   const [contactoNombre, setContactoNombre] = useState(perfil.contacto_emergencia_nombre ?? '')
@@ -37,7 +37,7 @@ export default function EditarPerfil({ perfil, onCerrar, onGuardado }: Props) {
       onGuardado({
         ...perfil,
         nombre: nombre.trim(),
-        telefono: telefono.trim() || null,
+        telefono: telefono.trim(),
         nivel: nivel || null,
         lesiones: lesiones.trim() || null,
         contacto_emergencia_nombre: contactoNombre.trim() || null,
@@ -68,6 +68,7 @@ export default function EditarPerfil({ perfil, onCerrar, onGuardado }: Props) {
             value={telefono}
             onChange={(e) => setTelefono(e.target.value)}
             inputMode="tel"
+            required
           />
 
           <label htmlFor="p-nivel">Nivel</label>

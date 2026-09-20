@@ -7,7 +7,7 @@ export type Perfil = {
   nombre: string
   apellido: string
   dni: string | null
-  telefono: string | null
+  telefono: string
   rol: Rol
   nivel: Nivel | null
   lesiones: string | null
@@ -66,7 +66,7 @@ export type TurnoConReservas = {
     perfiles: {
       nombre: string
       apellido: string
-      telefono: string | null
+      telefono: string
       lesiones: string | null
     } | null
   }[]

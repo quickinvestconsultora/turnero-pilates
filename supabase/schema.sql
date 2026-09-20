@@ -49,6 +49,15 @@ alter table public.perfiles
   add column if not exists deslinde_aceptado_en timestamptz,
   add column if not exists deslinde_pdf_subido boolean not null default false;
 
+-- El teléfono es obligatorio desde el formulario de registro (ver Auth.tsx);
+-- esto lo refuerza también del lado de la base, por si alguna vez se llama
+-- a signUp() sin pasar por el formulario. Las cuentas viejas (de antes de
+-- este campo) quedan con '' en vez de romper la migración.
+update public.perfiles set telefono = '' where telefono is null;
+alter table public.perfiles
+  alter column telefono set default '',
+  alter column telefono set not null;
+
 -- Cuando alguien se registra, le creamos el perfil automáticamente con los
 -- datos que mandó en el formulario (van en raw_user_meta_data). Si vino con
 -- 'acepta_deslinde', queda marcado el momento de la aceptación — el
@@ -66,7 +75,7 @@ begin
     coalesce(new.raw_user_meta_data ->> 'nombre', ''),
     coalesce(new.raw_user_meta_data ->> 'apellido', ''),
     nullif(new.raw_user_meta_data ->> 'dni', ''),
-    nullif(new.raw_user_meta_data ->> 'telefono', ''),
+    coalesce(new.raw_user_meta_data ->> 'telefono', ''),
     case when new.raw_user_meta_data ->> 'acepta_deslinde' = 'true' then now() end
   )
   on conflict (id) do nothing;
