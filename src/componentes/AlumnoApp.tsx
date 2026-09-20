@@ -6,6 +6,7 @@ import { encabezadoDia, horaCorta, yaPaso } from '../fechas'
 import CabeceraApp from './CabeceraApp'
 import EditarPerfil from './EditarPerfil'
 import AvisoPago from './AvisoPago'
+import ModalPago from './ModalPago'
 
 type Vista = 'disponibles' | 'mios'
 
@@ -21,6 +22,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   const [error, setError] = useState('')
   const [ocupadoId, setOcupadoId] = useState<string | null>(null)
   const [editandoPerfil, setEditandoPerfil] = useState(false)
+  const [pagoRequerido, setPagoRequerido] = useState(false)
 
   const cargar = useCallback(async () => {
     setError('')
@@ -45,7 +47,9 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       else await cancelar(turno.id)
       await cargar()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo completar la acción.')
+      const mensaje = e instanceof Error ? e.message : 'No se pudo completar la acción.'
+      if (mensaje === 'PAGO_REQUERIDO') setPagoRequerido(true)
+      else setError(mensaje)
     } finally {
       setOcupadoId(null)
     }
@@ -132,6 +136,8 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
           }}
         />
       )}
+
+      {pagoRequerido && <ModalPago perfil={perfil} onCerrar={() => setPagoRequerido(false)} />}
     </div>
   )
 }

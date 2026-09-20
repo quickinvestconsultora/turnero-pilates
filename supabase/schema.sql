@@ -291,6 +291,9 @@ declare
   v_ocupados int;
   v_estado_actual text;
   v_estado   text;
+  v_rol           text;
+  v_estado_cuenta text;
+  v_reservas_previas int;
 begin
   if auth.uid() is null then
     raise exception 'Necesitás iniciar sesión.';
@@ -317,6 +320,30 @@ begin
 
   if v_estado_actual in ('reservada', 'lista_espera') then
     return v_estado_actual; -- no hacemos nada, ya tiene lugar/está esperando
+  end if;
+
+  -- Regla de pago (solo alumnas): la primera reserva es gratis (prueba).
+  -- De ahí en más, o el staff la pasó a "al_dia" o queda bloqueada hasta
+  -- regularizar. "pendiente" siempre bloquea. El frontend reconoce el
+  -- mensaje 'PAGO_REQUERIDO' y muestra la ventana de pago en vez de un
+  -- error genérico.
+  select rol, estado_cuenta into v_rol, v_estado_cuenta
+  from public.perfiles where id = auth.uid();
+
+  if v_rol = 'alumno' then
+    if v_estado_cuenta = 'pendiente' then
+      raise exception 'PAGO_REQUERIDO';
+    end if;
+
+    if v_estado_cuenta = 'prueba' then
+      select count(*) into v_reservas_previas
+      from public.reservas
+      where alumno_id = auth.uid() and estado <> 'cancelada';
+
+      if v_reservas_previas >= 1 then
+        raise exception 'PAGO_REQUERIDO';
+      end if;
+    end if;
   end if;
 
   select count(*) into v_ocupados

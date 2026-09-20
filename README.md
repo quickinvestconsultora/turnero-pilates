@@ -128,7 +128,15 @@ Funciones: `reservar_turno`, `cancelar_reserva`, `listar_turnos` (alumno), `gene
 
 Pestaña **Clientes** (staff): lista todas las alumnas registradas, con su nivel, teléfono, fecha de alta y **estado de cuenta** (`Prueba` / `Al día` / `Debe`), que el staff cambia a mano con tres botones. Toda alumna nueva arranca en `Prueba` — no hay cobro ni vencimiento automático, es un criterio que aplica el staff.
 
-Cuando el estado queda en `Debe`, la alumna ve un aviso en su pantalla con las formas de pago que estén cargadas en **`src/config/pagos.ts`**:
+**Regla de reserva ligada al estado de cuenta** (la aplica `reservar_turno` en el servidor, no se puede saltear desde el navegador):
+
+- `Prueba`: la **primera** reserva (la que sea) es gratis. De la segunda en adelante, se bloquea y le aparece una ventana pidiendo que abone.
+- `Debe`: siempre bloqueada, misma ventana.
+- `Al día`: sin límite, reserva lo que quiera.
+
+El staff pasa a una alumna a `Al día` desde **Clientes** cuando confirma que pagó el mes, y eso le desbloquea la agenda. Si en algún momento deja de pagar, se la vuelve a pasar a `Debe`.
+
+Cuando queda bloqueada (`Debe`, o `Prueba` después de la primera clase), la alumna ve las formas de pago que estén cargadas en **`src/config/pagos.ts`**, tanto en el cartel permanente (`Debe`) como en la ventana que aparece al intentar reservar:
 
 ```ts
 export const LINK_MERCADO_PAGO = ''       // tu link de pago (mpago.la/...)
