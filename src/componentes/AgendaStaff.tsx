@@ -6,28 +6,34 @@ import {
   cancelarTurno,
   crearTurno,
   listarTurnosStaff,
+  marcarAsistencia,
   quitarReserva,
 } from '../servicios/agenda'
-import { encabezadoDia, horaCorta, hoyIso } from '../fechas'
+import { encabezadoDia, horaCorta, hoyIso, sumarDias, yaPaso } from '../fechas'
 
 export default function AgendaStaff() {
   const [turnos, setTurnos] = useState<TurnoConReservas[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [mostrarAlta, setMostrarAlta] = useState(false)
+  const [verPasados, setVerPasados] = useState(false)
 
   const cargar = useCallback(async () => {
     setError('')
     try {
-      setTurnos(await listarTurnosStaff())
+      const opciones = verPasados
+        ? { desde: sumarDias(hoyIso(), -7), dias: 7 }
+        : undefined
+      setTurnos(await listarTurnosStaff(opciones))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo cargar la agenda.')
     } finally {
       setCargando(false)
     }
-  }, [])
+  }, [verPasados])
 
   useEffect(() => {
+    setCargando(true)
     cargar()
   }, [cargar])
 
@@ -41,10 +47,19 @@ export default function AgendaStaff() {
   return (
     <div>
       <div className="fila-titulo">
-        <h2>Próximas 3 semanas</h2>
-        <button type="button" onClick={() => setMostrarAlta((v) => !v)}>
-          {mostrarAlta ? 'Cerrar' : '+ Turno suelto'}
-        </button>
+        <h2>{verPasados ? 'Última semana' : 'Próximas 3 semanas'}</h2>
+        <div className="barra-acciones">
+          <button
+            type="button"
+            className="link-secundario"
+            onClick={() => setVerPasados((v) => !v)}
+          >
+            {verPasados ? 'Ver próximos' : 'Cargar asistencia'}
+          </button>
+          <button type="button" onClick={() => setMostrarAlta((v) => !v)}>
+            {mostrarAlta ? 'Cerrar' : '+ Turno suelto'}
+          </button>
+        </div>
       </div>
 
       {mostrarAlta && (
@@ -92,6 +107,7 @@ function TurnoStaff({
   const [ocupado, setOcupado] = useState(false)
   const anotados = turno.reservas.filter((r) => r.estado === 'reservada')
   const espera = turno.reservas.filter((r) => r.estado === 'lista_espera')
+  const pasado = yaPaso(turno.fecha, turno.hora)
 
   const conManejo = async (fn: () => Promise<void>) => {
     setOcupado(true)
@@ -115,7 +131,7 @@ function TurnoStaff({
           {anotados.length}/{turno.cupo}
           {turno.cancelado && ' · CANCELADO'}
         </span>
-        {!turno.cancelado && (
+        {!turno.cancelado && !pasado && (
           <div className="barra-acciones">
             <button
               type="button"
@@ -148,6 +164,7 @@ function TurnoStaff({
             </button>
           </div>
         )}
+        {pasado && !turno.cancelado && <span className="etiqueta-rol">Ya pasó</span>}
       </div>
 
       {turno.nota && <p className="turno-nota">{turno.nota}</p>}
@@ -161,31 +178,62 @@ function TurnoStaff({
                 {r.perfiles?.nombre || 'Sin nombre'}
                 {r.perfiles?.telefono ? ` · ${r.perfiles.telefono}` : ''}
               </span>
-              <button
-                type="button"
-                className="link-peligro"
-                disabled={ocupado}
-                onClick={() => {
-                  if (confirm(`¿Sacar a ${r.perfiles?.nombre ?? 'esta persona'} del turno?`)) {
-                    conManejo(() => quitarReserva(r.id))
-                  }
-                }}
-              >
-                Sacar
-              </button>
+              {pasado ? (
+                <div className="asistencia">
+                  <button
+                    type="button"
+                    className={r.asistencia === 'asistio' ? 'activo-si' : ''}
+                    disabled={ocupado}
+                    onClick={() =>
+                      conManejo(() =>
+                        marcarAsistencia(r.id, r.asistencia === 'asistio' ? null : 'asistio'),
+                      )
+                    }
+                  >
+                    Asistió
+                  </button>
+                  <button
+                    type="button"
+                    className={r.asistencia === 'ausente' ? 'activo-no' : ''}
+                    disabled={ocupado}
+                    onClick={() =>
+                      conManejo(() =>
+                        marcarAsistencia(r.id, r.asistencia === 'ausente' ? null : 'ausente'),
+                      )
+                    }
+                  >
+                    Ausente
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="link-peligro"
+                  disabled={ocupado}
+                  onClick={() => {
+                    if (confirm(`¿Sacar a ${r.perfiles?.nombre ?? 'esta persona'} del turno?`)) {
+                      conManejo(() => quitarReserva(r.id))
+                    }
+                  }}
+                >
+                  Sacar
+                </button>
+              )}
             </li>
           ))}
           {espera.map((r) => (
             <li key={r.id} className="en-espera">
               <span>{r.perfiles?.nombre || 'Sin nombre'} — en espera</span>
-              <button
-                type="button"
-                className="link-secundario"
-                disabled={ocupado}
-                onClick={() => conManejo(() => quitarReserva(r.id))}
-              >
-                Sacar
-              </button>
+              {!pasado && (
+                <button
+                  type="button"
+                  className="link-secundario"
+                  disabled={ocupado}
+                  onClick={() => conManejo(() => quitarReserva(r.id))}
+                >
+                  Sacar
+                </button>
+              )}
             </li>
           ))}
         </ul>

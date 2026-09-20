@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import type { PlantillaTurno, TurnoConReservas } from '../tipos'
+import type { EstadoAsistencia, PlantillaTurno, TurnoConReservas } from '../tipos'
 import { hoyIso, sumarDias } from '../fechas'
 
 // ---------------------------------------------------------------------------
@@ -17,7 +17,7 @@ export async function listarTurnosStaff(opciones?: {
     .from('turnos')
     .select(
       'id, fecha, hora, duracion_min, cupo, instructor, plantilla_id, cancelado, nota, ' +
-        'reservas ( id, estado, creado_en, perfiles ( nombre, telefono ) )',
+        'reservas ( id, estado, creado_en, asistencia, perfiles ( nombre, telefono ) )',
     )
     .gte('fecha', desde)
     .lte('fecha', hasta)
@@ -69,6 +69,16 @@ export async function quitarReserva(reservaId: string): Promise<void> {
     .from('reservas')
     .update({ estado: 'cancelada' })
     .eq('id', reservaId)
+  if (error) throw new Error(error.message)
+}
+
+// El staff marca (o corrige) la asistencia de una reserva ya pasada.
+// null = sin marcar.
+export async function marcarAsistencia(
+  reservaId: string,
+  asistencia: EstadoAsistencia | null,
+): Promise<void> {
+  const { error } = await supabase.from('reservas').update({ asistencia }).eq('id', reservaId)
   if (error) throw new Error(error.message)
 }
 

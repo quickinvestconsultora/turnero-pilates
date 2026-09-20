@@ -115,13 +115,13 @@ where u.id = p.id and u.email = 'MAIL@EJEMPLO.COM';
 | `perfiles` | 1 fila por usuario. `rol`: `alumno` \| `staff`. |
 | `plantillas_turno` | Turno fijo semanal (día, hora, cupo, instructor). |
 | `turnos` | Turno concreto en una fecha. Se crea a mano o generado desde una plantilla. |
-| `reservas` | 1 fila por (turno, alumno). `estado`: `reservada` \| `lista_espera` \| `cancelada`. |
+| `reservas` | 1 fila por (turno, alumno). `estado`: `reservada` \| `lista_espera` \| `cancelada`. `asistencia`: `asistio` \| `ausente` \| null (se carga después de la clase, la pone el staff). |
 
 Funciones: `reservar_turno`, `cancelar_reserva`, `listar_turnos` (alumno), `generar_turnos` (staff).
 
 ## Pendiente (fuera del MVP)
 
-- Asistencia (marcar quién vino).
-- Estadísticas por mes (ocupación, alumnos activos, ausencias).
+- Estadísticas por mes (ocupación, alumnos activos, ausencias) — ya con datos de asistencia para alimentarlas.
 - Bonos / paquetes de clases y pagos.
 - Avisos automáticos por WhatsApp/mail cuando se cancela un turno.
+- Ficha de alumna (lesiones, nivel, contacto de emergencia).

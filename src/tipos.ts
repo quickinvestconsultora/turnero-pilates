@@ -9,6 +9,7 @@ export type Perfil = {
 }
 
 export type EstadoReserva = 'reservada' | 'lista_espera' | 'cancelada'
+export type EstadoAsistencia = 'asistio' | 'ausente'
 
 // Fila que devuelve la función listar_turnos (vista del alumno).
 export type TurnoDisponible = {
@@ -49,6 +50,7 @@ export type TurnoConReservas = {
     id: string
     estado: EstadoReserva
     creado_en: string
+    asistencia: EstadoAsistencia | null
     perfiles: { nombre: string; telefono: string | null } | null
   }[]
 }

@@ -114,6 +114,11 @@ create table if not exists public.reservas (
 create index if not exists reservas_turno_idx on public.reservas (turno_id);
 create index if not exists reservas_alumno_idx on public.reservas (alumno_id);
 
+-- Asistencia: la carga el staff después de que la clase pasó. Null mientras
+-- no se marcó (clase futura, o pasada y todavía sin cargar).
+alter table public.reservas
+  add column if not exists asistencia text check (asistencia in ('asistio', 'ausente'));
+
 -- ============================================================================
 -- 5. Row Level Security
 -- ============================================================================
