@@ -243,6 +243,14 @@ insert into storage.buckets (id, name, public)
 values ('deslindes', 'deslindes', false)
 on conflict (id) do nothing;
 
+-- Sin esto, ni siquiera un usuario logueado puede "ver" que el bucket
+-- existe (Storage lo trata como si no estuviera, aunque sí esté creado).
+-- No es sensible: solo dice que hay un bucket llamado "deslindes", los
+-- archivos de adentro los protegen las políticas de más abajo.
+drop policy if exists deslindes_bucket_visible on storage.buckets;
+create policy deslindes_bucket_visible on storage.buckets
+  for select using (id = 'deslindes');
+
 drop policy if exists deslindes_alumna_sube on storage.objects;
 create policy deslindes_alumna_sube on storage.objects
   for insert with check (
