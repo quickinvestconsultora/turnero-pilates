@@ -188,6 +188,33 @@ label {
   color: var(--acento-oscuro);
 }
 
+/* ---- Aviso de pago ---- */
+.aviso-pago {
+  background: rgba(180, 71, 46, 0.08);
+  border: 1px solid rgba(180, 71, 46, 0.25);
+  border-radius: var(--radio);
+  padding: 14px 16px;
+  margin: 0 4px 18px;
+}
+
+.aviso-pago p {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+
+.aviso-pago-opciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.aviso-pago-transferencia {
+  font-size: 13px;
+  margin: 0;
+}
+
 /* ---- Tabs ---- */
 .tabs {
   display: flex;
@@ -468,6 +495,12 @@ label {
   border-color: var(--error);
 }
 
+.asistencia button.activo-neutro {
+  background: var(--texto-suave);
+  color: #fff;
+  border-color: var(--texto-suave);
+}
+
 .vacio-inline {
   color: var(--texto-suave);
   font-size: 13px;
@@ -503,6 +536,64 @@ label {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* ---- Clientes ---- */
+.lista-clientes {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cliente {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 13px 15px;
+}
+
+.cliente-datos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.cliente-acciones {
+  flex: none;
+}
+
+.estado-cuenta {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.estado-cuenta--prueba {
+  background: var(--superficie-2);
+  color: var(--texto-suave);
+}
+
+.estado-cuenta--al_dia {
+  background: rgba(77, 124, 74, 0.14);
+  color: var(--ok);
+}
+
+.estado-cuenta--pendiente {
+  background: rgba(180, 71, 46, 0.12);
+  color: var(--error);
 }
 
 /* ---- Estadísticas ---- */

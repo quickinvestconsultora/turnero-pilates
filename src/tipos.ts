@@ -1,5 +1,6 @@
 export type Rol = 'alumno' | 'staff'
 export type Nivel = 'principiante' | 'intermedio' | 'avanzado'
+export type EstadoCuenta = 'prueba' | 'al_dia' | 'pendiente'
 
 export type Perfil = {
   id: string
@@ -10,6 +11,8 @@ export type Perfil = {
   lesiones: string | null
   contacto_emergencia_nombre: string | null
   contacto_emergencia_telefono: string | null
+  estado_cuenta: EstadoCuenta
+  pago_actualizado_en: string | null
   creado_en: string
 }
 

@@ -117,14 +117,30 @@ where u.id = p.id and u.email = 'MAIL@EJEMPLO.COM';
 
 | Tabla | Qué guarda |
 |---|---|
-| `perfiles` | 1 fila por usuario. `rol`: `alumno` \| `staff`. Ficha (opcional, se completa desde "Mis datos"): `nivel`, `lesiones`, `contacto_emergencia_nombre`, `contacto_emergencia_telefono`. Las lesiones se muestran al staff en la lista de anotadas de cada turno. |
+| `perfiles` | 1 fila por usuario. `rol`: `alumno` \| `staff`. Ficha (opcional, se completa desde "Mis datos"): `nivel`, `lesiones`, `contacto_emergencia_nombre`, `contacto_emergencia_telefono`. Las lesiones se muestran al staff en la lista de anotadas de cada turno. `estado_cuenta`: `prueba` \| `al_dia` \| `pendiente` — lo cambia el staff a mano desde **Clientes**, nunca la propia alumna. |
 | `plantillas_turno` | Turno fijo semanal (día, hora, cupo, instructor). |
 | `turnos` | Turno concreto en una fecha. Se crea a mano o generado desde una plantilla. |
 | `reservas` | 1 fila por (turno, alumno). `estado`: `reservada` \| `lista_espera` \| `cancelada`. `asistencia`: `asistio` \| `ausente` \| null (se carga después de la clase, la pone el staff). |
 
 Funciones: `reservar_turno`, `cancelar_reserva`, `listar_turnos` (alumno), `generar_turnos` (staff), `estadisticas` (staff — ocupación, ausentismo y ranking de faltas de los últimos 30 días).
 
+## Clientes y estado de cuenta
+
+Pestaña **Clientes** (staff): lista todas las alumnas registradas, con su nivel, teléfono, fecha de alta y **estado de cuenta** (`Prueba` / `Al día` / `Debe`), que el staff cambia a mano con tres botones. Toda alumna nueva arranca en `Prueba` — no hay cobro ni vencimiento automático, es un criterio que aplica el staff.
+
+Cuando el estado queda en `Debe`, la alumna ve un aviso en su pantalla con las formas de pago que estén cargadas en **`src/config/pagos.ts`**:
+
+```ts
+export const LINK_MERCADO_PAGO = ''       // tu link de pago (mpago.la/...)
+export const TRANSFERENCIA_ALIAS = ''     // alias o CBU
+export const TRANSFERENCIA_TITULAR = ''   // a nombre de quién
+export const WHATSAPP_NUMERO = ''         // con código de país, ej. 5492291234567
+```
+
+Cada botón aparece solo si su dato está cargado — no hay nada inventado ni de relleno. No es un cobro automático (no hay integración con la API de Mercado Pago ni webhooks): la alumna paga por su cuenta y el staff la pasa a `Al día` desde Clientes cuando lo confirma.
+
 ## Pendiente (fuera del MVP)
 
-- Bonos / paquetes de clases y pagos.
+- Bonos / paquetes de clases con vencimiento (por ahora el estado de cuenta es binario: al día o debe, sin "cuántas clases le quedan").
+- Cobro real con Mercado Pago (API + webhook) en vez del link manual.
 - Avisos automáticos por WhatsApp/mail cuando se cancela un turno.

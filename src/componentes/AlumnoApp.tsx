@@ -5,6 +5,7 @@ import { cancelar, listarTurnos, reservar, DIAS_VISIBLES } from '../servicios/tu
 import { encabezadoDia, horaCorta, yaPaso } from '../fechas'
 import CabeceraApp from './CabeceraApp'
 import EditarPerfil from './EditarPerfil'
+import AvisoPago from './AvisoPago'
 
 type Vista = 'disponibles' | 'mios'
 
@@ -80,6 +81,8 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
           </>
         }
       />
+
+      <AvisoPago perfil={perfil} />
 
       <nav className="tabs">
         <button

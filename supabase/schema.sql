@@ -31,6 +31,14 @@ alter table public.perfiles
   add column if not exists contacto_emergencia_nombre text,
   add column if not exists contacto_emergencia_telefono text;
 
+-- Estado de cuenta: toda alumna nueva arranca en "prueba" (primera clase,
+-- todavía no se le cobró nada). El staff la pasa a "al_dia" o "pendiente"
+-- a mano desde Clientes — no hay cobro automático.
+alter table public.perfiles
+  add column if not exists estado_cuenta text not null default 'prueba'
+    check (estado_cuenta in ('prueba', 'al_dia', 'pendiente')),
+  add column if not exists pago_actualizado_en timestamptz;
+
 -- Cuando alguien se registra, le creamos el perfil automáticamente con el
 -- nombre y teléfono que mandó en el formulario (van en raw_user_meta_data).
 create or replace function public.crear_perfil_para_usuario_nuevo()
@@ -144,8 +152,15 @@ drop policy if exists perfiles_editar_propio on public.perfiles;
 create policy perfiles_editar_propio on public.perfiles
   for update using (id = auth.uid()) with check (id = auth.uid());
 
--- Nadie se autoasciende a staff: si el que edita no es staff, el rol queda
--- como estaba (aunque el update intente cambiarlo).
+-- El staff además puede editar la ficha de cualquiera (para marcar estado
+-- de cuenta desde Clientes, por ejemplo).
+drop policy if exists perfiles_staff_edita on public.perfiles;
+create policy perfiles_staff_edita on public.perfiles
+  for update using (public.es_staff()) with check (public.es_staff());
+
+-- Nadie se autoasciende a staff, ni se marca a sí mismo "al día": si el que
+-- edita no es staff, esos dos campos quedan como estaban (aunque el update
+-- intente cambiarlos).
 create or replace function public.proteger_rol_perfil()
 returns trigger
 language plpgsql
@@ -156,10 +171,13 @@ begin
   -- Solo frenamos el cambio si viene de un usuario logueado que no es staff
   -- (o sea, desde la app). Con auth.uid() nulo —SQL Editor, service_role—
   -- dejamos pasar el cambio: así se puede nombrar al primer staff.
-  if new.rol is distinct from old.rol
-     and auth.uid() is not null
-     and not public.es_staff() then
-    new.rol := old.rol;
+  if auth.uid() is not null and not public.es_staff() then
+    if new.rol is distinct from old.rol then
+      new.rol := old.rol;
+    end if;
+    if new.estado_cuenta is distinct from old.estado_cuenta then
+      new.estado_cuenta := old.estado_cuenta;
+    end if;
   end if;
   return new;
 end;
