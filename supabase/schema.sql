@@ -23,6 +23,14 @@ create table if not exists public.perfiles (
   creado_en  timestamptz not null default now()
 );
 
+-- Ficha de la alumna: se completa después de registrarse, desde "Mis datos".
+-- Todo opcional y visible para el instructor antes de cada clase.
+alter table public.perfiles
+  add column if not exists nivel text check (nivel in ('principiante', 'intermedio', 'avanzado')),
+  add column if not exists lesiones text,
+  add column if not exists contacto_emergencia_nombre text,
+  add column if not exists contacto_emergencia_telefono text;
+
 -- Cuando alguien se registra, le creamos el perfil automáticamente con el
 -- nombre y teléfono que mandó en el formulario (van en raw_user_meta_data).
 create or replace function public.crear_perfil_para_usuario_nuevo()

@@ -117,7 +117,7 @@ where u.id = p.id and u.email = 'MAIL@EJEMPLO.COM';
 
 | Tabla | Qué guarda |
 |---|---|
-| `perfiles` | 1 fila por usuario. `rol`: `alumno` \| `staff`. |
+| `perfiles` | 1 fila por usuario. `rol`: `alumno` \| `staff`. Ficha (opcional, se completa desde "Mis datos"): `nivel`, `lesiones`, `contacto_emergencia_nombre`, `contacto_emergencia_telefono`. Las lesiones se muestran al staff en la lista de anotadas de cada turno. |
 | `plantillas_turno` | Turno fijo semanal (día, hora, cupo, instructor). |
 | `turnos` | Turno concreto en una fecha. Se crea a mano o generado desde una plantilla. |
 | `reservas` | 1 fila por (turno, alumno). `estado`: `reservada` \| `lista_espera` \| `cancelada`. `asistencia`: `asistio` \| `ausente` \| null (se carga después de la clase, la pone el staff). |
@@ -129,4 +129,3 @@ Funciones: `reservar_turno`, `cancelar_reserva`, `listar_turnos` (alumno), `gene
 - Estadísticas por mes (ocupación, alumnos activos, ausencias) — ya con datos de asistencia para alimentarlas.
 - Bonos / paquetes de clases y pagos.
 - Avisos automáticos por WhatsApp/mail cuando se cancela un turno.
-- Ficha de alumna (lesiones, nivel, contacto de emergencia).

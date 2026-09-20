@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import type { Perfil } from '../tipos'
+import type { Nivel, Perfil } from '../tipos'
 
 export async function registrarse(datos: {
   email: string
@@ -61,13 +61,24 @@ export async function obtenerMiPerfil(): Promise<Perfil | null> {
 export async function actualizarMiPerfil(cambios: {
   nombre: string
   telefono: string
+  nivel: Nivel | null
+  lesiones: string
+  contactoEmergenciaNombre: string
+  contactoEmergenciaTelefono: string
 }): Promise<void> {
   const { data: sesion } = await supabase.auth.getUser()
   if (!sesion.user) throw new Error('No hay sesión.')
 
   const { error } = await supabase
     .from('perfiles')
-    .update({ nombre: cambios.nombre.trim(), telefono: cambios.telefono.trim() })
+    .update({
+      nombre: cambios.nombre.trim(),
+      telefono: cambios.telefono.trim() || null,
+      nivel: cambios.nivel,
+      lesiones: cambios.lesiones.trim() || null,
+      contacto_emergencia_nombre: cambios.contactoEmergenciaNombre.trim() || null,
+      contacto_emergencia_telefono: cambios.contactoEmergenciaTelefono.trim() || null,
+    })
     .eq('id', sesion.user.id)
 
   if (error) throw new Error(error.message)

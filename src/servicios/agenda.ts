@@ -17,7 +17,7 @@ export async function listarTurnosStaff(opciones?: {
     .from('turnos')
     .select(
       'id, fecha, hora, duracion_min, cupo, instructor, plantilla_id, cancelado, nota, ' +
-        'reservas ( id, estado, creado_en, asistencia, perfiles ( nombre, telefono ) )',
+        'reservas ( id, estado, creado_en, asistencia, perfiles ( nombre, telefono, lesiones ) )',
     )
     .gte('fecha', desde)
     .lte('fecha', hasta)

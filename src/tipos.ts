@@ -1,10 +1,15 @@
 export type Rol = 'alumno' | 'staff'
+export type Nivel = 'principiante' | 'intermedio' | 'avanzado'
 
 export type Perfil = {
   id: string
   nombre: string
   telefono: string | null
   rol: Rol
+  nivel: Nivel | null
+  lesiones: string | null
+  contacto_emergencia_nombre: string | null
+  contacto_emergencia_telefono: string | null
   creado_en: string
 }
 
@@ -51,6 +56,6 @@ export type TurnoConReservas = {
     estado: EstadoReserva
     creado_en: string
     asistencia: EstadoAsistencia | null
-    perfiles: { nombre: string; telefono: string | null } | null
+    perfiles: { nombre: string; telefono: string | null; lesiones: string | null } | null
   }[]
 }

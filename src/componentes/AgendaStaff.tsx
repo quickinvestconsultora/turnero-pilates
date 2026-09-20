@@ -174,50 +174,57 @@ function TurnoStaff({
           {anotados.length === 0 && <li className="vacio-inline">Nadie anotado todavía</li>}
           {anotados.map((r) => (
             <li key={r.id}>
-              <span>
-                {r.perfiles?.nombre || 'Sin nombre'}
-                {r.perfiles?.telefono ? ` · ${r.perfiles.telefono}` : ''}
-              </span>
-              {pasado ? (
-                <div className="asistencia">
+              <div className="fila-anotada">
+                <span>
+                  {r.perfiles?.nombre || 'Sin nombre'}
+                  {r.perfiles?.telefono ? ` · ${r.perfiles.telefono}` : ''}
+                </span>
+                {pasado ? (
+                  <div className="asistencia">
+                    <button
+                      type="button"
+                      className={r.asistencia === 'asistio' ? 'activo-si' : ''}
+                      disabled={ocupado}
+                      onClick={() =>
+                        conManejo(() =>
+                          marcarAsistencia(r.id, r.asistencia === 'asistio' ? null : 'asistio'),
+                        )
+                      }
+                    >
+                      Asistió
+                    </button>
+                    <button
+                      type="button"
+                      className={r.asistencia === 'ausente' ? 'activo-no' : ''}
+                      disabled={ocupado}
+                      onClick={() =>
+                        conManejo(() =>
+                          marcarAsistencia(r.id, r.asistencia === 'ausente' ? null : 'ausente'),
+                        )
+                      }
+                    >
+                      Ausente
+                    </button>
+                  </div>
+                ) : (
                   <button
                     type="button"
-                    className={r.asistencia === 'asistio' ? 'activo-si' : ''}
+                    className="link-peligro"
                     disabled={ocupado}
-                    onClick={() =>
-                      conManejo(() =>
-                        marcarAsistencia(r.id, r.asistencia === 'asistio' ? null : 'asistio'),
-                      )
-                    }
+                    onClick={() => {
+                      if (confirm(`¿Sacar a ${r.perfiles?.nombre ?? 'esta persona'} del turno?`)) {
+                        conManejo(() => quitarReserva(r.id))
+                      }
+                    }}
                   >
-                    Asistió
+                    Sacar
                   </button>
-                  <button
-                    type="button"
-                    className={r.asistencia === 'ausente' ? 'activo-no' : ''}
-                    disabled={ocupado}
-                    onClick={() =>
-                      conManejo(() =>
-                        marcarAsistencia(r.id, r.asistencia === 'ausente' ? null : 'ausente'),
-                      )
-                    }
-                  >
-                    Ausente
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="link-peligro"
-                  disabled={ocupado}
-                  onClick={() => {
-                    if (confirm(`¿Sacar a ${r.perfiles?.nombre ?? 'esta persona'} del turno?`)) {
-                      conManejo(() => quitarReserva(r.id))
-                    }
-                  }}
-                >
-                  Sacar
-                </button>
+                )}
+              </div>
+              {r.perfiles?.lesiones && (
+                <p className="alerta-lesion">
+                  <strong>Atención:</strong> {r.perfiles.lesiones}
+                </p>
               )}
             </li>
           ))}

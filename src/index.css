@@ -407,15 +407,36 @@ label {
 }
 
 .anotados li {
+  font-size: 14px;
+}
+
+.fila-anotada {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 14px;
 }
 
 .anotados .en-espera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   color: var(--texto-suave);
+}
+
+.alerta-lesion {
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  background: rgba(180, 71, 46, 0.08);
+  border-left: 2px solid var(--error);
+  color: var(--error);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.alerta-lesion strong {
+  font-weight: 700;
 }
 
 /* ---- Asistencia ---- */
