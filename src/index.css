@@ -253,6 +253,35 @@ label {
   font-size: 14px;
 }
 
+.campo-password {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.campo-password input {
+  margin-bottom: 0;
+  padding-right: 42px;
+}
+
+.boton-ver-password {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 40px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--texto-suave);
+  border-radius: 0 8px 8px 0;
+  padding: 0;
+}
+
+.boton-ver-password svg {
+  width: 19px;
+  height: 19px;
+}
+
 .tarjeta-auth form {
   text-align: left;
 }
