@@ -5,6 +5,11 @@ import { hoyIso, sumarDias } from '../fechas'
 // Ventana de días hacia adelante que ve el alumno.
 export const DIAS_VISIBLES = 14
 
+// Hasta cuántas horas antes del turno se puede cancelar o cambiar un lugar
+// confirmado. Tiene que coincidir con el margen de cancelar_reserva() en
+// supabase/schema.sql (la base es la que lo hace cumplir de verdad).
+export const HORAS_LIMITE_CANCELAR = 2
+
 export async function listarTurnos(): Promise<TurnoDisponible[]> {
   const desde = hoyIso()
   const hasta = sumarDias(desde, DIAS_VISIBLES)

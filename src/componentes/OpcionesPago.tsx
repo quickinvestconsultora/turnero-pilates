@@ -6,12 +6,13 @@ import {
   WHATSAPP_NUMERO,
   linkWhatsApp,
 } from '../config/pagos'
+import { nombreCompleto } from '../personas'
 
 // Botones de pago, compartidos entre el cartel de AvisoPago y el modal que
 // aparece al intentar reservar sin poder. Cada uno aparece solo si el
 // estudio cargó ese dato en src/config/pagos.ts — nada de links inventados.
 export default function OpcionesPago({ perfil }: { perfil: Perfil }) {
-  const mensaje = `Hola! Soy ${perfil.nombre || 'una alumna'}, te aviso que ya hice la transferencia de mi clase en FORTEVA.`
+  const mensaje = `Hola! Soy ${nombreCompleto(perfil)}, te aviso que ya hice el pago de mi reserva en FORTEVA Studio.`
   const hayAlgunaOpcion = Boolean(LINK_MERCADO_PAGO || TRANSFERENCIA_ALIAS || WHATSAPP_NUMERO)
 
   return (
@@ -24,7 +25,7 @@ export default function OpcionesPago({ perfil }: { perfil: Perfil }) {
 
       {TRANSFERENCIA_ALIAS && (
         <p className="aviso-pago-transferencia">
-          Transferencia a <strong>{TRANSFERENCIA_ALIAS}</strong>
+          Transferí al alias <strong>{TRANSFERENCIA_ALIAS}</strong>
           {TRANSFERENCIA_TITULAR ? ` (${TRANSFERENCIA_TITULAR})` : ''}
         </p>
       )}
@@ -36,7 +37,7 @@ export default function OpcionesPago({ perfil }: { perfil: Perfil }) {
           target="_blank"
           rel="noopener noreferrer"
         >
-          Avisar que ya transferí
+          Avisar que ya pagué
         </a>
       )}
 

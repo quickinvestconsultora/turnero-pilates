@@ -56,6 +56,13 @@ export function yaPaso(fechaIso: string, hora: string): boolean {
   return new Date(y, m - 1, d, hh, mm).getTime() < Date.now()
 }
 
+// ¿Faltan menos de `horas` horas para la fecha+hora del turno (o ya pasó)?
+export function faltanMenosDe(fechaIso: string, hora: string, horas: number): boolean {
+  const [y, m, d] = fechaIso.split('-').map(Number)
+  const [hh, mm] = hora.split(':').map(Number)
+  return new Date(y, m - 1, d, hh, mm).getTime() - horas * 3600_000 < Date.now()
+}
+
 // Etiqueta relativa amigable para encabezar la lista: "Hoy", "Mañana" o el día.
 export function encabezadoDia(iso: string): string {
   if (iso === hoyIso()) return 'Hoy'

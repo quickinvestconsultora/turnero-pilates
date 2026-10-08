@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Perfil, TurnoDisponible } from '../tipos'
 import { cerrarSesion } from '../servicios/perfil'
-import { cancelar, listarTurnos, reservar, DIAS_VISIBLES } from '../servicios/turnos'
-import { encabezadoDia, horaCorta, yaPaso } from '../fechas'
+import {
+  cancelar,
+  listarTurnos,
+  reservar,
+  DIAS_VISIBLES,
+  HORAS_LIMITE_CANCELAR,
+} from '../servicios/turnos'
+import { encabezadoDia, faltanMenosDe, horaCorta, yaPaso } from '../fechas'
 import CabeceraApp from './CabeceraApp'
 import EditarPerfil from './EditarPerfil'
 import AvisoPago from './AvisoPago'
@@ -185,7 +191,14 @@ function ListaTurnos({
                     {t.nota && <span className="turno-nota">{t.nota}</span>}
                   </div>
 
-                  {t.mi_estado ? (
+                  {t.mi_estado === 'reservada' &&
+                  faltanMenosDe(t.fecha, t.hora, HORAS_LIMITE_CANCELAR) ? (
+                    <span className="ayuda">
+                      No se puede cancelar
+                      <br />
+                      (faltan menos de {HORAS_LIMITE_CANCELAR} h)
+                    </span>
+                  ) : t.mi_estado ? (
                     <button
                       type="button"
                       className="btn-fantasma"

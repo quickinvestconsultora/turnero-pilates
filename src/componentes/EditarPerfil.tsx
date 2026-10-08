@@ -62,7 +62,7 @@ export default function EditarPerfil({ perfil, onCerrar, onGuardado }: Props) {
             required
           />
 
-          <label htmlFor="p-telefono">Teléfono</label>
+          <label htmlFor="p-telefono">Celular</label>
           <input
             id="p-telefono"
             value={telefono}

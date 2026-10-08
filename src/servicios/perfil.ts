@@ -106,17 +106,16 @@ function traducirError(mensaje: string): string {
     return 'Revisá el correo, no parece válido.'
   }
   if (m.includes('email rate limit') || m.includes('over_email_send_rate_limit')) {
-    return (
-      'Supabase bloqueó el envío de correos por unos minutos (límite del servidor de mails ' +
-      'gratis). Si desactivás "Confirm email" en Authentication → Providers → Email, el ' +
-      'registro no manda correo y este error desaparece.'
-    )
+    return 'Se enviaron demasiados correos en poco tiempo. Esperá unos minutos y probá de nuevo.'
+  }
+  if (m.includes('for security purposes') || m.includes('over_request_rate_limit')) {
+    return 'Por seguridad tenés que esperar un momento antes de volver a intentarlo.'
   }
   if (m.includes('email not confirmed')) {
-    return 'Falta confirmar el correo. Revisá tu casilla o desactivá "Confirm email" en Supabase.'
+    return 'Todavía falta confirmar tu correo. Revisá tu casilla (y la carpeta de spam).'
   }
   if (m.includes('signups not allowed') || m.includes('signup is disabled')) {
-    return 'El registro está deshabilitado en Supabase (Authentication → Providers → Email).'
+    return 'El registro no está disponible por ahora. Escribile al estudio.'
   }
   return mensaje
 }

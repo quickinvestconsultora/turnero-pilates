@@ -387,6 +387,7 @@ security definer
 set search_path = public
 as $$
 declare
+  v_turno         public.turnos;
   v_estado_previo text;
 begin
   if auth.uid() is null then
@@ -394,7 +395,7 @@ begin
   end if;
 
   -- Bloqueamos el turno para serializar la promoción de la lista de espera.
-  perform 1 from public.turnos where id = p_turno_id for update;
+  select * into v_turno from public.turnos where id = p_turno_id for update;
   if not found then
     raise exception 'El turno no existe.';
   end if;
@@ -405,6 +406,16 @@ begin
 
   if v_estado_previo is null or v_estado_previo not in ('reservada', 'lista_espera') then
     raise exception 'No tenías una reserva activa en ese turno.';
+  end if;
+
+  -- Un lugar confirmado se puede cancelar o cambiar hasta 2 horas antes
+  -- (hora de Argentina: fecha+hora del turno son hora local, sin zona). La
+  -- lista de espera se puede dejar siempre, porque no ocupa lugar. Si cambiás
+  -- este margen, cambiá también HORAS_LIMITE_CANCELAR en src/servicios/turnos.ts.
+  if v_estado_previo = 'reservada'
+     and (v_turno.fecha + v_turno.hora) - interval '2 hours'
+         < (now() at time zone 'America/Argentina/Buenos_Aires') then
+    raise exception 'Ya no se puede cancelar: faltan menos de 2 horas para el turno. Escribile al estudio.';
   end if;
 
   update public.reservas

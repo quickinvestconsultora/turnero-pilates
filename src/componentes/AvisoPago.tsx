@@ -8,7 +8,7 @@ export default function AvisoPago({ perfil }: { perfil: Perfil }) {
   return (
     <div className="aviso-pago">
       <p>
-        <strong>Tenés un pago pendiente.</strong> Podés regularizarlo así:
+        <strong>Tenés un pago pendiente.</strong> Para reservar más turnos, abonalo así:
       </p>
       <OpcionesPago perfil={perfil} />
     </div>

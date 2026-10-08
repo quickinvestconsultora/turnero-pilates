@@ -37,8 +37,8 @@ export default function Auth() {
       } else {
         await registrarse({ email, password, nombre, apellido, dni, telefono, aceptaDeslinde })
         setAviso(
-          'Cuenta creada. Si el proyecto pide confirmar el correo, revisá tu casilla; ' +
-            'si no, ya podés iniciar sesión.',
+          '¡Cuenta creada! Si te llegó un correo para confirmarla, abrilo primero ' +
+            '(revisá también spam). Después ingresá con tu correo y contraseña.',
         )
         setModo('login')
       }
@@ -89,14 +89,14 @@ export default function Auth() {
                 required
               />
 
-              <label htmlFor="telefono">Teléfono</label>
+              <label htmlFor="telefono">Celular</label>
               <input
                 id="telefono"
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
                 inputMode="tel"
                 autoComplete="tel"
-                placeholder="Para avisarte si se cancela un turno"
+                placeholder="Con código de área, sin 0 ni 15"
                 required
               />
             </>
