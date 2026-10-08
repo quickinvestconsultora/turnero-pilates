@@ -323,7 +323,7 @@ begin
   if v_turno.cancelado then
     raise exception 'Ese turno fue cancelado.';
   end if;
-  if (v_turno.fecha + v_turno.hora) < now() then
+  if (v_turno.fecha + v_turno.hora) < (now() at time zone 'America/Argentina/Buenos_Aires') then
     raise exception 'Ese turno ya pasó.';
   end if;
 
@@ -535,18 +535,18 @@ begin
     'turnos_dictados', (
       select count(*) from turnos
       where fecha between p_desde and p_hasta and cancelado = false
-        and (fecha + hora) < now()
+        and (fecha + hora) < (now() at time zone 'America/Argentina/Buenos_Aires')
     ),
     'cupo_total', (
       select coalesce(sum(cupo), 0) from turnos
       where fecha between p_desde and p_hasta and cancelado = false
-        and (fecha + hora) < now()
+        and (fecha + hora) < (now() at time zone 'America/Argentina/Buenos_Aires')
     ),
     'reservas_totales', (
       select count(*) from reservas r
       join turnos t on t.id = r.turno_id
       where t.fecha between p_desde and p_hasta and t.cancelado = false
-        and (t.fecha + t.hora) < now()
+        and (t.fecha + t.hora) < (now() at time zone 'America/Argentina/Buenos_Aires')
         and r.estado = 'reservada'
     ),
     'alumnas_activas', (
@@ -577,7 +577,7 @@ begin
                where r.turno_id = t.id and r.estado = 'reservada') as reservas
           from turnos t
           where t.fecha between p_desde and p_hasta and t.cancelado = false
-            and (t.fecha + t.hora) < now()
+            and (t.fecha + t.hora) < (now() at time zone 'America/Argentina/Buenos_Aires')
         ) por_turno
         group by dia_semana, hora
       ) x
