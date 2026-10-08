@@ -269,6 +269,26 @@ begin
 end;
 $$;
 
+-- Personas anotadas en un turno por la profesora (o el staff) que todavía no
+-- tienen cuenta. Se les pide como mínimo nombre, apellido y teléfono; el mail
+-- es opcional y sirve para, más adelante, avisarles ("te agregaron a este
+-- turno, ¿querés registrarte con un click?"). Cuentan para el cupo.
+create table if not exists public.reservas_invitadas (
+  id                uuid primary key default gen_random_uuid(),
+  turno_id          uuid not null references public.turnos (id) on delete cascade,
+  nombre            text not null check (length(btrim(nombre)) > 0),
+  apellido          text not null check (length(btrim(apellido)) > 0),
+  telefono          text not null check (length(btrim(telefono)) > 0),
+  email             text,
+  agregada_por      uuid references auth.users (id) on delete set null default auth.uid(),
+  asistencia        text check (asistencia in ('asistio', 'ausente')),
+  aviso_enviado_en  timestamptz,
+  creado_en         timestamptz not null default now()
+);
+
+create index if not exists reservas_invitadas_turno_idx
+  on public.reservas_invitadas (turno_id);
+
 drop trigger if exists limitar_fotos on public.fotos_profesoras;
 create trigger limitar_fotos
   before insert on public.fotos_profesoras
@@ -283,6 +303,41 @@ alter table public.turnos          enable row level security;
 alter table public.reservas        enable row level security;
 alter table public.observaciones_clientes enable row level security;
 alter table public.fotos_profesoras enable row level security;
+alter table public.reservas_invitadas enable row level security;
+
+-- ¿Puede el usuario actual manejar las anotadas de este turno? El staff, en
+-- cualquiera; una profesora, solo en los suyos.
+create or replace function public.puede_gestionar_turno(p_turno_id uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if public.es_staff() then
+    return true;
+  end if;
+  return public.es_instructora() and exists (
+    select 1 from public.turnos t
+    where t.id = p_turno_id and t.instructora_id = auth.uid()
+  );
+end;
+$$;
+
+-- --- reservas_invitadas: solo quien maneja el turno. Se crean por función. -----
+drop policy if exists invitadas_ver on public.reservas_invitadas;
+create policy invitadas_ver on public.reservas_invitadas
+  for select using (public.puede_gestionar_turno(turno_id));
+
+drop policy if exists invitadas_actualiza on public.reservas_invitadas;
+create policy invitadas_actualiza on public.reservas_invitadas
+  for update using (public.puede_gestionar_turno(turno_id))
+  with check (public.puede_gestionar_turno(turno_id));
+
+drop policy if exists invitadas_borra on public.reservas_invitadas;
+create policy invitadas_borra on public.reservas_invitadas
+  for delete using (public.puede_gestionar_turno(turno_id));
 
 -- --- fotos_profesoras: las ve cualquiera con sesión; las maneja la dueña ------
 drop policy if exists fotos_profesoras_ver on public.fotos_profesoras;
@@ -529,6 +584,22 @@ create policy profes_foto_actualiza on storage.objects
 -- 7. Funciones de negocio
 -- ============================================================================
 
+-- Lugares ocupados de un turno: alumnas con reserva confirmada + personas sin
+-- cuenta que sumó la profesora. Es lo que se compara contra el cupo.
+create or replace function public.ocupados_turno(p_turno_id uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    (select count(*) from public.reservas r
+       where r.turno_id = p_turno_id and r.estado = 'reservada')
+    + (select count(*) from public.reservas_invitadas i
+         where i.turno_id = p_turno_id);
+$$;
+
 -- --- Reservar un turno ------------------------------------------------------
 -- Devuelve { estado: 'reservada' | 'lista_espera', primera_clase: boolean }.
 -- primera_clase = true cuando esta reserva es la primera que hace la alumna
@@ -605,9 +676,7 @@ begin
     end if;
   end if;
 
-  select count(*) into v_ocupados
-  from public.reservas
-  where turno_id = p_turno_id and estado = 'reservada';
+  v_ocupados := public.ocupados_turno(p_turno_id);
 
   v_estado := case when v_ocupados < v_turno.cupo then 'reservada' else 'lista_espera' end;
 
@@ -702,8 +771,7 @@ set search_path = public
 as $$
   select
     t.id, t.fecha, t.hora, t.duracion_min, t.cupo, t.instructor, t.instructora_id, t.nota,
-    (select count(*) from public.reservas r
-       where r.turno_id = t.id and r.estado = 'reservada') as ocupados,
+    public.ocupados_turno(t.id) as ocupados,
     (select r.estado from public.reservas r
        where r.turno_id = t.id and r.alumno_id = auth.uid()
        and r.estado in ('reservada', 'lista_espera')) as mi_estado
@@ -773,6 +841,136 @@ begin
   from public.perfiles p
   where p.rol = 'alumno'
   order by p.nombre;
+end;
+$$;
+
+-- --- Anotar a una alumna registrada en un turno (profesora dueña o staff) -----
+-- Saltea las reglas de pago (la anota quien maneja el turno) pero respeta el
+-- cupo: si está completo, hay que subirlo antes.
+create or replace function public.agregar_alumna_a_turno(p_turno_id uuid, p_alumna_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_turno         public.turnos;
+  v_estado_actual text;
+begin
+  if not public.puede_gestionar_turno(p_turno_id) then
+    raise exception 'No podés agregar alumnas a este turno.';
+  end if;
+
+  select * into v_turno from public.turnos where id = p_turno_id for update;
+  if not found then
+    raise exception 'El turno no existe.';
+  end if;
+  if v_turno.cancelado then
+    raise exception 'Ese turno fue cancelado.';
+  end if;
+  if (v_turno.fecha + v_turno.hora) < (now() at time zone 'America/Argentina/Buenos_Aires') then
+    raise exception 'Ese turno ya pasó.';
+  end if;
+
+  if not exists (select 1 from public.perfiles where id = p_alumna_id and rol = 'alumno') then
+    raise exception 'No encontramos a esa alumna.';
+  end if;
+
+  select estado into v_estado_actual
+  from public.reservas
+  where turno_id = p_turno_id and alumno_id = p_alumna_id;
+  if v_estado_actual in ('reservada', 'lista_espera') then
+    raise exception 'Ya está anotada en este turno.';
+  end if;
+
+  if public.ocupados_turno(p_turno_id) >= v_turno.cupo then
+    raise exception 'El turno está completo. Subí el cupo para sumar más alumnas.';
+  end if;
+
+  insert into public.reservas (turno_id, alumno_id, estado)
+  values (p_turno_id, p_alumna_id, 'reservada')
+  on conflict (turno_id, alumno_id)
+    do update set estado = 'reservada', creado_en = now();
+end;
+$$;
+
+-- --- Anotar en un turno a alguien que todavía no tiene cuenta -------------------
+-- Pide como mínimo nombre, apellido y teléfono. Si ese teléfono ya es de una
+-- alumna registrada, avisa para no duplicar a la persona.
+create or replace function public.agregar_invitada_a_turno(
+  p_turno_id uuid,
+  p_nombre text,
+  p_apellido text,
+  p_telefono text,
+  p_email text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_turno    public.turnos;
+  v_digitos  text := regexp_replace(coalesce(p_telefono, ''), '\D', '', 'g');
+  v_existente text;
+  v_id       uuid;
+begin
+  if not public.puede_gestionar_turno(p_turno_id) then
+    raise exception 'No podés agregar alumnas a este turno.';
+  end if;
+
+  if length(btrim(coalesce(p_nombre, ''))) = 0 or length(btrim(coalesce(p_apellido, ''))) = 0 then
+    raise exception 'Hacen falta el nombre y el apellido.';
+  end if;
+  if length(v_digitos) < 8 then
+    raise exception 'El teléfono no parece válido (con código de área, sin 0 ni 15).';
+  end if;
+  if length(btrim(coalesce(p_email, ''))) > 0 and position('@' in p_email) = 0 then
+    raise exception 'El mail no parece válido.';
+  end if;
+
+  select * into v_turno from public.turnos where id = p_turno_id for update;
+  if not found then
+    raise exception 'El turno no existe.';
+  end if;
+  if v_turno.cancelado then
+    raise exception 'Ese turno fue cancelado.';
+  end if;
+  if (v_turno.fecha + v_turno.hora) < (now() at time zone 'America/Argentina/Buenos_Aires') then
+    raise exception 'Ese turno ya pasó.';
+  end if;
+
+  select btrim(nombre || ' ' || apellido) into v_existente
+  from public.perfiles
+  where rol = 'alumno' and right(regexp_replace(telefono, '\D', '', 'g'), 8) = right(v_digitos, 8)
+  limit 1;
+  if v_existente is not null then
+    raise exception 'Ese teléfono ya es de una alumna registrada (%). Buscala en "Ya registrada".', v_existente;
+  end if;
+
+  if exists (
+    select 1 from public.reservas_invitadas
+    where turno_id = p_turno_id
+      and right(regexp_replace(telefono, '\D', '', 'g'), 8) = right(v_digitos, 8)
+  ) then
+    raise exception 'Ya está anotada en este turno.';
+  end if;
+
+  if public.ocupados_turno(p_turno_id) >= v_turno.cupo then
+    raise exception 'El turno está completo. Subí el cupo para sumar más alumnas.';
+  end if;
+
+  insert into public.reservas_invitadas (turno_id, nombre, apellido, telefono, email)
+  values (
+    p_turno_id,
+    btrim(p_nombre),
+    btrim(p_apellido),
+    btrim(p_telefono),
+    nullif(btrim(coalesce(p_email, '')), '')
+  )
+  returning id into v_id;
+
+  return v_id;
 end;
 $$;
 
@@ -919,4 +1117,7 @@ grant execute on function public.listar_turnos(date, date)     to authenticated;
 grant execute on function public.generar_turnos(uuid, date, date) to authenticated;
 grant execute on function public.estadisticas(date, date)      to authenticated;
 grant execute on function public.listar_profesoras()           to authenticated;
+grant execute on function public.ocupados_turno(uuid)          to authenticated;
+grant execute on function public.agregar_alumna_a_turno(uuid, uuid) to authenticated;
+grant execute on function public.agregar_invitada_a_turno(uuid, text, text, text, text) to authenticated;
 grant execute on function public.clientes_para_instructora()   to authenticated;

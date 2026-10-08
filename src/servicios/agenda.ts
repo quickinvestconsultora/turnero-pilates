@@ -19,6 +19,7 @@ export async function listarTurnosStaff(opciones?: {
     .from('turnos')
     .select(
       'id, fecha, hora, duracion_min, cupo, instructor, instructora_id, plantilla_id, cancelado, nota, ' +
+        'reservas_invitadas ( id, nombre, apellido, telefono, asistencia ), ' +
         'reservas ( id, estado, creado_en, asistencia, perfiles ( nombre, apellido, telefono, lesiones ) )',
     )
     .gte('fecha', desde)
@@ -76,6 +77,43 @@ export async function quitarReserva(reservaId: string): Promise<void> {
     .from('reservas')
     .update({ estado: 'cancelada' })
     .eq('id', reservaId)
+  if (error) throw new Error(error.message)
+}
+
+// Anota a una alumna ya registrada en un turno (profesora dueña o staff).
+export async function agregarAlumnaATurno(turnoId: string, alumnaId: string): Promise<void> {
+  const { error } = await supabase.rpc('agregar_alumna_a_turno', {
+    p_turno_id: turnoId,
+    p_alumna_id: alumnaId,
+  })
+  if (error) throw new Error(error.message)
+}
+
+// Anota a alguien sin cuenta: nombre, apellido y teléfono son obligatorios.
+export async function agregarInvitadaATurno(
+  turnoId: string,
+  datos: { nombre: string; apellido: string; telefono: string; email?: string },
+): Promise<void> {
+  const { error } = await supabase.rpc('agregar_invitada_a_turno', {
+    p_turno_id: turnoId,
+    p_nombre: datos.nombre,
+    p_apellido: datos.apellido,
+    p_telefono: datos.telefono,
+    p_email: datos.email?.trim() || null,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function quitarInvitada(id: string): Promise<void> {
+  const { error } = await supabase.from('reservas_invitadas').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function marcarAsistenciaInvitada(
+  id: string,
+  asistencia: EstadoAsistencia | null,
+): Promise<void> {
+  const { error } = await supabase.from('reservas_invitadas').update({ asistencia }).eq('id', id)
   if (error) throw new Error(error.message)
 }
 

@@ -7,10 +7,13 @@ import {
   crearTurno,
   listarTurnosStaff,
   marcarAsistencia,
+  marcarAsistenciaInvitada,
+  quitarInvitada,
   quitarReserva,
 } from '../servicios/agenda'
 import { encabezadoDia, horaCorta, hoyIso, sumarDias, yaPaso } from '../fechas'
 import { nombreCompleto } from '../personas'
+import AgregarAlumna from './AgregarAlumna'
 import CampoProfesora from './CampoProfesora'
 import type { ValorProfesora } from './CampoProfesora'
 
@@ -134,7 +137,9 @@ function TurnoStaff({
   const [ocupado, setOcupado] = useState(false)
   const anotados = turno.reservas.filter((r) => r.estado === 'reservada')
   const espera = turno.reservas.filter((r) => r.estado === 'lista_espera')
+  const invitadas = turno.reservas_invitadas ?? []
   const pasado = yaPaso(turno.fecha, turno.hora)
+  const [agregando, setAgregando] = useState(false)
 
   const conManejo = async (fn: () => Promise<void>) => {
     setOcupado(true)
@@ -154,7 +159,7 @@ function TurnoStaff({
       <div className="turno-staff-cabecera">
         <span className="turno-hora">{horaCorta(turno.hora)}</span>
         <span className="turno-detalle">
-          {anotados.length}/{turno.cupo}
+          {anotados.length + invitadas.length}/{turno.cupo}
           {turno.cancelado && ' · CANCELADO'}
         </span>
         {!turno.cancelado && !pasado && !soloLectura && (
@@ -198,7 +203,9 @@ function TurnoStaff({
 
       {!turno.cancelado && !soloLectura && (
         <ul className="anotados">
-          {anotados.length === 0 && <li className="vacio-inline">Nadie anotado todavía</li>}
+          {anotados.length + invitadas.length === 0 && (
+            <li className="vacio-inline">Nadie anotado todavía</li>
+          )}
           {anotados.map((r) => (
             <li key={r.id}>
               <div className="fila-anotada">
@@ -256,6 +263,57 @@ function TurnoStaff({
               )}
             </li>
           ))}
+          {invitadas.map((i) => (
+            <li key={i.id}>
+              <div className="fila-anotada">
+                <span>
+                  {nombreCompleto(i)} · {i.telefono}
+                  <span className="etiqueta-sin-registrar">Sin registrar</span>
+                </span>
+                {pasado ? (
+                  <div className="asistencia">
+                    <button
+                      type="button"
+                      className={i.asistencia === 'asistio' ? 'activo-si' : ''}
+                      disabled={ocupado}
+                      onClick={() =>
+                        conManejo(() =>
+                          marcarAsistenciaInvitada(i.id, i.asistencia === 'asistio' ? null : 'asistio'),
+                        )
+                      }
+                    >
+                      Asistió
+                    </button>
+                    <button
+                      type="button"
+                      className={i.asistencia === 'ausente' ? 'activo-no' : ''}
+                      disabled={ocupado}
+                      onClick={() =>
+                        conManejo(() =>
+                          marcarAsistenciaInvitada(i.id, i.asistencia === 'ausente' ? null : 'ausente'),
+                        )
+                      }
+                    >
+                      Ausente
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="link-peligro"
+                    disabled={ocupado}
+                    onClick={() => {
+                      if (confirm(`¿Sacar a ${nombreCompleto(i)} del turno?`)) {
+                        conManejo(() => quitarInvitada(i.id))
+                      }
+                    }}
+                  >
+                    Sacar
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
           {espera.map((r) => (
             <li key={r.id} className="en-espera">
               <span>{r.perfiles ? nombreCompleto(r.perfiles) : 'Sin nombre'} — en espera</span>
@@ -273,6 +331,23 @@ function TurnoStaff({
           ))}
         </ul>
       )}
+
+      {!turno.cancelado && !pasado && !soloLectura &&
+        (agregando ? (
+          <AgregarAlumna
+            turnoId={turno.id}
+            paraProfesora={Boolean(miId)}
+            onAgregada={() => {
+              setAgregando(false)
+              onCambio()
+            }}
+            onCerrar={() => setAgregando(false)}
+          />
+        ) : (
+          <button type="button" className="link-secundario" onClick={() => setAgregando(true)}>
+            + Agregar alumna
+          </button>
+        ))}
     </div>
   )
 }

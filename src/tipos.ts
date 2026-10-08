@@ -85,6 +85,15 @@ export type ItemHistorial = {
   asistencia: EstadoAsistencia | null
 }
 
+// Persona anotada en un turno por la profesora o el staff, sin cuenta todavía.
+export type Invitada = {
+  id: string
+  nombre: string
+  apellido: string
+  telefono: string
+  asistencia: EstadoAsistencia | null
+}
+
 // Turno con sus reservas embebidas (vista del staff).
 export type TurnoConReservas = {
   id: string
@@ -97,6 +106,7 @@ export type TurnoConReservas = {
   plantilla_id: string | null
   cancelado: boolean
   nota: string | null
+  reservas_invitadas: Invitada[]
   reservas: {
     id: string
     estado: EstadoReserva
