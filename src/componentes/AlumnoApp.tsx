@@ -181,13 +181,15 @@ function ListaTurnos({
                   <div className="turno-info">
                     <span className="turno-hora">{horaCorta(t.hora)}</span>
                     <span className="turno-detalle">
-                      {t.instructor ? `${t.instructor} · ` : ''}
                       {t.mi_estado === 'lista_espera'
                         ? 'En lista de espera'
                         : libres > 0
                           ? `${libres} lugar${libres === 1 ? '' : 'es'}`
                           : 'Completo'}
                     </span>
+                    {t.instructor && (
+                      <span className="turno-profesora">Profesora: {t.instructor}</span>
+                    )}
                     {t.nota && <span className="turno-nota">{t.nota}</span>}
                   </div>
 

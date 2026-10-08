@@ -6,14 +6,16 @@ import { hoyIso, sumarDias } from '../fechas'
 // Turnos concretos (la agenda que ve y edita el staff)
 // ---------------------------------------------------------------------------
 
+// instructoraId: si viene, solo los turnos de esa profesora (su propia agenda).
 export async function listarTurnosStaff(opciones?: {
   desde?: string
   dias?: number
+  instructoraId?: string
 }): Promise<TurnoConReservas[]> {
   const desde = opciones?.desde ?? hoyIso()
   const hasta = sumarDias(desde, opciones?.dias ?? 21)
 
-  const { data, error } = await supabase
+  let consulta = supabase
     .from('turnos')
     .select(
       'id, fecha, hora, duracion_min, cupo, instructor, plantilla_id, cancelado, nota, ' +
@@ -21,6 +23,9 @@ export async function listarTurnosStaff(opciones?: {
     )
     .gte('fecha', desde)
     .lte('fecha', hasta)
+  if (opciones?.instructoraId) consulta = consulta.eq('instructora_id', opciones.instructoraId)
+
+  const { data, error } = await consulta
     .order('fecha', { ascending: true })
     .order('hora', { ascending: true })
 
@@ -34,6 +39,7 @@ export async function crearTurno(datos: {
   cupo: number
   duracion_min?: number
   instructor?: string
+  instructoraId?: string
   nota?: string
 }): Promise<void> {
   const { error } = await supabase.from('turnos').insert({
@@ -42,6 +48,7 @@ export async function crearTurno(datos: {
     cupo: datos.cupo,
     duracion_min: datos.duracion_min ?? 60,
     instructor: datos.instructor?.trim() || null,
+    instructora_id: datos.instructoraId ?? null,
     nota: datos.nota?.trim() || null,
   })
   if (error) {
@@ -86,10 +93,11 @@ export async function marcarAsistencia(
 // Plantillas (turnos recurrentes semanales)
 // ---------------------------------------------------------------------------
 
-export async function listarPlantillas(): Promise<PlantillaTurno[]> {
-  const { data, error } = await supabase
-    .from('plantillas_turno')
-    .select('*')
+export async function listarPlantillas(instructoraId?: string): Promise<PlantillaTurno[]> {
+  let consulta = supabase.from('plantillas_turno').select('*')
+  if (instructoraId) consulta = consulta.eq('instructora_id', instructoraId)
+
+  const { data, error } = await consulta
     .order('dia_semana', { ascending: true })
     .order('hora', { ascending: true })
   if (error) throw new Error(error.message)
@@ -102,6 +110,7 @@ export async function crearPlantilla(datos: {
   cupo: number
   duracion_min?: number
   instructor?: string
+  instructoraId?: string
 }): Promise<void> {
   const { error } = await supabase.from('plantillas_turno').insert({
     dia_semana: datos.dia_semana,
@@ -109,6 +118,7 @@ export async function crearPlantilla(datos: {
     cupo: datos.cupo,
     duracion_min: datos.duracion_min ?? 60,
     instructor: datos.instructor?.trim() || null,
+    instructora_id: datos.instructoraId ?? null,
   })
   if (error) throw new Error(error.message)
 }

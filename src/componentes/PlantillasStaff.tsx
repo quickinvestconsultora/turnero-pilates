@@ -10,7 +10,8 @@ import {
 } from '../servicios/agenda'
 import { NOMBRE_DIA, horaCorta } from '../fechas'
 
-export default function PlantillasStaff() {
+// instructoraId: cuando la usa una profesora, solo ve y crea sus turnos fijos.
+export default function PlantillasStaff({ instructoraId }: { instructoraId?: string }) {
   const [plantillas, setPlantillas] = useState<PlantillaTurno[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
@@ -20,13 +21,13 @@ export default function PlantillasStaff() {
   const cargar = useCallback(async () => {
     setError('')
     try {
-      setPlantillas(await listarPlantillas())
+      setPlantillas(await listarPlantillas(instructoraId))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudieron cargar los turnos fijos.')
     } finally {
       setCargando(false)
     }
-  }, [])
+  }, [instructoraId])
 
   useEffect(() => {
     cargar()
@@ -54,7 +55,7 @@ export default function PlantillasStaff() {
         <em>Generar</em> para publicarlos en la agenda de las próximas 4 semanas.
       </p>
 
-      <FormAltaPlantilla onCreada={cargar} />
+      <FormAltaPlantilla onCreada={cargar} instructoraId={instructoraId} />
 
       {error && <p className="mensaje-error">{error}</p>}
       {aviso && <p className="mensaje-ok">{aviso}</p>}
@@ -72,7 +73,7 @@ export default function PlantillasStaff() {
                   {NOMBRE_DIA[p.dia_semana]} {horaCorta(p.hora)}
                 </strong>
                 <span className="turno-detalle">
-                  {p.instructor ? `${p.instructor} · ` : ''}
+                  {p.instructor ? `Profesora ${p.instructor} · ` : ''}
                   cupo {p.cupo}
                   {!p.activa && ' · inactiva'}
                 </span>
@@ -127,7 +128,13 @@ export default function PlantillasStaff() {
   )
 }
 
-function FormAltaPlantilla({ onCreada }: { onCreada: () => void }) {
+function FormAltaPlantilla({
+  onCreada,
+  instructoraId,
+}: {
+  onCreada: () => void
+  instructoraId?: string
+}) {
   const [dia, setDia] = useState('1')
   const [hora, setHora] = useState('09:00')
   const [cupo, setCupo] = useState('6')
@@ -145,7 +152,13 @@ function FormAltaPlantilla({ onCreada }: { onCreada: () => void }) {
     }
     setEnviando(true)
     try {
-      await crearPlantilla({ dia_semana: Number(dia), hora, cupo: cupoNum, instructor })
+      await crearPlantilla({
+        dia_semana: Number(dia),
+        hora,
+        cupo: cupoNum,
+        instructor,
+        instructoraId,
+      })
       setInstructor('')
       onCreada()
     } catch (err) {
@@ -190,14 +203,16 @@ function FormAltaPlantilla({ onCreada }: { onCreada: () => void }) {
             required
           />
         </div>
-        <div>
-          <label htmlFor="pl-instructor">Instructor (opcional)</label>
-          <input
-            id="pl-instructor"
-            value={instructor}
-            onChange={(e) => setInstructor(e.target.value)}
-          />
-        </div>
+        {!instructoraId && (
+          <div>
+            <label htmlFor="pl-instructor">Profesora (opcional)</label>
+            <input
+              id="pl-instructor"
+              value={instructor}
+              onChange={(e) => setInstructor(e.target.value)}
+            />
+          </div>
+        )}
       </div>
 
       {error && <p className="mensaje-error">{error}</p>}

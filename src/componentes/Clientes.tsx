@@ -146,10 +146,15 @@ function ClienteItem({
         {errorDeslinde && <span className="mensaje-error">{errorDeslinde}</span>}
       </div>
 
-      <div className={`estado-cuenta estado-cuenta--${cliente.estado_cuenta}`}>
-        {ETIQUETA_ESTADO[cliente.estado_cuenta]}
-      </div>
+      {cliente.rol === 'instructora' ? (
+        <div className="estado-cuenta estado-cuenta--prueba">Profesora</div>
+      ) : (
+        <div className={`estado-cuenta estado-cuenta--${cliente.estado_cuenta}`}>
+          {ETIQUETA_ESTADO[cliente.estado_cuenta]}
+        </div>
+      )}
 
+      {cliente.rol !== 'instructora' && (
       <div className="asistencia cliente-acciones">
         <button
           type="button"
@@ -176,8 +181,9 @@ function ClienteItem({
           Debe
         </button>
       </div>
+      )}
 
-      {fichaAbierta && <FichaCliente cliente={cliente} />}
+      {fichaAbierta && <FichaCliente cliente={cliente} onCambio={onCambio} />}
     </li>
   )
 }

@@ -58,6 +58,13 @@ alter table public.perfiles
   alter column telefono set default '',
   alter column telefono set not null;
 
+-- Roles: alumna (reserva), instructora (maneja sus propios turnos) y staff
+-- (administra todo). Una profesora se registra como cualquier alumna y el
+-- staff la pasa a "instructora" desde Clientes.
+alter table public.perfiles drop constraint if exists perfiles_rol_check;
+alter table public.perfiles
+  add constraint perfiles_rol_check check (rol in ('alumno', 'instructora', 'staff'));
+
 -- Cuando alguien se registra, le creamos el perfil automáticamente con los
 -- datos que mandó en el formulario (van en raw_user_meta_data). Si vino con
 -- 'acepta_deslinde', queda marcado el momento de la aceptación — el
@@ -102,6 +109,20 @@ as $$
   );
 $$;
 
+-- Helper: ¿el usuario actual es instructora?
+create or replace function public.es_instructora()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.perfiles
+    where id = auth.uid() and rol = 'instructora'
+  );
+$$;
+
 -- ----------------------------------------------------------------------------
 -- 2. Plantillas de turno (turno recurrente semanal)
 -- ----------------------------------------------------------------------------
@@ -136,6 +157,42 @@ create table if not exists public.turnos (
 );
 
 create index if not exists turnos_fecha_idx on public.turnos (fecha);
+
+-- Profesora a cargo (opcional). Cuando está, "instructor" (el texto que se
+-- muestra) lo completa la base con su nombre, así no hay que tipearlo ni
+-- puede quedar distinto. Turnos sin instructora_id: el staff escribe el
+-- nombre a mano, como siempre.
+alter table public.plantillas_turno
+  add column if not exists instructora_id uuid references public.perfiles (id) on delete set null;
+alter table public.turnos
+  add column if not exists instructora_id uuid references public.perfiles (id) on delete set null;
+
+create index if not exists turnos_instructora_idx on public.turnos (instructora_id);
+
+create or replace function public.completar_instructor()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.instructora_id is not null then
+    select btrim(nombre || ' ' || apellido) into new.instructor
+    from public.perfiles where id = new.instructora_id;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists completar_instructor_turno on public.turnos;
+create trigger completar_instructor_turno
+  before insert or update on public.turnos
+  for each row execute function public.completar_instructor();
+
+drop trigger if exists completar_instructor_plantilla on public.plantillas_turno;
+create trigger completar_instructor_plantilla
+  before insert or update on public.plantillas_turno
+  for each row execute function public.completar_instructor();
 
 -- ----------------------------------------------------------------------------
 -- 4. Reservas
@@ -244,11 +301,66 @@ create policy turnos_ver on public.turnos
   for select using (
     public.es_staff()
     or (not cancelado and fecha >= current_date)
+    or instructora_id = auth.uid()
   );
 
 drop policy if exists turnos_staff_escribe on public.turnos;
 create policy turnos_staff_escribe on public.turnos
   for all using (public.es_staff()) with check (public.es_staff());
+
+-- Instructora: crea, edita y cancela solo los turnos que son suyos.
+drop policy if exists turnos_instructora_escribe on public.turnos;
+create policy turnos_instructora_escribe on public.turnos
+  for all
+  using (public.es_instructora() and instructora_id = auth.uid())
+  with check (public.es_instructora() and instructora_id = auth.uid());
+
+drop policy if exists plantillas_instructora on public.plantillas_turno;
+create policy plantillas_instructora on public.plantillas_turno
+  for all
+  using (public.es_instructora() and instructora_id = auth.uid())
+  with check (public.es_instructora() and instructora_id = auth.uid());
+
+-- Instructora: ve quién está anotado en SUS turnos (y los datos básicos de
+-- esas alumnas, incluida la lesión que declararon) y marca la asistencia.
+drop policy if exists reservas_instructora_ver on public.reservas;
+create policy reservas_instructora_ver on public.reservas
+  for select using (
+    public.es_instructora()
+    and exists (
+      select 1 from public.turnos t
+      where t.id = reservas.turno_id and t.instructora_id = auth.uid()
+    )
+  );
+
+drop policy if exists reservas_instructora_asistencia on public.reservas;
+create policy reservas_instructora_asistencia on public.reservas
+  for update
+  using (
+    public.es_instructora()
+    and exists (
+      select 1 from public.turnos t
+      where t.id = reservas.turno_id and t.instructora_id = auth.uid()
+    )
+  )
+  with check (
+    public.es_instructora()
+    and exists (
+      select 1 from public.turnos t
+      where t.id = reservas.turno_id and t.instructora_id = auth.uid()
+    )
+  );
+
+drop policy if exists perfiles_instructora_ve on public.perfiles;
+create policy perfiles_instructora_ve on public.perfiles
+  for select using (
+    public.es_instructora()
+    and exists (
+      select 1 from public.reservas r
+      join public.turnos t on t.id = r.turno_id
+      where r.alumno_id = perfiles.id and t.instructora_id = auth.uid()
+    )
+  );
 
 -- --- reservas -----------------------------------------------------------------
 -- Alumno: ve solo las suyas. Staff: ve y edita todas.
@@ -508,20 +620,24 @@ declare
   v_fecha date;
   v_creados int := 0;
 begin
-  if not public.es_staff() then
-    raise exception 'Solo el staff puede generar turnos.';
-  end if;
-
   select * into v_pl from public.plantillas_turno where id = p_plantilla_id;
   if not found then
     raise exception 'La plantilla no existe.';
   end if;
 
+  -- Staff genera cualquiera; una instructora, solo los turnos fijos suyos.
+  if not public.es_staff()
+     and not (public.es_instructora() and v_pl.instructora_id = auth.uid()) then
+    raise exception 'No tenés permiso para generar turnos de este turno fijo.';
+  end if;
+
   v_fecha := p_desde;
   while v_fecha <= p_hasta loop
     if extract(dow from v_fecha)::int = v_pl.dia_semana then
-      insert into public.turnos (fecha, hora, duracion_min, cupo, instructor, plantilla_id)
-      values (v_fecha, v_pl.hora, v_pl.duracion_min, v_pl.cupo, v_pl.instructor, v_pl.id)
+      insert into public.turnos
+        (fecha, hora, duracion_min, cupo, instructor, instructora_id, plantilla_id)
+      values
+        (v_fecha, v_pl.hora, v_pl.duracion_min, v_pl.cupo, v_pl.instructor, v_pl.instructora_id, v_pl.id)
       on conflict (fecha, hora) do nothing;
       if found then
         v_creados := v_creados + 1;

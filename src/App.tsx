@@ -8,6 +8,7 @@ import Auth from './componentes/Auth'
 import CrearPassword from './componentes/CrearPassword'
 import AlumnoApp from './componentes/AlumnoApp'
 import AdminApp from './componentes/AdminApp'
+import InstructoraApp from './componentes/InstructoraApp'
 import Cargando from './componentes/Cargando'
 
 type EstadoPerfil =
@@ -142,9 +143,12 @@ export default function App() {
     )
   }
 
-  return perfilState.perfil.rol === 'staff' ? (
-    <AdminApp perfil={perfilState.perfil} />
-  ) : (
+  if (perfilState.perfil.rol === 'staff') return <AdminApp perfil={perfilState.perfil} />
+  if (perfilState.perfil.rol === 'instructora') {
+    return <InstructoraApp perfil={perfilState.perfil} />
+  }
+
+  return (
     <AlumnoApp
       perfil={perfilState.perfil}
       onPerfilActualizado={(p) => setPerfilState({ estado: 'listo', perfil: p })}

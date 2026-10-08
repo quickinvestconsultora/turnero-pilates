@@ -49,7 +49,7 @@ Abrí **`/app`** (no la raíz, que es la presentación) para llegar al login.
 ### 5. Crear el primer usuario staff
 
 1. Registrate desde la app con el mail del estudio (queda como `alumno`).
-2. En Supabase: **Table Editor → `perfiles`**, buscá esa fila y cambiá `rol` de `alumno` a `staff`.
+2. En Supabase: **Table Editor → `perfiles`**, buscá esa fila y cambiá `rol` de `alumno` a| `perfiles` | 1 fila por usuario. `rol`: `alumno` | `instructora` | `staff`.
 3. Recargá la app: ahora entrás al panel de administración.
 
 ### (Opcional) Desactivar confirmación de correo
@@ -117,7 +117,7 @@ where u.id = p.id and u.email = 'MAIL@EJEMPLO.COM';
 
 | Tabla | Qué guarda |
 |---|---|
-| `perfiles` | 1 fila por usuario. `rol`: `alumno` \| `staff`. Identidad, obligatoria desde el registro: `apellido`, `dni`. Ficha (opcional, se completa desde "Mis datos"): `nivel`, `lesiones`, `contacto_emergencia_nombre`, `contacto_emergencia_telefono`. Las lesiones se muestran al staff en la lista de anotadas de cada turno. `estado_cuenta`: `prueba` \| `al_dia` \| `pendiente` — lo cambia el staff a mano desde **Clientes**, nunca la propia alumna. `deslinde_aceptado_en` / `deslinde_pdf_subido`: ver más abajo. |
+| `perfiles` | 1 fila por usuario. `rol`: `alumno` | `instructora` | `staff`.\| `staff`. Identidad, obligatoria desde el registro: `apellido`, `dni`. Ficha (opcional, se completa desde "Mis datos"): `nivel`, `lesiones`, `contacto_emergencia_nombre`, `contacto_emergencia_telefono`. Las lesiones se muestran al staff en la lista de anotadas de cada turno. `estado_cuenta`: `prueba` \| `al_dia` \| `pendiente` — lo cambia el staff a mano desde **Clientes**, nunca la propia alumna. `deslinde_aceptado_en` / `deslinde_pdf_subido`: ver más abajo. |
 | `plantillas_turno` | Turno fijo semanal (día, hora, cupo, instructor). |
 | `turnos` | Turno concreto en una fecha. Se crea a mano o generado desde una plantilla. |
 | `reservas` | 1 fila por (turno, alumno). `estado`: `reservada` \| `lista_espera` \| `cancelada`. `asistencia`: `asistio` \| `ausente` \| null (se carga después de la clase, la pone el staff). |

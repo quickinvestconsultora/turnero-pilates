@@ -1,4 +1,4 @@
-export type Rol = 'alumno' | 'staff'
+export type Rol = 'alumno' | 'instructora' | 'staff'
 export type Nivel = 'principiante' | 'intermedio' | 'avanzado'
 export type EstadoCuenta = 'prueba' | 'al_dia' | 'pendiente'
 
@@ -50,8 +50,17 @@ export type PlantillaTurno = {
   duracion_min: number
   cupo: number
   instructor: string | null
+  instructora_id: string | null
   activa: boolean
   creado_en: string
+}
+
+// Una clase de la alumna en su historial (ver FichaCliente).
+export type ItemHistorial = {
+  fecha: string
+  hora: string
+  instructor: string | null
+  asistencia: EstadoAsistencia | null
 }
 
 // Turno con sus reservas embebidas (vista del staff).

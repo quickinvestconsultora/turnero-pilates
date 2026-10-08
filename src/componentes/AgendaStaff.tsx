@@ -12,7 +12,9 @@ import {
 import { encabezadoDia, horaCorta, hoyIso, sumarDias, yaPaso } from '../fechas'
 import { nombreCompleto } from '../personas'
 
-export default function AgendaStaff() {
+// instructoraId: cuando una profesora usa esta pantalla, solo ve y crea sus
+// propios turnos. Sin eso (staff), ve y maneja toda la agenda.
+export default function AgendaStaff({ instructoraId }: { instructoraId?: string }) {
   const [turnos, setTurnos] = useState<TurnoConReservas[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
@@ -22,16 +24,14 @@ export default function AgendaStaff() {
   const cargar = useCallback(async () => {
     setError('')
     try {
-      const opciones = verPasados
-        ? { desde: sumarDias(hoyIso(), -7), dias: 7 }
-        : undefined
-      setTurnos(await listarTurnosStaff(opciones))
+      const periodo = verPasados ? { desde: sumarDias(hoyIso(), -7), dias: 7 } : {}
+      setTurnos(await listarTurnosStaff({ ...periodo, instructoraId }))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo cargar la agenda.')
     } finally {
       setCargando(false)
     }
-  }, [verPasados])
+  }, [verPasados, instructoraId])
 
   useEffect(() => {
     setCargando(true)
@@ -65,6 +65,7 @@ export default function AgendaStaff() {
 
       {mostrarAlta && (
         <FormAltaTurno
+          instructoraId={instructoraId}
           onCreado={() => {
             setMostrarAlta(false)
             cargar()
@@ -128,7 +129,6 @@ function TurnoStaff({
       <div className="turno-staff-cabecera">
         <span className="turno-hora">{horaCorta(turno.hora)}</span>
         <span className="turno-detalle">
-          {turno.instructor ? `${turno.instructor} · ` : ''}
           {anotados.length}/{turno.cupo}
           {turno.cancelado && ' · CANCELADO'}
         </span>
@@ -168,6 +168,7 @@ function TurnoStaff({
         {pasado && !turno.cancelado && <span className="etiqueta-rol">Ya pasó</span>}
       </div>
 
+      {turno.instructor && <p className="turno-profesora">Profesora: {turno.instructor}</p>}
       {turno.nota && <p className="turno-nota">{turno.nota}</p>}
 
       {!turno.cancelado && (
@@ -251,7 +252,13 @@ function TurnoStaff({
   )
 }
 
-function FormAltaTurno({ onCreado }: { onCreado: () => void }) {
+function FormAltaTurno({
+  onCreado,
+  instructoraId,
+}: {
+  onCreado: () => void
+  instructoraId?: string
+}) {
   const [fecha, setFecha] = useState(hoyIso())
   const [hora, setHora] = useState('09:00')
   const [cupo, setCupo] = useState('6')
@@ -270,7 +277,7 @@ function FormAltaTurno({ onCreado }: { onCreado: () => void }) {
     }
     setEnviando(true)
     try {
-      await crearTurno({ fecha, hora, cupo: cupoNum, instructor, nota })
+      await crearTurno({ fecha, hora, cupo: cupoNum, instructor, instructoraId, nota })
       onCreado()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo crear el turno.')
@@ -313,14 +320,16 @@ function FormAltaTurno({ onCreado }: { onCreado: () => void }) {
             required
           />
         </div>
-        <div>
-          <label htmlFor="a-instructor">Instructor (opcional)</label>
-          <input
-            id="a-instructor"
-            value={instructor}
-            onChange={(e) => setInstructor(e.target.value)}
-          />
-        </div>
+        {!instructoraId && (
+          <div>
+            <label htmlFor="a-instructor">Profesora (opcional)</label>
+            <input
+              id="a-instructor"
+              value={instructor}
+              onChange={(e) => setInstructor(e.target.value)}
+            />
+          </div>
+        )}
       </div>
       <label htmlFor="a-nota">Nota (opcional)</label>
       <input id="a-nota" value={nota} onChange={(e) => setNota(e.target.value)} />
