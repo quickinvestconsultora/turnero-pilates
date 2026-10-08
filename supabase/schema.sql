@@ -65,6 +65,12 @@ alter table public.perfiles drop constraint if exists perfiles_rol_check;
 alter table public.perfiles
   add constraint perfiles_rol_check check (rol in ('alumno', 'instructora', 'staff'));
 
+-- Perfil público de la profesora (foto + descripción): lo edita ella desde
+-- "Mi perfil" y lo ven las alumnas al tocar su nombre en un turno.
+alter table public.perfiles
+  add column if not exists bio text,
+  add column if not exists foto_url text;
+
 -- Cuando alguien se registra, le creamos el perfil automáticamente con los
 -- datos que mandó en el formulario (van en raw_user_meta_data). Si vino con
 -- 'acepta_deslinde', queda marcado el momento de la aceptación — el
@@ -244,6 +250,19 @@ drop policy if exists observaciones_staff on public.observaciones_clientes;
 create policy observaciones_staff on public.observaciones_clientes
   for all using (public.es_staff()) with check (public.es_staff());
 
+-- Las profesoras leen y agregan observaciones, y borran solo las suyas.
+drop policy if exists observaciones_instructora_ver on public.observaciones_clientes;
+create policy observaciones_instructora_ver on public.observaciones_clientes
+  for select using (public.es_instructora());
+
+drop policy if exists observaciones_instructora_crea on public.observaciones_clientes;
+create policy observaciones_instructora_crea on public.observaciones_clientes
+  for insert with check (public.es_instructora() and autor_id = auth.uid());
+
+drop policy if exists observaciones_instructora_borra on public.observaciones_clientes;
+create policy observaciones_instructora_borra on public.observaciones_clientes
+  for delete using (public.es_instructora() and autor_id = auth.uid());
+
 -- --- perfiles -----------------------------------------------------------------
 drop policy if exists perfiles_ver_propio on public.perfiles;
 create policy perfiles_ver_propio on public.perfiles
@@ -300,8 +319,8 @@ drop policy if exists turnos_ver on public.turnos;
 create policy turnos_ver on public.turnos
   for select using (
     public.es_staff()
+    or public.es_instructora()
     or (not cancelado and fecha >= current_date)
-    or instructora_id = auth.uid()
   );
 
 drop policy if exists turnos_staff_escribe on public.turnos;
@@ -321,17 +340,13 @@ create policy plantillas_instructora on public.plantillas_turno
   using (public.es_instructora() and instructora_id = auth.uid())
   with check (public.es_instructora() and instructora_id = auth.uid());
 
--- Instructora: ve quién está anotado en SUS turnos (y los datos básicos de
--- esas alumnas, incluida la lesión que declararon) y marca la asistencia.
+-- Instructora: ve toda la agenda y cuántas anotadas hay en cada turno, pero
+-- solo marca asistencia en los suyos. Los datos de las alumnas anotadas
+-- (nombre, lesión) los ve únicamente de sus propios turnos, ver
+-- perfiles_instructora_ve más abajo.
 drop policy if exists reservas_instructora_ver on public.reservas;
 create policy reservas_instructora_ver on public.reservas
-  for select using (
-    public.es_instructora()
-    and exists (
-      select 1 from public.turnos t
-      where t.id = reservas.turno_id and t.instructora_id = auth.uid()
-    )
-  );
+  for select using (public.es_instructora());
 
 drop policy if exists reservas_instructora_asistencia on public.reservas;
 create policy reservas_instructora_asistencia on public.reservas
@@ -413,6 +428,39 @@ create policy deslindes_ver on storage.objects
   for select using (
     bucket_id = 'deslindes'
     and ((storage.foldername(name))[1] = auth.uid()::text or public.es_staff())
+  );
+
+-- Fotos de las profesoras: bucket PÚBLICO (se muestran a las alumnas con un
+-- <img>). Cada una sube solo a su carpeta "<id>/foto.jpg".
+insert into storage.buckets (id, name, public)
+values ('profes', 'profes', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists profes_bucket_visible on storage.buckets;
+create policy profes_bucket_visible on storage.buckets
+  for select using (id = 'profes');
+
+drop policy if exists profes_foto_ver on storage.objects;
+create policy profes_foto_ver on storage.objects
+  for select using (bucket_id = 'profes');
+
+drop policy if exists profes_foto_sube on storage.objects;
+create policy profes_foto_sube on storage.objects
+  for insert with check (
+    bucket_id = 'profes'
+    and (storage.foldername(name))[1] = auth.uid()::text
+    and (public.es_instructora() or public.es_staff())
+  );
+
+drop policy if exists profes_foto_actualiza on storage.objects;
+create policy profes_foto_actualiza on storage.objects
+  for update using (
+    bucket_id = 'profes'
+    and (storage.foldername(name))[1] = auth.uid()::text
+    and (public.es_instructora() or public.es_staff())
+  ) with check (
+    bucket_id = 'profes'
+    and (storage.foldername(name))[1] = auth.uid()::text
   );
 
 -- ============================================================================
@@ -572,7 +620,8 @@ $$;
 -- --- Listar turnos para el alumno -----------------------------------------
 -- Un turno por fila, con cuántos lugares hay ocupados y en qué estado está
 -- MI reserva (o null si no me anoté).
-create or replace function public.listar_turnos(p_desde date, p_hasta date)
+drop function if exists public.listar_turnos(date, date);
+create function public.listar_turnos(p_desde date, p_hasta date)
 returns table (
   id           uuid,
   fecha        date,
@@ -580,6 +629,7 @@ returns table (
   duracion_min smallint,
   cupo         smallint,
   instructor   text,
+  instructora_id uuid,
   nota         text,
   ocupados     bigint,
   mi_estado    text
@@ -589,7 +639,7 @@ security definer
 set search_path = public
 as $$
   select
-    t.id, t.fecha, t.hora, t.duracion_min, t.cupo, t.instructor, t.nota,
+    t.id, t.fecha, t.hora, t.duracion_min, t.cupo, t.instructor, t.instructora_id, t.nota,
     (select count(*) from public.reservas r
        where r.turno_id = t.id and r.estado = 'reservada') as ocupados,
     (select r.estado from public.reservas r
@@ -599,6 +649,57 @@ as $$
   where t.cancelado = false
     and t.fecha between p_desde and p_hasta
   order by t.fecha, t.hora;
+$$;
+
+-- --- Profesoras: perfil público ----------------------------------------------
+-- Las alumnas no pueden leer perfiles ajenos, así que lo que se muestra de
+-- una profesora (nombre, foto, descripción) sale por acá y nada más.
+create or replace function public.listar_profesoras()
+returns table (id uuid, nombre text, bio text, foto_url text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p.id, btrim(p.nombre || ' ' || p.apellido), p.bio, p.foto_url
+  from public.perfiles p
+  where p.rol = 'instructora'
+  order by p.nombre;
+$$;
+
+-- --- Clientes para profesoras ---------------------------------------------------
+-- Lo que una profesora ve de las alumnas: datos y ficha, SIN estado de cuenta
+-- ni nada de pagos (eso es solo del staff).
+create or replace function public.clientes_para_instructora()
+returns table (
+  id uuid,
+  nombre text,
+  apellido text,
+  dni text,
+  telefono text,
+  nivel text,
+  lesiones text,
+  contacto_emergencia_nombre text,
+  contacto_emergencia_telefono text,
+  creado_en timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not (public.es_instructora() or public.es_staff()) then
+    raise exception 'Sin permiso.';
+  end if;
+
+  return query
+  select p.id, p.nombre, p.apellido, p.dni, p.telefono, p.nivel, p.lesiones,
+         p.contacto_emergencia_nombre, p.contacto_emergencia_telefono, p.creado_en
+  from public.perfiles p
+  where p.rol = 'alumno'
+  order by p.nombre;
+end;
 $$;
 
 -- --- Generar turnos desde una plantilla (staff) --------------------------
@@ -743,3 +844,5 @@ grant execute on function public.cancelar_reserva(uuid)        to authenticated;
 grant execute on function public.listar_turnos(date, date)     to authenticated;
 grant execute on function public.generar_turnos(uuid, date, date) to authenticated;
 grant execute on function public.estadisticas(date, date)      to authenticated;
+grant execute on function public.listar_profesoras()           to authenticated;
+grant execute on function public.clientes_para_instructora()   to authenticated;

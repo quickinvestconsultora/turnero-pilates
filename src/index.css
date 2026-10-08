@@ -678,6 +678,32 @@ label {
   margin: 0;
 }
 
+.ficha-avanzado {
+  margin-top: 18px;
+  font-size: 11px;
+  color: var(--texto-suave);
+}
+
+.ficha-avanzado summary {
+  cursor: pointer;
+  width: max-content;
+}
+
+.ficha-avanzado p {
+  margin: 8px 0 6px;
+}
+
+.boton-mini {
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 500;
+  background: transparent;
+  color: var(--texto-suave);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  box-shadow: none;
+}
+
 .ficha-resumen {
   margin: 0 0 8px;
   font-size: 13px;
@@ -973,4 +999,165 @@ label {
   .grilla-campos {
     grid-template-columns: 1fr;
   }
+}
+
+/* ---- Profesoras: foto, ficha, tutorial ---- */
+.foto-profe {
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--borde);
+  background: var(--superficie-2);
+}
+
+.foto-profe--inicial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 600;
+  color: var(--acento-oscuro);
+}
+
+.turno-profesora--ficha {
+  align-self: flex-start;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.modal-profesora {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.modal-profesora h2 {
+  margin: 8px 0 0;
+}
+
+.profesora-bio {
+  margin: 8px 0 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  text-align: left;
+}
+
+.perfil-profe-foto {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 14px 0;
+}
+
+.boton-archivo {
+  display: inline-block;
+  padding: 8px 14px;
+  border: 1px solid var(--borde);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--texto);
+  cursor: pointer;
+}
+
+.lista-profesoras {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profesora-item {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 13px 15px;
+}
+
+.profesora-datos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.profesora-bio-corta {
+  font-size: 13px;
+  color: var(--texto-suave);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bienvenida {
+  max-width: 420px;
+  text-align: center;
+}
+
+.bienvenida-logo {
+  width: 150px;
+  max-width: 60%;
+  margin: 0 auto 14px;
+  display: block;
+}
+
+.bienvenida h2 {
+  font-size: 26px;
+}
+
+.bienvenida-texto {
+  margin: 0 0 10px;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.bienvenida-detalle {
+  margin: 0 0 14px;
+  padding: 10px 14px 10px 30px;
+  background: var(--superficie-2);
+  border-radius: var(--radio);
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--texto-suave);
+}
+
+.bienvenida-puntos {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 14px 0;
+}
+
+.bienvenida-puntos .punto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--borde);
+}
+
+.bienvenida-puntos .punto.activo {
+  background: var(--acento);
+}
+
+.bienvenida-botones {
+  justify-content: space-between;
 }

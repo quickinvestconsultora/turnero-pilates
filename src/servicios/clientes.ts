@@ -5,7 +5,7 @@ import { yaPaso } from '../fechas'
 export async function listarObservaciones(alumnaId: string): Promise<Observacion[]> {
   const { data, error } = await supabase
     .from('observaciones_clientes')
-    .select('id, alumna_id, texto, creado_en')
+    .select('id, alumna_id, autor_id, texto, creado_en')
     .eq('alumna_id', alumnaId)
     .order('creado_en', { ascending: false })
 
@@ -26,11 +26,19 @@ export async function borrarObservacion(id: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
-export async function listarClientes(): Promise<Perfil[]> {
+// paraProfesora: la lista que ve una profesora, que sale de una función de la
+// base que no incluye el estado de cuenta ni ningún dato de pagos.
+export async function listarClientes(paraProfesora = false): Promise<Perfil[]> {
+  if (paraProfesora) {
+    const { data, error } = await supabase.rpc('clientes_para_instructora')
+    if (error) throw new Error(error.message)
+    return (data ?? []) as unknown as Perfil[]
+  }
+
   const { data, error } = await supabase
     .from('perfiles')
     .select('*')
-    .in('rol', ['alumno', 'instructora'])
+    .eq('rol', 'alumno')
     .order('nombre', { ascending: true })
 
   if (error) throw new Error(error.message)

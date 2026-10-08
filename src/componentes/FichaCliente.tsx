@@ -12,17 +12,21 @@ import { fechaCorta, horaCorta } from '../fechas'
 
 const ETIQUETA_ASISTENCIA = { asistio: 'Asistió', ausente: 'Faltó' } as const
 
-// Ficha completa de una alumna para el staff: lo que ella cargó en "Mis
+// Ficha completa de una alumna para el estudio: lo que ella cargó en "Mis
 // datos" (solo lectura), su historial de asistencia y las observaciones
-// internas del estudio, que la alumna nunca ve.
+// internas, que la alumna nunca ve. La profesora (paraProfesora) ve lo mismo,
+// pero no puede cambiar roles y solo borra las observaciones que escribió ella.
 export default function FichaCliente({
   cliente,
   onCambio,
+  paraProfesora = false,
+  miId,
 }: {
   cliente: Perfil
   onCambio: () => void
+  paraProfesora?: boolean
+  miId?: string
 }) {
-  const esProfesora = cliente.rol === 'instructora'
   const [historial, setHistorial] = useState<ItemHistorial[] | null>(null)
   const [verTodo, setVerTodo] = useState(false)
   const [observaciones, setObservaciones] = useState<Observacion[]>([])
@@ -46,22 +50,25 @@ export default function FichaCliente({
   }, [cargar])
 
   useEffect(() => {
-    if (esProfesora) return
     listarHistorial(cliente.id)
       .then(setHistorial)
       .catch((e) =>
         setError(e instanceof Error ? e.message : 'No se pudo cargar el historial.'),
       )
-  }, [cliente.id, esProfesora])
+  }, [cliente.id])
 
-  const cambiarRol = async () => {
-    const mensaje = esProfesora
-      ? `¿Devolver a ${cliente.nombre} a alumna? Deja de ver "Mis turnos" y vuelve a reservar.`
-      : `¿Convertir a ${cliente.nombre} en profesora? Va a poder crear y manejar sus propios turnos.`
-    if (!window.confirm(mensaje)) return
+  const convertirEnProfesora = async () => {
+    const nombre = `${cliente.nombre} ${cliente.apellido}`.trim()
+    if (
+      !window.confirm(
+        `¿Convertir a ${nombre} en profesora?\n\nVa a dejar de reservar turnos como alumna y va a poder crear y manejar los suyos.`,
+      )
+    ) {
+      return
+    }
     setError('')
     try {
-      await actualizarRol(cliente.id, esProfesora ? 'alumno' : 'instructora')
+      await actualizarRol(cliente.id, 'instructora')
       onCambio()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cambiar el rol.')
@@ -114,42 +121,36 @@ export default function FichaCliente({
         </dd>
       </dl>
 
-      {!esProfesora && (
+      <h3>Historial de asistencia</h3>
+      {historial === null ? (
+        <p className="ayuda">Cargando...</p>
+      ) : historial.length === 0 ? (
+        <p className="ayuda">Todavía no tuvo clases.</p>
+      ) : (
         <>
-          <h3>Historial de asistencia</h3>
-          {historial === null ? (
-            <p className="ayuda">Cargando...</p>
-          ) : historial.length === 0 ? (
-            <p className="ayuda">Todavía no tuvo clases.</p>
-          ) : (
-            <>
-              <p className="ficha-resumen">
-                <strong>{asistio}</strong> asistió · <strong>{falto}</strong> faltó ·{' '}
-                <strong>{sinMarcar}</strong> sin marcar
-                {ultima && ` · Última clase: ${fechaCorta(ultima.fecha)}`}
-              </p>
-              <ul className="ficha-historial">
-                {visibles.map((h) => (
-                  <li key={h.fecha + h.hora}>
-                    <span>
-                      {fechaCorta(h.fecha)} · {horaCorta(h.hora)}
-                    </span>
-                    <span className={`etiqueta-asistencia etiqueta-asistencia--${h.asistencia ?? 'nada'}`}>
-                      {h.asistencia ? ETIQUETA_ASISTENCIA[h.asistencia] : 'Sin marcar'}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {historial.length > 8 && (
-                <button
-                  type="button"
-                  className="link-secundario"
-                  onClick={() => setVerTodo(!verTodo)}
+          <p className="ficha-resumen">
+            <strong>{asistio}</strong> asistió · <strong>{falto}</strong> faltó ·{' '}
+            <strong>{sinMarcar}</strong> sin marcar
+            {ultima && ` · Última clase: ${fechaCorta(ultima.fecha)}`}
+          </p>
+          <ul className="ficha-historial">
+            {visibles.map((h) => (
+              <li key={h.fecha + h.hora}>
+                <span>
+                  {fechaCorta(h.fecha)} · {horaCorta(h.hora)}
+                </span>
+                <span
+                  className={`etiqueta-asistencia etiqueta-asistencia--${h.asistencia ?? 'nada'}`}
                 >
-                  {verTodo ? 'Ver menos' : `Ver las ${historial.length} clases`}
-                </button>
-              )}
-            </>
+                  {h.asistencia ? ETIQUETA_ASISTENCIA[h.asistencia] : 'Sin marcar'}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {historial.length > 8 && (
+            <button type="button" className="link-secundario" onClick={() => setVerTodo(!verTodo)}>
+              {verTodo ? 'Ver menos' : `Ver las ${historial.length} clases`}
+            </button>
           )}
         </>
       )}
@@ -186,23 +187,25 @@ export default function FichaCliente({
                 })}
               </span>
               <p>{o.texto}</p>
-              <button type="button" className="link-secundario" onClick={() => borrar(o)}>
-                Borrar
-              </button>
+              {(!paraProfesora || o.autor_id === miId) && (
+                <button type="button" className="link-secundario" onClick={() => borrar(o)}>
+                  Borrar
+                </button>
+              )}
             </li>
           ))}
         </ul>
       )}
 
-      <h3>Rol</h3>
-      <p className="ayuda">
-        {esProfesora
-          ? 'Es profesora: arma y ve sus propios turnos, y su nombre figura en cada uno.'
-          : 'Si es una profesora del estudio, pasala a "profesora" para que pueda cargar sus turnos.'}
-      </p>
-      <button type="button" className="link-secundario" onClick={cambiarRol}>
-        {esProfesora ? 'Volver a alumna' : 'Convertir en profesora'}
-      </button>
+      {!paraProfesora && (
+        <details className="ficha-avanzado">
+          <summary>Más opciones</summary>
+          <p>Si es una profesora del estudio, podés pasarla de alumna a profesora.</p>
+          <button type="button" className="boton-mini" onClick={convertirEnProfesora}>
+            Convertir en profesora
+          </button>
+        </details>
+      )}
     </div>
   )
 }

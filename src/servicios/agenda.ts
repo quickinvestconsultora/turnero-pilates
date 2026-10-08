@@ -18,7 +18,7 @@ export async function listarTurnosStaff(opciones?: {
   let consulta = supabase
     .from('turnos')
     .select(
-      'id, fecha, hora, duracion_min, cupo, instructor, plantilla_id, cancelado, nota, ' +
+      'id, fecha, hora, duracion_min, cupo, instructor, instructora_id, plantilla_id, cancelado, nota, ' +
         'reservas ( id, estado, creado_en, asistencia, perfiles ( nombre, apellido, telefono, lesiones ) )',
     )
     .gte('fecha', desde)

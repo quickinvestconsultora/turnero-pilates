@@ -145,7 +145,12 @@ export default function App() {
 
   if (perfilState.perfil.rol === 'staff') return <AdminApp perfil={perfilState.perfil} />
   if (perfilState.perfil.rol === 'instructora') {
-    return <InstructoraApp perfil={perfilState.perfil} />
+    return (
+      <InstructoraApp
+        perfil={perfilState.perfil}
+        onPerfilActualizado={(p) => setPerfilState({ estado: 'listo', perfil: p })}
+      />
+    )
   }
 
   return (

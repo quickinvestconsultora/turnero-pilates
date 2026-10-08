@@ -17,12 +17,23 @@ export type Perfil = {
   pago_actualizado_en: string | null
   deslinde_aceptado_en: string | null
   deslinde_pdf_subido: boolean
+  bio: string | null
+  foto_url: string | null
   creado_en: string
+}
+
+// Perfil público de una profesora (lo que ven las alumnas).
+export type Profesora = {
+  id: string
+  nombre: string
+  bio: string | null
+  foto_url: string | null
 }
 
 export type Observacion = {
   id: string
   alumna_id: string
+  autor_id: string | null
   texto: string
   creado_en: string
 }
@@ -38,6 +49,7 @@ export type TurnoDisponible = {
   duracion_min: number
   cupo: number
   instructor: string | null
+  instructora_id: string | null
   nota: string | null
   ocupados: number
   mi_estado: EstadoReserva | null
@@ -71,6 +83,7 @@ export type TurnoConReservas = {
   duracion_min: number
   cupo: number
   instructor: string | null
+  instructora_id: string | null
   plantilla_id: string | null
   cancelado: boolean
   nota: string | null

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Perfil, TurnoDisponible } from '../tipos'
+import type { Perfil, Profesora, TurnoDisponible } from '../tipos'
 import { cerrarSesion } from '../servicios/perfil'
+import { listarProfesoras } from '../servicios/profesoras'
 import {
   cancelar,
   listarTurnos,
@@ -13,6 +14,7 @@ import CabeceraApp from './CabeceraApp'
 import EditarPerfil from './EditarPerfil'
 import AvisoPago from './AvisoPago'
 import ModalPago from './ModalPago'
+import ModalProfesora from './ModalProfesora'
 
 type Vista = 'disponibles' | 'mios'
 
@@ -29,6 +31,15 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   const [ocupadoId, setOcupadoId] = useState<string | null>(null)
   const [editandoPerfil, setEditandoPerfil] = useState(false)
   const [pagoRequerido, setPagoRequerido] = useState(false)
+  const [profesoras, setProfesoras] = useState<Profesora[]>([])
+  const [profesoraAbierta, setProfesoraAbierta] = useState<Profesora | null>(null)
+
+  useEffect(() => {
+    // Si falla, el nombre de la profesora se ve igual, solo que sin ficha.
+    listarProfesoras()
+      .then(setProfesoras)
+      .catch(() => setProfesoras([]))
+  }, [])
 
   const cargar = useCallback(async () => {
     setError('')
@@ -126,6 +137,8 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
           <ListaTurnos
             turnos={lista}
             ocupadoId={ocupadoId}
+            profesoras={profesoras}
+            onVerProfesora={setProfesoraAbierta}
             onReservar={(t) => accion(t, 'reservar')}
             onCancelar={(t) => accion(t, 'cancelar')}
           />
@@ -144,6 +157,10 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       )}
 
       {pagoRequerido && <ModalPago perfil={perfil} onCerrar={() => setPagoRequerido(false)} />}
+
+      {profesoraAbierta && (
+        <ModalProfesora profesora={profesoraAbierta} onCerrar={() => setProfesoraAbierta(null)} />
+      )}
     </div>
   )
 }
@@ -151,11 +168,15 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
 function ListaTurnos({
   turnos,
   ocupadoId,
+  profesoras,
+  onVerProfesora,
   onReservar,
   onCancelar,
 }: {
   turnos: TurnoDisponible[]
   ocupadoId: string | null
+  profesoras: Profesora[]
+  onVerProfesora: (p: Profesora) => void
   onReservar: (t: TurnoDisponible) => void
   onCancelar: (t: TurnoDisponible) => void
 }) {
@@ -187,9 +208,21 @@ function ListaTurnos({
                           ? `${libres} lugar${libres === 1 ? '' : 'es'}`
                           : 'Completo'}
                     </span>
-                    {t.instructor && (
-                      <span className="turno-profesora">Profesora: {t.instructor}</span>
-                    )}
+                    {t.instructor &&
+                      (() => {
+                        const ficha = profesoras.find((p) => p.id === t.instructora_id)
+                        return ficha ? (
+                          <button
+                            type="button"
+                            className="turno-profesora turno-profesora--ficha"
+                            onClick={() => onVerProfesora(ficha)}
+                          >
+                            Profesora: {t.instructor}
+                          </button>
+                        ) : (
+                          <span className="turno-profesora">Profesora: {t.instructor}</span>
+                        )
+                      })()}
                     {t.nota && <span className="turno-nota">{t.nota}</span>}
                   </div>
 

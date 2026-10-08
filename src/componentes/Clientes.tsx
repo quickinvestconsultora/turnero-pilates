@@ -18,7 +18,15 @@ const ETIQUETA_NIVEL: Record<string, string> = {
   avanzado: 'Avanzado',
 }
 
-export default function Clientes() {
+// paraProfesora: la versión que ve una profesora (miId = su id): mismas fichas
+// y observaciones, pero sin estado de cuenta, pagos ni deslinde.
+export default function Clientes({
+  paraProfesora = false,
+  miId,
+}: {
+  paraProfesora?: boolean
+  miId?: string
+}) {
   const [clientes, setClientes] = useState<Perfil[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
@@ -27,13 +35,13 @@ export default function Clientes() {
   const cargar = useCallback(async () => {
     setError('')
     try {
-      setClientes(await listarClientes())
+      setClientes(await listarClientes(paraProfesora))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudieron cargar los clientes.')
     } finally {
       setCargando(false)
     }
-  }, [])
+  }, [paraProfesora])
 
   useEffect(() => {
     cargar()
@@ -75,7 +83,14 @@ export default function Clientes() {
       ) : (
         <ul className="lista-clientes">
           {filtrados.map((c) => (
-            <ClienteItem key={c.id} cliente={c} onCambio={cargar} onError={setError} />
+            <ClienteItem
+              key={c.id}
+              cliente={c}
+              paraProfesora={paraProfesora}
+              miId={miId}
+              onCambio={cargar}
+              onError={setError}
+            />
           ))}
         </ul>
       )}
@@ -85,10 +100,14 @@ export default function Clientes() {
 
 function ClienteItem({
   cliente,
+  paraProfesora,
+  miId,
   onCambio,
   onError,
 }: {
   cliente: Perfil
+  paraProfesora: boolean
+  miId?: string
   onCambio: () => void
   onError: (m: string) => void
 }) {
@@ -139,22 +158,22 @@ function ClienteItem({
           >
             {fichaAbierta ? 'Cerrar ficha' : 'Ver ficha y observaciones'}
           </button>
-          <button type="button" className="link-secundario enlace-deslinde" onClick={verDeslinde}>
-            Ver deslinde firmado
-          </button>
+          {!paraProfesora && (
+            <button type="button" className="link-secundario enlace-deslinde" onClick={verDeslinde}>
+              Ver deslinde firmado
+            </button>
+          )}
         </div>
         {errorDeslinde && <span className="mensaje-error">{errorDeslinde}</span>}
       </div>
 
-      {cliente.rol === 'instructora' ? (
-        <div className="estado-cuenta estado-cuenta--prueba">Profesora</div>
-      ) : (
+      {!paraProfesora && (
         <div className={`estado-cuenta estado-cuenta--${cliente.estado_cuenta}`}>
           {ETIQUETA_ESTADO[cliente.estado_cuenta]}
         </div>
       )}
 
-      {cliente.rol !== 'instructora' && (
+      {!paraProfesora && (
       <div className="asistencia cliente-acciones">
         <button
           type="button"
@@ -183,7 +202,9 @@ function ClienteItem({
       </div>
       )}
 
-      {fichaAbierta && <FichaCliente cliente={cliente} onCambio={onCambio} />}
+      {fichaAbierta && (
+        <FichaCliente cliente={cliente} onCambio={onCambio} paraProfesora={paraProfesora} miId={miId} />
+      )}
     </li>
   )
 }

@@ -9,6 +9,8 @@ import {
   listarPlantillas,
 } from '../servicios/agenda'
 import { NOMBRE_DIA, horaCorta } from '../fechas'
+import CampoProfesora from './CampoProfesora'
+import type { ValorProfesora } from './CampoProfesora'
 
 // instructoraId: cuando la usa una profesora, solo ve y crea sus turnos fijos.
 export default function PlantillasStaff({ instructoraId }: { instructoraId?: string }) {
@@ -138,7 +140,7 @@ function FormAltaPlantilla({
   const [dia, setDia] = useState('1')
   const [hora, setHora] = useState('09:00')
   const [cupo, setCupo] = useState('6')
-  const [instructor, setInstructor] = useState('')
+  const [profesora, setProfesora] = useState<ValorProfesora>({})
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
 
@@ -156,10 +158,9 @@ function FormAltaPlantilla({
         dia_semana: Number(dia),
         hora,
         cupo: cupoNum,
-        instructor,
-        instructoraId,
+        instructor: profesora.instructor,
+        instructoraId: instructoraId ?? profesora.instructoraId,
       })
-      setInstructor('')
       onCreada()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo crear.')
@@ -203,16 +204,7 @@ function FormAltaPlantilla({
             required
           />
         </div>
-        {!instructoraId && (
-          <div>
-            <label htmlFor="pl-instructor">Profesora (opcional)</label>
-            <input
-              id="pl-instructor"
-              value={instructor}
-              onChange={(e) => setInstructor(e.target.value)}
-            />
-          </div>
-        )}
+        {!instructoraId && <CampoProfesora id="pl-profesora" onCambio={setProfesora} />}
       </div>
 
       {error && <p className="mensaje-error">{error}</p>}

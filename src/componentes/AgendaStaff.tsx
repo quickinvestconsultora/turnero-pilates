@@ -11,27 +11,33 @@ import {
 } from '../servicios/agenda'
 import { encabezadoDia, horaCorta, hoyIso, sumarDias, yaPaso } from '../fechas'
 import { nombreCompleto } from '../personas'
+import CampoProfesora from './CampoProfesora'
+import type { ValorProfesora } from './CampoProfesora'
 
-// instructoraId: cuando una profesora usa esta pantalla, solo ve y crea sus
-// propios turnos. Sin eso (staff), ve y maneja toda la agenda.
+// instructoraId: cuando una profesora usa esta pantalla ve toda la agenda,
+// pero solo maneja (cupo, cancelar, anotadas, asistencia) los turnos suyos y
+// los que crea quedan a su nombre. Sin eso (staff), maneja todo.
 export default function AgendaStaff({ instructoraId }: { instructoraId?: string }) {
   const [turnos, setTurnos] = useState<TurnoConReservas[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [mostrarAlta, setMostrarAlta] = useState(false)
   const [verPasados, setVerPasados] = useState(false)
+  const [soloMios, setSoloMios] = useState(false)
 
   const cargar = useCallback(async () => {
     setError('')
     try {
       const periodo = verPasados ? { desde: sumarDias(hoyIso(), -7), dias: 7 } : {}
-      setTurnos(await listarTurnosStaff({ ...periodo, instructoraId }))
+      setTurnos(
+        await listarTurnosStaff({ ...periodo, instructoraId: soloMios ? instructoraId : undefined }),
+      )
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo cargar la agenda.')
     } finally {
       setCargando(false)
     }
-  }, [verPasados, instructoraId])
+  }, [verPasados, instructoraId, soloMios])
 
   useEffect(() => {
     setCargando(true)
@@ -57,6 +63,15 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
           >
             {verPasados ? 'Ver próximos' : 'Cargar asistencia'}
           </button>
+          {instructoraId && (
+            <button
+              type="button"
+              className="link-secundario"
+              onClick={() => setSoloMios((v) => !v)}
+            >
+              {soloMios ? 'Ver todos' : 'Ver solo los míos'}
+            </button>
+          )}
           <button type="button" onClick={() => setMostrarAlta((v) => !v)}>
             {mostrarAlta ? 'Cerrar' : '+ Turno suelto'}
           </button>
@@ -87,7 +102,13 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
             <section key={fecha} className="grupo-dia">
               <h2>{encabezadoDia(fecha)}</h2>
               {delDia.map((t) => (
-                <TurnoStaff key={t.id} turno={t} onCambio={cargar} onError={setError} />
+                <TurnoStaff
+                  key={t.id}
+                  turno={t}
+                  miId={instructoraId}
+                  onCambio={cargar}
+                  onError={setError}
+                />
               ))}
             </section>
           ))}
@@ -99,13 +120,17 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
 
 function TurnoStaff({
   turno,
+  miId,
   onCambio,
   onError,
 }: {
   turno: TurnoConReservas
+  miId?: string
   onCambio: () => void
   onError: (m: string) => void
 }) {
+  // Una profesora ve los turnos de las demás pero no los toca ni ve sus anotadas.
+  const soloLectura = Boolean(miId) && turno.instructora_id !== miId
   const [ocupado, setOcupado] = useState(false)
   const anotados = turno.reservas.filter((r) => r.estado === 'reservada')
   const espera = turno.reservas.filter((r) => r.estado === 'lista_espera')
@@ -132,7 +157,7 @@ function TurnoStaff({
           {anotados.length}/{turno.cupo}
           {turno.cancelado && ' · CANCELADO'}
         </span>
-        {!turno.cancelado && !pasado && (
+        {!turno.cancelado && !pasado && !soloLectura && (
           <div className="barra-acciones">
             <button
               type="button"
@@ -171,7 +196,7 @@ function TurnoStaff({
       {turno.instructor && <p className="turno-profesora">Profesora: {turno.instructor}</p>}
       {turno.nota && <p className="turno-nota">{turno.nota}</p>}
 
-      {!turno.cancelado && (
+      {!turno.cancelado && !soloLectura && (
         <ul className="anotados">
           {anotados.length === 0 && <li className="vacio-inline">Nadie anotado todavía</li>}
           {anotados.map((r) => (
@@ -262,7 +287,7 @@ function FormAltaTurno({
   const [fecha, setFecha] = useState(hoyIso())
   const [hora, setHora] = useState('09:00')
   const [cupo, setCupo] = useState('6')
-  const [instructor, setInstructor] = useState('')
+  const [profesora, setProfesora] = useState<ValorProfesora>({})
   const [nota, setNota] = useState('')
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -277,7 +302,14 @@ function FormAltaTurno({
     }
     setEnviando(true)
     try {
-      await crearTurno({ fecha, hora, cupo: cupoNum, instructor, instructoraId, nota })
+      await crearTurno({
+        fecha,
+        hora,
+        cupo: cupoNum,
+        instructor: profesora.instructor,
+        instructoraId: instructoraId ?? profesora.instructoraId,
+        nota,
+      })
       onCreado()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo crear el turno.')
@@ -320,16 +352,7 @@ function FormAltaTurno({
             required
           />
         </div>
-        {!instructoraId && (
-          <div>
-            <label htmlFor="a-instructor">Profesora (opcional)</label>
-            <input
-              id="a-instructor"
-              value={instructor}
-              onChange={(e) => setInstructor(e.target.value)}
-            />
-          </div>
-        )}
+        {!instructoraId && <CampoProfesora id="a-profesora" onCambio={setProfesora} />}
       </div>
       <label htmlFor="a-nota">Nota (opcional)</label>
       <input id="a-nota" value={nota} onChange={(e) => setNota(e.target.value)} />

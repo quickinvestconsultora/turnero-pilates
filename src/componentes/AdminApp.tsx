@@ -6,8 +6,9 @@ import AgendaStaff from './AgendaStaff'
 import PlantillasStaff from './PlantillasStaff'
 import Estadisticas from './Estadisticas'
 import Clientes from './Clientes'
+import Profesores from './Profesores'
 
-type Vista = 'agenda' | 'plantillas' | 'clientes' | 'estadisticas'
+type Vista = 'agenda' | 'plantillas' | 'clientes' | 'profesores' | 'estadisticas'
 
 export default function AdminApp({ perfil }: { perfil: Perfil }) {
   const [vista, setVista] = useState<Vista>('agenda')
@@ -52,6 +53,13 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
         </button>
         <button
           type="button"
+          className={vista === 'profesores' ? 'tab activa' : 'tab'}
+          onClick={() => setVista('profesores')}
+        >
+          Profesores
+        </button>
+        <button
+          type="button"
           className={vista === 'estadisticas' ? 'tab activa' : 'tab'}
           onClick={() => setVista('estadisticas')}
         >
@@ -63,6 +71,7 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
         {vista === 'agenda' && <AgendaStaff />}
         {vista === 'plantillas' && <PlantillasStaff />}
         {vista === 'clientes' && <Clientes />}
+        {vista === 'profesores' && <Profesores />}
         {vista === 'estadisticas' && <Estadisticas />}
       </main>
     </div>
