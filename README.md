@@ -4,6 +4,7 @@ App de reservas para FORTEVA Studio (Pilates & Strength).
 
 - **Alumno**: se registra, ve los turnos de los próximos 14 días y se anota (o se pone en lista de espera si está completo). Puede cancelar o cambiar un lugar confirmado hasta **2 horas antes** del turno (lo hace cumplir `cancelar_reserva` en la base; la lista de espera se puede dejar siempre). Pasado ese límite, solo el staff puede sacarla.
 - **Staff**: arma la agenda con turnos sueltos y/o turnos fijos semanales, ve quién se anotó en cada turno y puede cancelar un turno o sacar a alguien.
+- **Profesora** (`rol = instructora`): se registra como cualquier alumna y el staff la convierte desde **Clientes → Ver ficha → Convertir en profesora**. Entra a una pantalla propia donde crea sus turnos sueltos y fijos, ve quién se anotó (con lesiones) y marca asistencia, **solo de sus propios turnos**; no ve clientes, pagos ni estadísticas. Su nombre se completa solo en cada turno y las alumnas lo ven como "Profesora: X". Los permisos los hace cumplir la base (RLS), no la pantalla.
 
 Stack: React + Vite + TypeScript + Supabase (auth + Postgres + RLS). No hay backend propio: toda la lógica sensible (reservar sin sobrecupo, generar turnos) vive en funciones de Postgres.
 
