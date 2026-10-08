@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Perfil, Profesora, TurnoDisponible } from '../tipos'
 import { cerrarSesion } from '../servicios/perfil'
-import { listarProfesoras } from '../servicios/profesoras'
+import { listarFotosGaleria, listarProfesoras } from '../servicios/profesoras'
+import type { FotoGaleria } from '../servicios/profesoras'
 import {
   cancelar,
   listarTurnos,
@@ -34,11 +35,16 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   const [profesoras, setProfesoras] = useState<Profesora[]>([])
   const [profesoraAbierta, setProfesoraAbierta] = useState<Profesora | null>(null)
 
+  const [galeria, setGaleria] = useState<FotoGaleria[]>([])
+
   useEffect(() => {
     // Si falla, el nombre de la profesora se ve igual, solo que sin ficha.
     listarProfesoras()
       .then(setProfesoras)
       .catch(() => setProfesoras([]))
+    listarFotosGaleria()
+      .then(setGaleria)
+      .catch(() => setGaleria([]))
   }, [])
 
   const cargar = useCallback(async () => {
@@ -159,7 +165,11 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       {pagoRequerido && <ModalPago perfil={perfil} onCerrar={() => setPagoRequerido(false)} />}
 
       {profesoraAbierta && (
-        <ModalProfesora profesora={profesoraAbierta} onCerrar={() => setProfesoraAbierta(null)} />
+        <ModalProfesora
+          profesora={profesoraAbierta}
+          fotos={galeria.filter((f) => f.profesora_id === profesoraAbierta.id).map((f) => f.url)}
+          onCerrar={() => setProfesoraAbierta(null)}
+        />
       )}
     </div>
   )

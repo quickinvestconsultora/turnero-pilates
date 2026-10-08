@@ -1161,3 +1161,144 @@ label {
 .bienvenida-botones {
   justify-content: space-between;
 }
+
+/* ---- Ficha de la profesora (vista de alumnas y vista previa) ---- */
+.tarjeta-profesora {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: center;
+}
+
+.tarjeta-profesora h2 {
+  margin: 8px 0 0;
+}
+
+.profesora-frase {
+  margin: 4px 0;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 18px;
+  line-height: 1.35;
+  color: var(--acento-oscuro);
+}
+
+.profesora-chips {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.profesora-chips li {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borde);
+  font-size: 12px;
+}
+
+.profesora-seccion {
+  width: 100%;
+  text-align: left;
+  margin-top: 8px;
+}
+
+.profesora-seccion h3 {
+  margin: 0 0 3px;
+  font-size: 13px;
+  color: var(--texto-suave);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.profesora-seccion p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.profesora-instagram {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--acento-oscuro);
+}
+
+.previa-titulo {
+  margin: 26px 0 8px;
+}
+
+.previa-profesora {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 20px 18px;
+}
+
+/* ---- Galería de fotos de la profesora ---- */
+.profesora-galeria {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.profesora-galeria img,
+.galeria-item img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+  border: 1px solid var(--borde);
+}
+
+.galeria-editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 8px;
+  margin: 10px 0 18px;
+}
+
+.galeria-item {
+  position: relative;
+}
+
+.galeria-borrar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  line-height: 1;
+  font-size: 16px;
+  background: rgba(28, 22, 15, 0.7);
+  color: #fff;
+  border: 0;
+  box-shadow: none;
+}
+
+.galeria-agregar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border: 1px dashed var(--acento);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--acento-oscuro);
+  text-align: center;
+  cursor: pointer;
+}

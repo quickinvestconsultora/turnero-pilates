@@ -69,7 +69,12 @@ alter table public.perfiles
 -- "Mi perfil" y lo ven las alumnas al tocar su nombre en un turno.
 alter table public.perfiles
   add column if not exists bio text,
-  add column if not exists foto_url text;
+  add column if not exists foto_url text,
+  add column if not exists formacion text,
+  add column if not exists especialidades text,
+  add column if not exists experiencia text,
+  add column if not exists frase text,
+  add column if not exists instagram text;
 
 -- Cuando alguien se registra, le creamos el perfil automáticamente con los
 -- datos que mandó en el formulario (van en raw_user_meta_data). Si vino con
@@ -236,6 +241,39 @@ create table if not exists public.observaciones_clientes (
 create index if not exists observaciones_alumna_idx
   on public.observaciones_clientes (alumna_id, creado_en desc);
 
+-- Galería de fotos de cada profesora (la que ven las alumnas en su ficha).
+-- Los archivos están en el bucket público "profes"; acá se guarda la lista.
+create table if not exists public.fotos_profesoras (
+  id            uuid primary key default gen_random_uuid(),
+  profesora_id  uuid not null references public.perfiles (id) on delete cascade,
+  url           text not null,
+  ruta          text not null,
+  creado_en     timestamptz not null default now()
+);
+
+create index if not exists fotos_profesoras_idx
+  on public.fotos_profesoras (profesora_id, creado_en);
+
+-- Tope de 8 fotos por profesora, para que la ficha no se llene de archivos.
+create or replace function public.limitar_fotos_profesora()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if (select count(*) from public.fotos_profesoras where profesora_id = new.profesora_id) >= 8 then
+    raise exception 'Podés tener hasta 8 fotos en tu ficha. Borrá alguna para subir otra.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists limitar_fotos on public.fotos_profesoras;
+create trigger limitar_fotos
+  before insert on public.fotos_profesoras
+  for each row execute function public.limitar_fotos_profesora();
+
 -- ============================================================================
 -- 5. Row Level Security
 -- ============================================================================
@@ -244,6 +282,22 @@ alter table public.plantillas_turno enable row level security;
 alter table public.turnos          enable row level security;
 alter table public.reservas        enable row level security;
 alter table public.observaciones_clientes enable row level security;
+alter table public.fotos_profesoras enable row level security;
+
+-- --- fotos_profesoras: las ve cualquiera con sesión; las maneja la dueña ------
+drop policy if exists fotos_profesoras_ver on public.fotos_profesoras;
+create policy fotos_profesoras_ver on public.fotos_profesoras
+  for select to authenticated using (true);
+
+drop policy if exists fotos_profesoras_crea on public.fotos_profesoras;
+create policy fotos_profesoras_crea on public.fotos_profesoras
+  for insert with check (profesora_id = auth.uid() and public.es_instructora());
+
+drop policy if exists fotos_profesoras_borra on public.fotos_profesoras;
+create policy fotos_profesoras_borra on public.fotos_profesoras
+  for delete using (
+    (profesora_id = auth.uid() and public.es_instructora()) or public.es_staff()
+  );
 
 -- --- observaciones_clientes: solo staff, nunca la alumna ----------------------
 drop policy if exists observaciones_staff on public.observaciones_clientes;
@@ -452,6 +506,14 @@ create policy profes_foto_sube on storage.objects
     and (public.es_instructora() or public.es_staff())
   );
 
+drop policy if exists profes_foto_borra on storage.objects;
+create policy profes_foto_borra on storage.objects
+  for delete using (
+    bucket_id = 'profes'
+    and (storage.foldername(name))[1] = auth.uid()::text
+    and (public.es_instructora() or public.es_staff())
+  );
+
 drop policy if exists profes_foto_actualiza on storage.objects;
 create policy profes_foto_actualiza on storage.objects
   for update using (
@@ -654,14 +716,26 @@ $$;
 -- --- Profesoras: perfil público ----------------------------------------------
 -- Las alumnas no pueden leer perfiles ajenos, así que lo que se muestra de
 -- una profesora (nombre, foto, descripción) sale por acá y nada más.
-create or replace function public.listar_profesoras()
-returns table (id uuid, nombre text, bio text, foto_url text)
+drop function if exists public.listar_profesoras();
+create function public.listar_profesoras()
+returns table (
+  id uuid,
+  nombre text,
+  bio text,
+  foto_url text,
+  formacion text,
+  especialidades text,
+  experiencia text,
+  frase text,
+  instagram text
+)
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select p.id, btrim(p.nombre || ' ' || p.apellido), p.bio, p.foto_url
+  select p.id, btrim(p.nombre || ' ' || p.apellido), p.bio, p.foto_url,
+         p.formacion, p.especialidades, p.experiencia, p.frase, p.instagram
   from public.perfiles p
   where p.rol = 'instructora'
   order by p.nombre;

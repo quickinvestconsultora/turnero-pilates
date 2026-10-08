@@ -19,6 +19,11 @@ export type Perfil = {
   deslinde_pdf_subido: boolean
   bio: string | null
   foto_url: string | null
+  formacion: string | null
+  especialidades: string | null
+  experiencia: string | null
+  frase: string | null
+  instagram: string | null
   creado_en: string
 }
 
@@ -28,6 +33,11 @@ export type Profesora = {
   nombre: string
   bio: string | null
   foto_url: string | null
+  formacion: string | null
+  especialidades: string | null // separadas por coma o salto de línea
+  experiencia: string | null
+  frase: string | null
+  instagram: string | null // solo el usuario, sin @
 }
 
 export type Observacion = {
