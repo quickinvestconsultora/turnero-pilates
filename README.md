@@ -121,6 +121,7 @@ where u.id = p.id and u.email = 'MAIL@EJEMPLO.COM';
 | `plantillas_turno` | Turno fijo semanal (día, hora, cupo, instructor). |
 | `turnos` | Turno concreto en una fecha. Se crea a mano o generado desde una plantilla. |
 | `reservas` | 1 fila por (turno, alumno). `estado`: `reservada` \| `lista_espera` \| `cancelada`. `asistencia`: `asistio` \| `ausente` \| null (se carga después de la clase, la pone el staff). |
+| `observaciones_clientes` | Notas internas con fecha sobre cada alumna, las carga el staff desde **Clientes → Ver ficha y observaciones**. Tabla aparte (no una columna de `perfiles`) y con acceso solo para staff: la alumna puede leer su propio perfil, pero nunca ve estas notas. |
 
 Funciones: `reservar_turno`, `cancelar_reserva`, `listar_turnos` (alumno), `generar_turnos` (staff), `estadisticas` (staff — ocupación, ausentismo y ranking de faltas de los últimos 30 días).
 

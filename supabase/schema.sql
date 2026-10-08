@@ -159,6 +159,20 @@ create index if not exists reservas_alumno_idx on public.reservas (alumno_id);
 alter table public.reservas
   add column if not exists asistencia text check (asistencia in ('asistio', 'ausente'));
 
+-- Observaciones del estudio sobre cada alumna (notas internas con fecha).
+-- Tabla aparte y no una columna de perfiles: la alumna puede leer su propio
+-- perfil, y estas notas son solo para el staff.
+create table if not exists public.observaciones_clientes (
+  id         uuid primary key default gen_random_uuid(),
+  alumna_id  uuid not null references public.perfiles (id) on delete cascade,
+  texto      text not null check (length(btrim(texto)) > 0),
+  autor_id   uuid references auth.users (id) on delete set null default auth.uid(),
+  creado_en  timestamptz not null default now()
+);
+
+create index if not exists observaciones_alumna_idx
+  on public.observaciones_clientes (alumna_id, creado_en desc);
+
 -- ============================================================================
 -- 5. Row Level Security
 -- ============================================================================
@@ -166,6 +180,12 @@ alter table public.perfiles        enable row level security;
 alter table public.plantillas_turno enable row level security;
 alter table public.turnos          enable row level security;
 alter table public.reservas        enable row level security;
+alter table public.observaciones_clientes enable row level security;
+
+-- --- observaciones_clientes: solo staff, nunca la alumna ----------------------
+drop policy if exists observaciones_staff on public.observaciones_clientes;
+create policy observaciones_staff on public.observaciones_clientes
+  for all using (public.es_staff()) with check (public.es_staff());
 
 -- --- perfiles -----------------------------------------------------------------
 drop policy if exists perfiles_ver_propio on public.perfiles;

@@ -4,6 +4,7 @@ import { actualizarEstadoCuenta, listarClientes } from '../servicios/clientes'
 import { obtenerUrlDeslinde } from '../servicios/deslinde'
 import { fechaCorta } from '../fechas'
 import { nombreCompleto } from '../personas'
+import FichaCliente from './FichaCliente'
 
 const ETIQUETA_ESTADO: Record<EstadoCuenta, string> = {
   prueba: 'Prueba',
@@ -93,6 +94,7 @@ function ClienteItem({
 }) {
   const [ocupado, setOcupado] = useState(false)
   const [errorDeslinde, setErrorDeslinde] = useState('')
+  const [fichaAbierta, setFichaAbierta] = useState(false)
 
   const cambiarEstado = async (estado: EstadoCuenta) => {
     if (estado === cliente.estado_cuenta) return
@@ -129,9 +131,18 @@ function ClienteItem({
           {' · Desde '}
           {fechaCorta(cliente.creado_en.slice(0, 10))}
         </span>
-        <button type="button" className="link-secundario enlace-deslinde" onClick={verDeslinde}>
-          Ver deslinde firmado
-        </button>
+        <div className="cliente-enlaces">
+          <button
+            type="button"
+            className="link-secundario enlace-deslinde"
+            onClick={() => setFichaAbierta(!fichaAbierta)}
+          >
+            {fichaAbierta ? 'Cerrar ficha' : 'Ver ficha y observaciones'}
+          </button>
+          <button type="button" className="link-secundario enlace-deslinde" onClick={verDeslinde}>
+            Ver deslinde firmado
+          </button>
+        </div>
         {errorDeslinde && <span className="mensaje-error">{errorDeslinde}</span>}
       </div>
 
@@ -165,6 +176,8 @@ function ClienteItem({
           Debe
         </button>
       </div>
+
+      {fichaAbierta && <FichaCliente cliente={cliente} />}
     </li>
   )
 }

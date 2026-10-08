@@ -20,7 +20,14 @@ export type Perfil = {
   creado_en: string
 }
 
-export type EstadoReserva = 'reservada' | 'lista_espera' | 'cancelada'
+export type Observacion = {
+  id: string
+  alumna_id: string
+  texto: string
+  creado_en: string
+}
+
+export type EstadoReserva ='reservada' | 'lista_espera' | 'cancelada'
 export type EstadoAsistencia = 'asistio' | 'ausente'
 
 // Fila que devuelve la función listar_turnos (vista del alumno).
