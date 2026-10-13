@@ -241,6 +241,10 @@ create index if not exists reservas_alumno_idx on public.reservas (alumno_id);
 alter table public.reservas
   add column if not exists asistencia text check (asistencia in ('asistio', 'ausente'));
 
+-- Marca de "ya se mandó el recordatorio de 2 horas antes" (una sola vez).
+alter table public.reservas
+  add column if not exists recordatorio_enviado_en timestamptz;
+
 -- Observaciones del estudio sobre cada alumna (notas internas con fecha).
 -- Tabla aparte y no una columna de perfiles: la alumna puede leer su propio
 -- perfil, y estas notas son solo para el staff.
@@ -302,6 +306,9 @@ create table if not exists public.reservas_invitadas (
 
 create index if not exists reservas_invitadas_turno_idx
   on public.reservas_invitadas (turno_id);
+
+alter table public.reservas_invitadas
+  add column if not exists recordatorio_enviado_en timestamptz;
 
 drop trigger if exists limitar_fotos on public.fotos_profesoras;
 create trigger limitar_fotos
@@ -1086,6 +1093,66 @@ begin
 end;
 $$;
 
+-- --- Recordatorio de 2 horas antes ---------------------------------------------
+-- Las usa SOLO la Edge Function "enviar-recordatorios" (con la clave de
+-- servicio), que corre cada 10 minutos. Devuelve a quién hay que avisar: los
+-- turnos que empiezan en las próximas 2 horas (hora argentina), con reserva
+-- confirmada (o invitada con mail) que todavía no recibió el aviso. No avisa
+-- a quien reservó dentro de las últimas 2 horas: recién se anotó.
+create or replace function public.recordatorios_pendientes()
+returns table (
+  tipo       text,
+  reserva_id uuid,
+  nombre     text,
+  email      text,
+  fecha      date,
+  hora       time,
+  profesora  text
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select 'alumna'::text, r.id, p.nombre, u.email::text, t.fecha, t.hora, t.instructor
+  from public.reservas r
+  join public.turnos t on t.id = r.turno_id
+  join public.perfiles p on p.id = r.alumno_id
+  join auth.users u on u.id = r.alumno_id
+  where r.estado = 'reservada'
+    and r.recordatorio_enviado_en is null
+    and not t.cancelado
+    and u.email is not null
+    and ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') > now()
+    and ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') <= now() + interval '2 hours'
+    and r.creado_en <= ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') - interval '2 hours'
+  union all
+  select 'invitada'::text, i.id, i.nombre, i.email, t.fecha, t.hora, t.instructor
+  from public.reservas_invitadas i
+  join public.turnos t on t.id = i.turno_id
+  where i.recordatorio_enviado_en is null
+    and i.email is not null
+    and not t.cancelado
+    and ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') > now()
+    and ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') <= now() + interval '2 hours'
+    and i.creado_en <= ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') - interval '2 hours';
+$$;
+
+create or replace function public.marcar_recordatorios(p_reservas uuid[], p_invitadas uuid[])
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.reservas
+    set recordatorio_enviado_en = now()
+  where id = any(p_reservas);
+
+  update public.reservas_invitadas
+    set recordatorio_enviado_en = now()
+  where id = any(p_invitadas);
+$$;
+
 -- --- Generar turnos desde una plantilla (staff) --------------------------
 -- Crea un turno por cada fecha entre p_desde y p_hasta que caiga en el día
 -- de semana de la plantilla. Los que ya existen (misma fecha/hora) se saltean.
@@ -1229,6 +1296,13 @@ grant execute on function public.reservar_serie(uuid)          to authenticated;
 grant execute on function public.listar_turnos(date, date)     to authenticated;
 grant execute on function public.generar_turnos(uuid, date, date) to authenticated;
 grant execute on function public.estadisticas(date, date)      to authenticated;
+-- Los recordatorios los maneja solo la función programada (clave de servicio):
+-- ni alumnas ni la app pueden llamarlos.
+revoke execute on function public.recordatorios_pendientes() from public, anon, authenticated;
+revoke execute on function public.marcar_recordatorios(uuid[], uuid[]) from public, anon, authenticated;
+grant execute on function public.recordatorios_pendientes() to service_role;
+grant execute on function public.marcar_recordatorios(uuid[], uuid[]) to service_role;
+
 grant execute on function public.listar_profesoras()           to authenticated;
 grant execute on function public.ocupados_turno(uuid)          to authenticated;
 grant execute on function public.agregar_alumna_a_turno(uuid, uuid) to authenticated;

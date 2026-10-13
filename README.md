@@ -163,6 +163,45 @@ El staff lo descarga por cada alumna desde **Clientes → Ver deslinde firmado**
 
 La generación de PDF usa `jsPDF`, cargado en un chunk aparte (no suma peso al resto de la app: solo se descarga cuando hace falta generar un PDF).
 
+## Recordatorios por mail (2 horas antes)
+
+**El código está listo; falta conectar la API de Brevo (pasos de abajo).** Cada 10 minutos una tarea programada le pide a la base los turnos que empiezan en las próximas 2 horas (hora argentina) y manda un mail a cada alumna anotada y a las "sin registrar" que tengan mail cargado. Una sola vez por reserva (queda marcado en `recordatorio_enviado_en`), y no avisa a quien reservó dentro de esas 2 horas.
+
+Piezas: las funciones `recordatorios_pendientes` y `marcar_recordatorios` de `supabase/schema.sql` (solo las puede usar la clave de servicio) y la Edge Function [`supabase/functions/enviar-recordatorios/index.ts`](supabase/functions/enviar-recordatorios/index.ts).
+
+### Conectarlo
+
+1. **API key de Brevo**: Brevo → *SMTP & API → API Keys → Generate a new API key* (es distinta de la clave SMTP). Copiala.
+2. **Secretos**: Supabase → *Edge Functions → Secrets* → agregá `BREVO_API_KEY` (la clave del paso 1) y `CRON_SECRET` (un texto largo cualquiera que inventes). Opcional: `MAIL_REMITENTE` si el remitente verificado en Brevo no es `fortevastudio@gmail.com`.
+3. **Publicar la función**: Supabase → *Edge Functions → Deploy a new function → Via Editor*, nombre `enviar-recordatorios`, pegá el contenido de `index.ts` y *Deploy*.
+4. **Probar sin mandar nada**: en la pestaña *Test* de la función, método POST, encabezado `x-cron-secret` con tu secreto y cuerpo `{"prueba": true}`. Devuelve quién recibiría un mail ahora.
+5. **Programarla** (SQL Editor, reemplazando los dos valores entre `<>`):
+
+```sql
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+
+select cron.schedule(
+  'recordatorios-turnos',
+  '*/10 * * * *',
+  $$
+  select net.http_post(
+    url := 'https://<ID-DEL-PROYECTO>.supabase.co/functions/v1/enviar-recordatorios',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer <ANON-KEY-DEL-PROYECTO>',
+      'x-cron-secret', '<EL-MISMO-CRON_SECRET>'
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
+
+Para apagarla: `select cron.unschedule('recordatorios-turnos');`.
+
+Antes de activarlo en serio conviene arreglar el remitente: con un Gmail, Brevo puede reescribir el "De". Lo prolijo es una dirección del dominio (`turnos@fortevastudio.com.ar`) con sus registros DNS.
+
 ## Pendiente (fuera del MVP)
 
 - Bonos / paquetes de clases con vencimiento (por ahora el estado de cuenta es binario: al día o debe, sin "cuántas clases le quedan").
@@ -171,6 +210,5 @@ La generación de PDF usa `jsPDF`, cargado en un chunk aparte (no suma peso al r
 **En pausa hasta tener mail propio del estudio** (dominio + cuenta en Resend/Brevo con API key — ver "Correos de confirmación de registro" más arriba). Ninguna de las tres se puede armar con lo que manda Supabase hoy, porque necesitan mandar contenido propio (adjuntos, disparadas por eventos), no solo los mails fijos de login:
 
 - Mandar el PDF del deslinde por mail a la administradora apenas se registra una alumna (hoy se descarga a demanda desde Clientes → Ver deslinde firmado).
-- Recordatorio por mail antes de cada clase (baja el ausentismo).
 - Avisar por mail a la alumna cuando se libera un lugar de la lista de espera (hoy sube sola en el sistema pero no se entera hasta que entra a mirar).
 - Mail cuando una profesora (o el staff) suma a alguien a un turno: a la que **ya tiene cuenta**, "te agregaron a este turno"; a la que **no está registrada** (las que quedan en `reservas_invitadas`, con su mail opcional y la columna `aviso_enviado_en` lista para marcar el envío), "te agregaron a un turno en FORTEVA, no estás registrada: registrate con un click". Falta también que, al registrarse, esa persona se vincule con sus turnos ya cargados (hoy quedan como "sin registrar" hasta que se las pase a mano).
