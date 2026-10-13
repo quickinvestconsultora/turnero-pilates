@@ -1349,3 +1349,35 @@ label {
   align-items: flex-end;
   gap: 4px;
 }
+
+/* ---- Filtros de Clientes (resumen de abonos) ---- */
+.filtros-clientes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 10px;
+}
+
+.chip {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--borde);
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: none;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.chip.activo {
+  background: var(--primario);
+  color: var(--primario-texto);
+  border-color: var(--primario);
+}
+
+.chip-numero {
+  opacity: 0.7;
+  font-weight: 700;
+}

@@ -58,6 +58,58 @@ export async function crearTurno(datos: {
   }
 }
 
+// Cambios que el staff hace desde la agenda sobre un turno ya creado. Si el
+// turno viene de un turno fijo y `aplicarASerie` es true, el cambio también
+// alcanza a todos los turnos futuros de ese horario y al turno fijo en sí
+// (así lo que se genere después sale igual).
+export type CambiosTurno = {
+  cupo?: number
+  // undefined = no tocar la profesora; null = dejar sin profesora.
+  profesora?: { instructoraId: string } | { instructor: string } | null
+}
+
+export async function editarTurno(
+  turno: { id: string; plantilla_id: string | null },
+  cambios: CambiosTurno,
+  aplicarASerie: boolean,
+): Promise<void> {
+  const campos: Record<string, unknown> = {}
+  if (cambios.cupo !== undefined) campos.cupo = cambios.cupo
+  if (cambios.profesora !== undefined) {
+    if (cambios.profesora === null) {
+      campos.instructora_id = null
+      campos.instructor = null
+    } else if ('instructoraId' in cambios.profesora) {
+      // El nombre visible lo completa la base a partir de la profesora.
+      campos.instructora_id = cambios.profesora.instructoraId
+    } else {
+      campos.instructora_id = null
+      campos.instructor = cambios.profesora.instructor.trim() || null
+    }
+  }
+  if (Object.keys(campos).length === 0) return
+
+  if (aplicarASerie && turno.plantilla_id) {
+    const { error: errorPlantilla } = await supabase
+      .from('plantillas_turno')
+      .update(campos)
+      .eq('id', turno.plantilla_id)
+    if (errorPlantilla) throw new Error(errorPlantilla.message)
+
+    const { error } = await supabase
+      .from('turnos')
+      .update(campos)
+      .eq('plantilla_id', turno.plantilla_id)
+      .eq('cancelado', false)
+      .gte('fecha', hoyIso())
+    if (error) throw new Error(error.message)
+    return
+  }
+
+  const { error } = await supabase.from('turnos').update(campos).eq('id', turno.id)
+  if (error) throw new Error(error.message)
+}
+
 export async function actualizarTurno(
   id: string,
   cambios: Partial<{ cupo: number; instructor: string | null; nota: string | null; cancelado: boolean }>,

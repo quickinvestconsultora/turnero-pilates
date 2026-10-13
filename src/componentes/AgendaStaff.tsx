@@ -14,6 +14,7 @@ import {
 import { encabezadoDia, horaCorta, hoyIso, sumarDias, yaPaso } from '../fechas'
 import { nombreCompleto } from '../personas'
 import AgregarAlumna from './AgregarAlumna'
+import EditarTurno from './EditarTurno'
 import CampoProfesora from './CampoProfesora'
 import type { ValorProfesora } from './CampoProfesora'
 
@@ -140,6 +141,7 @@ function TurnoStaff({
   const invitadas = turno.reservas_invitadas ?? []
   const pasado = yaPaso(turno.fecha, turno.hora)
   const [agregando, setAgregando] = useState(false)
+  const [editando, setEditando] = useState(false)
 
   const conManejo = async (fn: () => Promise<void>) => {
     setOcupado(true)
@@ -169,6 +171,12 @@ function TurnoStaff({
               className="link-secundario"
               disabled={ocupado}
               onClick={() => {
+                // El staff abre el panel completo (profesora y cupo, también
+                // para toda la serie); la profesora solo cambia el cupo.
+                if (!miId) {
+                  setEditando((v) => !v)
+                  return
+                }
                 const valor = prompt('Nuevo cupo', String(turno.cupo))
                 if (valor == null) return
                 const cupo = Number(valor)
@@ -179,7 +187,7 @@ function TurnoStaff({
                 conManejo(() => actualizarTurno(turno.id, { cupo }))
               }}
             >
-              Editar cupo
+              {miId ? 'Editar cupo' : 'Editar'}
             </button>
             <button
               type="button"
@@ -197,6 +205,17 @@ function TurnoStaff({
         )}
         {pasado && !turno.cancelado && <span className="etiqueta-rol">Ya pasó</span>}
       </div>
+
+      {editando && !miId && (
+        <EditarTurno
+          turno={turno}
+          onGuardado={() => {
+            setEditando(false)
+            onCambio()
+          }}
+          onCerrar={() => setEditando(false)}
+        />
+      )}
 
       {turno.instructor && <p className="turno-profesora">Profesora: {turno.instructor}</p>}
       {turno.nota && <p className="turno-nota">{turno.nota}</p>}
@@ -267,7 +286,8 @@ function TurnoStaff({
             <li key={i.id}>
               <div className="fila-anotada">
                 <span>
-                  {nombreCompleto(i)} · {i.telefono}
+                  {nombreCompleto(i)}
+                  {i.telefono ? ` · ${i.telefono}` : ''}
                   <span className="etiqueta-sin-registrar">Sin registrar</span>
                 </span>
                 {pasado ? (

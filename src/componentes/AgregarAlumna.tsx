@@ -126,23 +126,21 @@ export default function AgregarAlumna({
               />
             </div>
             <div>
-              <label htmlFor={`ag-apellido-${turnoId}`}>Apellido</label>
+              <label htmlFor={`ag-apellido-${turnoId}`}>Apellido (opcional)</label>
               <input
                 id={`ag-apellido-${turnoId}`}
                 value={apellido}
                 onChange={(e) => setApellido(e.target.value)}
-                required
               />
             </div>
             <div>
-              <label htmlFor={`ag-tel-${turnoId}`}>Celular</label>
+              <label htmlFor={`ag-tel-${turnoId}`}>Celular (opcional)</label>
               <input
                 id={`ag-tel-${turnoId}`}
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
                 inputMode="tel"
                 placeholder="Con código de área"
-                required
               />
             </div>
             <div>
@@ -156,6 +154,10 @@ export default function AgregarAlumna({
               />
             </div>
           </div>
+          <p className="ayuda">
+            Con solo el nombre alcanza: si todavía no tiene los demás datos, queda anotada igual y
+            se completan después.
+          </p>
           <button type="submit" disabled={enviando}>
             {enviando ? 'Agregando...' : 'Agregar al turno'}
           </button>

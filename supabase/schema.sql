@@ -288,15 +288,16 @@ end;
 $$;
 
 -- Personas anotadas en un turno por la profesora (o el staff) que todavía no
--- tienen cuenta. Se les pide como mínimo nombre, apellido y teléfono; el mail
--- es opcional y sirve para, más adelante, avisarles ("te agregaron a este
+-- tienen cuenta. Alcanza con el nombre (por si pasan el turno y todavía no
+-- tienen más datos); apellido, teléfono y mail son opcionales y se completan
+-- después. El mail sirve para, más adelante, avisarles ("te agregaron a este
 -- turno, ¿querés registrarte con un click?"). Cuentan para el cupo.
 create table if not exists public.reservas_invitadas (
   id                uuid primary key default gen_random_uuid(),
   turno_id          uuid not null references public.turnos (id) on delete cascade,
   nombre            text not null check (length(btrim(nombre)) > 0),
-  apellido          text not null check (length(btrim(apellido)) > 0),
-  telefono          text not null check (length(btrim(telefono)) > 0),
+  apellido          text not null default '',
+  telefono          text not null default '',
   email             text,
   agregada_por      uuid references auth.users (id) on delete set null default auth.uid(),
   asistencia        text check (asistencia in ('asistio', 'ausente')),
@@ -309,6 +310,13 @@ create index if not exists reservas_invitadas_turno_idx
 
 alter table public.reservas_invitadas
   add column if not exists recordatorio_enviado_en timestamptz;
+
+-- Para instalaciones que ya tenían apellido y teléfono obligatorios.
+alter table public.reservas_invitadas drop constraint if exists reservas_invitadas_apellido_check;
+alter table public.reservas_invitadas drop constraint if exists reservas_invitadas_telefono_check;
+alter table public.reservas_invitadas
+  alter column apellido set default '',
+  alter column telefono set default '';
 
 drop trigger if exists limitar_fotos on public.fotos_profesoras;
 create trigger limitar_fotos
@@ -1014,13 +1022,15 @@ end;
 $$;
 
 -- --- Anotar en un turno a alguien que todavía no tiene cuenta -------------------
--- Pide como mínimo nombre, apellido y teléfono. Si ese teléfono ya es de una
--- alumna registrada, avisa para no duplicar a la persona.
-create or replace function public.agregar_invitada_a_turno(
+-- Pide solo el nombre; apellido, teléfono y mail son opcionales. Si se carga
+-- el teléfono y ya es de una alumna registrada, avisa para no duplicar a la
+-- persona.
+drop function if exists public.agregar_invitada_a_turno(uuid, text, text, text, text);
+create function public.agregar_invitada_a_turno(
   p_turno_id uuid,
   p_nombre text,
-  p_apellido text,
-  p_telefono text,
+  p_apellido text default '',
+  p_telefono text default '',
   p_email text default null
 )
 returns uuid
@@ -1038,11 +1048,11 @@ begin
     raise exception 'No podés agregar alumnas a este turno.';
   end if;
 
-  if length(btrim(coalesce(p_nombre, ''))) = 0 or length(btrim(coalesce(p_apellido, ''))) = 0 then
-    raise exception 'Hacen falta el nombre y el apellido.';
+  if length(btrim(coalesce(p_nombre, ''))) = 0 then
+    raise exception 'Hace falta al menos el nombre.';
   end if;
-  if length(v_digitos) < 8 then
-    raise exception 'El teléfono no parece válido (con código de área, sin 0 ni 15).';
+  if length(v_digitos) > 0 and length(v_digitos) < 8 then
+    raise exception 'El teléfono no parece válido (con código de área, sin 0 ni 15). Podés dejarlo vacío.';
   end if;
   if length(btrim(coalesce(p_email, ''))) > 0 and position('@' in p_email) = 0 then
     raise exception 'El mail no parece válido.';
@@ -1059,18 +1069,26 @@ begin
     raise exception 'Ese turno ya pasó.';
   end if;
 
-  select btrim(nombre || ' ' || apellido) into v_existente
-  from public.perfiles
-  where rol = 'alumno' and right(regexp_replace(telefono, '\D', '', 'g'), 8) = right(v_digitos, 8)
-  limit 1;
-  if v_existente is not null then
-    raise exception 'Ese teléfono ya es de una alumna registrada (%). Buscala en "Ya registrada".', v_existente;
+  if length(v_digitos) >= 8 then
+    select btrim(nombre || ' ' || apellido) into v_existente
+    from public.perfiles
+    where rol = 'alumno' and right(regexp_replace(telefono, '\D', '', 'g'), 8) = right(v_digitos, 8)
+    limit 1;
+    if v_existente is not null then
+      raise exception 'Ese teléfono ya es de una alumna registrada (%). Buscala en "Ya registrada".', v_existente;
+    end if;
   end if;
 
+  -- Misma persona dos veces en el turno: por teléfono si lo hay, si no por nombre.
   if exists (
     select 1 from public.reservas_invitadas
     where turno_id = p_turno_id
-      and right(regexp_replace(telefono, '\D', '', 'g'), 8) = right(v_digitos, 8)
+      and (
+        (length(v_digitos) >= 8
+          and right(regexp_replace(telefono, '\D', '', 'g'), 8) = right(v_digitos, 8))
+        or (length(v_digitos) < 8
+          and lower(btrim(nombre || ' ' || apellido)) = lower(btrim(p_nombre || ' ' || coalesce(p_apellido, ''))))
+      )
   ) then
     raise exception 'Ya está anotada en este turno.';
   end if;
@@ -1083,8 +1101,8 @@ begin
   values (
     p_turno_id,
     btrim(p_nombre),
-    btrim(p_apellido),
-    btrim(p_telefono),
+    btrim(coalesce(p_apellido, '')),
+    btrim(coalesce(p_telefono, '')),
     nullif(btrim(coalesce(p_email, '')), '')
   )
   returning id into v_id;

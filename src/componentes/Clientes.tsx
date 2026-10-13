@@ -3,7 +3,7 @@ import type { EstadoCuenta, Perfil } from '../tipos'
 import { actualizarEstadoCuenta, listarClientes, sumarMesDeAbono } from '../servicios/clientes'
 import { obtenerUrlDeslinde } from '../servicios/deslinde'
 import { abonoVencido, diaMes } from '../cuenta'
-import { fechaCorta } from '../fechas'
+import { fechaCorta, hoyIso, sumarDias } from '../fechas'
 import { nombreCompleto } from '../personas'
 import FichaCliente from './FichaCliente'
 
@@ -12,6 +12,17 @@ const ETIQUETA_ESTADO: Record<EstadoCuenta, string> = {
   al_dia: 'Al día',
   pendiente: 'Debe',
 }
+
+type Filtro = 'todas' | 'vencen' | 'vencidas' | 'debe' | 'prueba' | 'al_dia'
+
+const ETIQUETA_FILTRO: [Filtro, string][] = [
+  ['todas', 'Todas'],
+  ['vencen', 'Vencen esta semana'],
+  ['vencidas', 'Vencidas'],
+  ['debe', 'Deben'],
+  ['prueba', 'Prueba'],
+  ['al_dia', 'Al día'],
+]
 
 const ETIQUETA_NIVEL: Record<string, string> = {
   principiante: 'Principiante',
@@ -32,6 +43,7 @@ export default function Clientes({
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [busqueda, setBusqueda] = useState('')
+  const [filtro, setFiltro] = useState<Filtro>('todas')
 
   const cargar = useCallback(async () => {
     setError('')
@@ -48,16 +60,43 @@ export default function Clientes({
     cargar()
   }, [cargar])
 
+  const resumen = useMemo(() => {
+    const en7 = sumarDias(hoyIso(), 7)
+    const cuenta: Record<Filtro, (c: Perfil) => boolean> = {
+      todas: () => true,
+      vencen: (c) =>
+        c.estado_cuenta === 'al_dia' &&
+        !abonoVencido(c) &&
+        c.al_dia_hasta !== null &&
+        c.al_dia_hasta <= en7,
+      vencidas: (c) => abonoVencido(c),
+      debe: (c) => c.estado_cuenta === 'pendiente',
+      prueba: (c) => c.estado_cuenta === 'prueba',
+      al_dia: (c) => c.estado_cuenta === 'al_dia' && !abonoVencido(c),
+    }
+    const numeros = Object.fromEntries(
+      (Object.keys(cuenta) as Filtro[]).map((f) => [f, clientes.filter(cuenta[f]).length]),
+    ) as Record<Filtro, number>
+    return { cuenta, numeros }
+  }, [clientes])
+
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
-    if (!q) return clientes
-    return clientes.filter(
-      (c) =>
-        nombreCompleto(c).toLowerCase().includes(q) ||
-        (c.telefono ?? '').includes(q) ||
-        (c.dni ?? '').includes(q),
-    )
-  }, [clientes, busqueda])
+    let lista = paraProfesora ? clientes : clientes.filter(resumen.cuenta[filtro])
+    if (q) {
+      lista = lista.filter(
+        (c) =>
+          nombreCompleto(c).toLowerCase().includes(q) ||
+          (c.telefono ?? '').includes(q) ||
+          (c.dni ?? '').includes(q),
+      )
+    }
+    // En los filtros de vencimiento, primero las que vencen antes.
+    if (filtro === 'vencen' || filtro === 'vencidas') {
+      lista = [...lista].sort((a, b) => (a.al_dia_hasta ?? '').localeCompare(b.al_dia_hasta ?? ''))
+    }
+    return lista
+  }, [clientes, busqueda, filtro, paraProfesora, resumen])
 
   return (
     <div>
@@ -65,6 +104,21 @@ export default function Clientes({
         <h2>Clientes</h2>
         <span className="turno-detalle">{clientes.length} en total</span>
       </div>
+
+      {!paraProfesora && (
+        <div className="filtros-clientes" role="group" aria-label="Filtrar por estado de cuenta">
+          {ETIQUETA_FILTRO.map(([f, etiqueta]) => (
+            <button
+              key={f}
+              type="button"
+              className={filtro === f ? 'chip activo' : 'chip'}
+              onClick={() => setFiltro(f)}
+            >
+              {etiqueta} <span className="chip-numero">{resumen.numeros[f]}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <input
         value={busqueda}
