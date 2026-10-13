@@ -5,6 +5,8 @@ import { obtenerUrlDeslinde } from '../servicios/deslinde'
 import { abonoVencido, diaMes } from '../cuenta'
 import { fechaCorta, hoyIso, sumarDias } from '../fechas'
 import { nombreCompleto } from '../personas'
+import { mensajeCliente } from '../whatsapp'
+import EnlaceWhatsApp from './EnlaceWhatsApp'
 import FichaCliente from './FichaCliente'
 
 const ETIQUETA_ESTADO: Record<EstadoCuenta, string> = {
@@ -234,6 +236,14 @@ function ClienteItem({
               Ver deslinde firmado
             </button>
           )}
+          <EnlaceWhatsApp
+            telefono={cliente.telefono}
+            mensaje={
+              paraProfesora
+                ? `Hola ${cliente.nombre.trim() || 'hola'}! Te escribimos de FORTEVA Studio.`
+                : mensajeCliente(cliente)
+            }
+          />
         </div>
         {errorDeslinde && <span className="mensaje-error">{errorDeslinde}</span>}
       </div>

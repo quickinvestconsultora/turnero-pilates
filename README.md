@@ -138,6 +138,10 @@ Pestaña **Clientes** (staff): lista todas las alumnas registradas, con su nivel
 
 El staff pasa a una alumna a `Al día` desde **Clientes** cuando confirma que pagó el mes. **El abono no se renueva solo**: cuando vence hay que volver a confirmar el pago (tocando "Al día" otra vez, o "+1 mes" para sumar el mes siguiente) y, si ya venció y nadie lo renovó, queda como "Venció el dd/mm" y se bloquean las reservas nuevas sin necesidad de marcarla "Debe". Si deja de pagar antes, se la pasa a `Debe`.
 
+**WhatsApp con un toque:** en cada alumna de **Clientes** y en cada anotada de la agenda hay un botón "WhatsApp" que abre el chat con el mensaje ya escrito (sin ninguna API: se arma un link `wa.me`, convirtiendo el celular al formato argentino `549…`, ver `src/whatsapp.ts`). En Clientes el mensaje se adapta: si el abono venció o debe, es un aviso de cobro con el link de Mercado Pago y el alias que haya en `config/pagos.ts`; si no, un saludo. La profesora lo ve con un saludo simple.
+
+**Personas "sin registrar":** si después se registran con el **mismo mail o el mismo celular** (últimos 8 dígitos) con el que las anotó una profesora, sus turnos ya cargados pasan solos a su cuenta, con la asistencia que tuvieran. Si se las anotó solo con el nombre, desde la agenda se las pasa a mano con **"Vincular a una cuenta"**.
+
 Cuando queda bloqueada (`Debe`, o `Prueba` después de la primera clase), la alumna ve las formas de pago que estén cargadas en **`src/config/pagos.ts`**, tanto en el cartel permanente (`Debe`) como en la ventana que aparece al intentar reservar:
 
 ```ts
@@ -211,4 +215,4 @@ Antes de activarlo en serio conviene arreglar el remitente: con un Gmail, Brevo 
 
 - Mandar el PDF del deslinde por mail a la administradora apenas se registra una alumna (hoy se descarga a demanda desde Clientes → Ver deslinde firmado).
 - Avisar por mail a la alumna cuando se libera un lugar de la lista de espera (hoy sube sola en el sistema pero no se entera hasta que entra a mirar).
-- Mail cuando una profesora (o el staff) suma a alguien a un turno: a la que **ya tiene cuenta**, "te agregaron a este turno"; a la que **no está registrada** (las que quedan en `reservas_invitadas`, con su mail opcional y la columna `aviso_enviado_en` lista para marcar el envío), "te agregaron a un turno en FORTEVA, no estás registrada: registrate con un click". Falta también que, al registrarse, esa persona se vincule con sus turnos ya cargados (hoy quedan como "sin registrar" hasta que se las pase a mano).
+- Mail cuando una profesora (o el staff) suma a alguien a un turno: a la que **ya tiene cuenta**, "te agregaron a este turno"; a la que **no está registrada** (las que quedan en `reservas_invitadas`, con su mail opcional y la columna `aviso_enviado_en` lista para marcar el envío), "te agregaron a un turno en FORTEVA, no estás registrada: registrate con un click".

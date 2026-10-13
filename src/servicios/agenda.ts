@@ -156,6 +156,15 @@ export async function agregarInvitadaATurno(
   if (error) throw new Error(error.message)
 }
 
+// Pasa la anotación de alguien "sin registrar" a la cuenta de una alumna.
+export async function vincularInvitada(invitadaId: string, alumnaId: string): Promise<void> {
+  const { error } = await supabase.rpc('vincular_invitada', {
+    p_invitada_id: invitadaId,
+    p_alumna_id: alumnaId,
+  })
+  if (error) throw new Error(error.message)
+}
+
 export async function quitarInvitada(id: string): Promise<void> {
   const { error } = await supabase.from('reservas_invitadas').delete().eq('id', id)
   if (error) throw new Error(error.message)

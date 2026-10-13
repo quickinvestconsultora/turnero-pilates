@@ -15,6 +15,9 @@ import { encabezadoDia, horaCorta, hoyIso, sumarDias, yaPaso } from '../fechas'
 import { nombreCompleto } from '../personas'
 import AgregarAlumna from './AgregarAlumna'
 import EditarTurno from './EditarTurno'
+import EnlaceWhatsApp from './EnlaceWhatsApp'
+import VincularInvitada from './VincularInvitada'
+import { mensajeTurno } from '../whatsapp'
 import CampoProfesora from './CampoProfesora'
 import type { ValorProfesora } from './CampoProfesora'
 
@@ -142,6 +145,7 @@ function TurnoStaff({
   const pasado = yaPaso(turno.fecha, turno.hora)
   const [agregando, setAgregando] = useState(false)
   const [editando, setEditando] = useState(false)
+  const [vinculandoId, setVinculandoId] = useState<string | null>(null)
 
   const conManejo = async (fn: () => Promise<void>) => {
     setOcupado(true)
@@ -231,6 +235,12 @@ function TurnoStaff({
                 <span>
                   {r.perfiles ? nombreCompleto(r.perfiles) : 'Sin nombre'}
                   {r.perfiles?.telefono ? ` · ${r.perfiles.telefono}` : ''}
+                  {r.perfiles && (
+                    <EnlaceWhatsApp
+                      telefono={r.perfiles.telefono}
+                      mensaje={mensajeTurno(r.perfiles.nombre, turno.fecha, turno.hora)}
+                    />
+                  )}
                 </span>
                 {pasado ? (
                   <div className="asistencia">
@@ -288,7 +298,18 @@ function TurnoStaff({
                 <span>
                   {nombreCompleto(i)}
                   {i.telefono ? ` · ${i.telefono}` : ''}
+                  <EnlaceWhatsApp
+                    telefono={i.telefono}
+                    mensaje={mensajeTurno(i.nombre, turno.fecha, turno.hora)}
+                  />
                   <span className="etiqueta-sin-registrar">Sin registrar</span>
+                  <button
+                    type="button"
+                    className="boton-mini boton-vincular"
+                    onClick={() => setVinculandoId(vinculandoId === i.id ? null : i.id)}
+                  >
+                    Vincular a una cuenta
+                  </button>
                 </span>
                 {pasado ? (
                   <div className="asistencia">
@@ -332,6 +353,17 @@ function TurnoStaff({
                   </button>
                 )}
               </div>
+              {vinculandoId === i.id && (
+                <VincularInvitada
+                  invitada={i}
+                  paraProfesora={Boolean(miId)}
+                  onVinculada={() => {
+                    setVinculandoId(null)
+                    onCambio()
+                  }}
+                  onCerrar={() => setVinculandoId(null)}
+                />
+              )}
             </li>
           ))}
           {espera.map((r) => (

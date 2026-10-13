@@ -111,6 +111,36 @@ begin
     case when new.raw_user_meta_data ->> 'acepta_deslinde' = 'true' then now() end
   )
   on conflict (id) do nothing;
+
+  -- Si la profesora ya la había anotado en turnos como "sin registrar", acá
+  -- esas reservas pasan a su cuenta (coincide el mail, o los últimos 8 dígitos
+  -- del celular). Si algo falla, el registro igual sigue: es un extra.
+  begin
+    with coinciden as (
+      select i.*
+      from public.reservas_invitadas i
+      where (
+        nullif(btrim(coalesce(i.email, '')), '') is not null
+        and lower(btrim(i.email)) = lower(coalesce(new.email, ''))
+      )
+      or (
+        length(regexp_replace(i.telefono, '\D', '', 'g')) >= 8
+        and length(regexp_replace(coalesce(new.raw_user_meta_data ->> 'telefono', ''), '\D', '', 'g')) >= 8
+        and right(regexp_replace(i.telefono, '\D', '', 'g'), 8)
+          = right(regexp_replace(new.raw_user_meta_data ->> 'telefono', '\D', '', 'g'), 8)
+      )
+    ), nuevas as (
+      insert into public.reservas (turno_id, alumno_id, estado, asistencia)
+      select c.turno_id, new.id, 'reservada', c.asistencia from coinciden c
+      on conflict (turno_id, alumno_id) do nothing
+      returning 1
+    )
+    delete from public.reservas_invitadas
+    where id in (select id from coinciden);
+  exception when others then
+    null;
+  end;
+
   return new;
 end;
 $$;
@@ -1111,6 +1141,47 @@ begin
 end;
 $$;
 
+-- --- Vincular a una persona "sin registrar" con una cuenta existente --------------
+-- Para cuando la profesora la anotó solo con el nombre y después se sabe quién
+-- es: su reserva pasa a la cuenta de la alumna (con la asistencia que tuviera)
+-- y se borra la anotación suelta. El cupo no cambia: una reemplaza a la otra.
+create or replace function public.vincular_invitada(p_invitada_id uuid, p_alumna_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  i public.reservas_invitadas;
+begin
+  select * into i from public.reservas_invitadas where id = p_invitada_id;
+  if not found then
+    raise exception 'Esa persona ya no está anotada en el turno.';
+  end if;
+  if not public.puede_gestionar_turno(i.turno_id) then
+    raise exception 'No podés modificar este turno.';
+  end if;
+  if not exists (select 1 from public.perfiles where id = p_alumna_id and rol = 'alumno') then
+    raise exception 'No encontramos a esa alumna.';
+  end if;
+
+  if not exists (
+    select 1 from public.reservas
+    where turno_id = i.turno_id and alumno_id = p_alumna_id
+      and estado in ('reservada', 'lista_espera')
+  ) then
+    insert into public.reservas (turno_id, alumno_id, estado, asistencia)
+    values (i.turno_id, p_alumna_id, 'reservada', i.asistencia)
+    on conflict (turno_id, alumno_id)
+      do update set estado = 'reservada',
+                    asistencia = coalesce(excluded.asistencia, public.reservas.asistencia),
+                    creado_en = now();
+  end if;
+
+  delete from public.reservas_invitadas where id = i.id;
+end;
+$$;
+
 -- --- Recordatorio de 2 horas antes ---------------------------------------------
 -- Las usa SOLO la Edge Function "enviar-recordatorios" (con la clave de
 -- servicio), que corre cada 10 minutos. Devuelve a quién hay que avisar: los
@@ -1324,5 +1395,6 @@ grant execute on function public.marcar_recordatorios(uuid[], uuid[]) to service
 grant execute on function public.listar_profesoras()           to authenticated;
 grant execute on function public.ocupados_turno(uuid)          to authenticated;
 grant execute on function public.agregar_alumna_a_turno(uuid, uuid) to authenticated;
+grant execute on function public.vincular_invitada(uuid, uuid) to authenticated;
 grant execute on function public.agregar_invitada_a_turno(uuid, text, text, text, text) to authenticated;
 grant execute on function public.clientes_para_instructora()   to authenticated;
