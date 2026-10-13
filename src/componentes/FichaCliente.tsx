@@ -5,10 +5,18 @@ import {
   actualizarRol,
   agregarObservacion,
   borrarObservacion,
+  borrarPago,
+  ETIQUETA_MEDIO,
   listarHistorial,
   listarObservaciones,
+  listarPagos,
 } from '../servicios/clientes'
+import type { Pago } from '../servicios/clientes'
+import { diaMes } from '../cuenta'
 import { fechaCorta, horaCorta } from '../fechas'
+
+const formatoPesos = (n: number) =>
+  n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
 
 const ETIQUETA_ASISTENCIA = { asistio: 'Asistió', ausente: 'Faltó' } as const
 
@@ -28,6 +36,7 @@ export default function FichaCliente({
   miId?: string
 }) {
   const [historial, setHistorial] = useState<ItemHistorial[] | null>(null)
+  const [pagos, setPagos] = useState<Pago[] | null>(null)
   const [verTodo, setVerTodo] = useState(false)
   const [observaciones, setObservaciones] = useState<Observacion[]>([])
   const [cargando, setCargando] = useState(true)
@@ -56,6 +65,24 @@ export default function FichaCliente({
         setError(e instanceof Error ? e.message : 'No se pudo cargar el historial.'),
       )
   }, [cliente.id])
+
+  useEffect(() => {
+    if (paraProfesora) return
+    listarPagos(cliente.id)
+      .then(setPagos)
+      .catch((e) => setError(e instanceof Error ? e.message : 'No se pudieron cargar los pagos.'))
+  }, [cliente.id, paraProfesora, cliente.al_dia_hasta])
+
+  const quitarPago = async (p: Pago) => {
+    if (!window.confirm('¿Borrar este pago del historial? No cambia el estado de la alumna.')) return
+    setError('')
+    try {
+      await borrarPago(p.id)
+      setPagos((lista) => (lista ?? []).filter((x) => x.id !== p.id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo borrar el pago.')
+    }
+  }
 
   const convertirEnProfesora = async () => {
     const nombre = `${cliente.nombre} ${cliente.apellido}`.trim()
@@ -151,6 +178,34 @@ export default function FichaCliente({
             <button type="button" className="link-secundario" onClick={() => setVerTodo(!verTodo)}>
               {verTodo ? 'Ver menos' : `Ver las ${historial.length} clases`}
             </button>
+          )}
+        </>
+      )}
+
+      {!paraProfesora && (
+        <>
+          <h3>Historial de pagos</h3>
+          {pagos === null ? (
+            <p className="ayuda">Cargando...</p>
+          ) : pagos.length === 0 ? (
+            <p className="ayuda">Todavía no hay pagos registrados.</p>
+          ) : (
+            <ul className="ficha-historial">
+              {pagos.map((p) => (
+                <li key={p.id}>
+                  <span>
+                    {new Date(p.creado_en).toLocaleDateString('es-AR')} ·{' '}
+                    <strong>{p.monto === null ? 'Sin monto' : formatoPesos(p.monto)}</strong> ·{' '}
+                    {ETIQUETA_MEDIO[p.medio]}
+                    {p.abono_hasta && ` · cubre hasta el ${diaMes(p.abono_hasta)}`}
+                    {p.nota && <span className="ayuda"> · {p.nota}</span>}
+                  </span>
+                  <button type="button" className="link-secundario" onClick={() => quitarPago(p)}>
+                    Borrar
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </>
       )}

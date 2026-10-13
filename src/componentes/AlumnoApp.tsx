@@ -7,6 +7,7 @@ import {
   cancelar,
   listarTurnos,
   reservar,
+  marcarPromocionVista,
   reservarSerie,
   DIAS_VISIBLES,
   HORAS_LIMITE_CANCELAR,
@@ -23,6 +24,7 @@ import { abonoVencido, diaMes } from '../cuenta'
 import CabeceraApp from './CabeceraApp'
 import EditarPerfil from './EditarPerfil'
 import AvisoPago from './AvisoPago'
+import AvisoPromocion from './AvisoPromocion'
 import EstadoAbono from './EstadoAbono'
 import InstalarApp from './InstalarApp'
 import ModalPago from './ModalPago'
@@ -131,6 +133,20 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
 
   const lista = vista === 'disponibles' ? disponibles : mios
 
+  // Turnos en los que la base la subió desde la lista de espera y todavía no
+  // vio el aviso. Al tocar "Entendido" quedan marcados como vistos.
+  const promovidas = useMemo(
+    () => mios.filter((t) => t.mi_estado === 'reservada' && t.promovida_sin_ver),
+    [mios],
+  )
+  const entenderPromociones = async () => {
+    try {
+      await Promise.all(promovidas.map((t) => marcarPromocionVista(t.id)))
+    } finally {
+      await cargar()
+    }
+  }
+
   // "Reservar todo el mes": solo con abono al día. Para cada turno que viene de
   // un turno fijo, cuántos del mismo horario y mes podría sumar hoy (sin
   // reserva, con lugar y dentro de lo que cubre el abono).
@@ -175,6 +191,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
         }
       />
 
+      <AvisoPromocion turnos={promovidas} onEntendido={entenderPromociones} />
       <AvisoPago perfil={perfil} />
       <EstadoAbono perfil={perfil} />
       <InstalarApp />

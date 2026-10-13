@@ -138,6 +138,10 @@ Pestaña **Clientes** (staff): lista todas las alumnas registradas, con su nivel
 
 El staff pasa a una alumna a `Al día` desde **Clientes** cuando confirma que pagó el mes. **El abono no se renueva solo**: cuando vence hay que volver a confirmar el pago (tocando "Al día" otra vez, o "+1 mes" para sumar el mes siguiente) y, si ya venció y nadie lo renovó, queda como "Venció el dd/mm" y se bloquean las reservas nuevas sin necesidad de marcarla "Debe". Si deja de pagar antes, se la pasa a `Debe`.
 
+**Historial de pagos:** "Al día" y "+1 mes" ya no cambian el estado directo: abren un panel para confirmar el cobro (monto, con atajos de los precios de `config/precios.ts`; medio: transferencia, Mercado Pago, efectivo u otro; y una nota). Queda guardado en `pagos_clientes` y se ve en **la ficha de la alumna → Historial de pagos**, donde también se puede borrar un registro cargado por error (no cambia su estado). Lo ve solo el staff. `registrar_pago` hace las dos cosas de una vez en la base.
+
+**Lista de espera:** cuando se libera un lugar (cancela una alumna, o el staff o la profesora sacan a alguien, o se borra una "sin registrar"), la base sube sola a la primera en espera (trigger `promover_lista_espera`) y, al abrir la app, ella ve "¡Se liberó un lugar! Ya quedaste anotada en…" una sola vez.
+
 **WhatsApp con un toque:** en cada alumna de **Clientes** y en cada anotada de la agenda hay un botón "WhatsApp" que abre el chat con el mensaje ya escrito (sin ninguna API: se arma un link `wa.me`, convirtiendo el celular al formato argentino `549…`, ver `src/whatsapp.ts`). En Clientes el mensaje se adapta: si el abono venció o debe, es un aviso de cobro con el link de Mercado Pago y el alias que haya en `config/pagos.ts`; si no, un saludo. La profesora lo ve con un saludo simple.
 
 **Personas "sin registrar":** si después se registran con el **mismo mail o el mismo celular** (últimos 8 dígitos) con el que las anotó una profesora, sus turnos ya cargados pasan solos a su cuenta, con la asistencia que tuvieran. Si se las anotó solo con el nombre, desde la agenda se las pasa a mano con **"Vincular a una cuenta"**.
@@ -214,5 +218,5 @@ Antes de activarlo en serio conviene arreglar el remitente: con un Gmail, Brevo 
 **En pausa hasta tener mail propio del estudio** (dominio + cuenta en Resend/Brevo con API key — ver "Correos de confirmación de registro" más arriba). Ninguna de las tres se puede armar con lo que manda Supabase hoy, porque necesitan mandar contenido propio (adjuntos, disparadas por eventos), no solo los mails fijos de login:
 
 - Mandar el PDF del deslinde por mail a la administradora apenas se registra una alumna (hoy se descarga a demanda desde Clientes → Ver deslinde firmado).
-- Avisar por mail a la alumna cuando se libera un lugar de la lista de espera (hoy sube sola en el sistema pero no se entera hasta que entra a mirar).
+- Avisar **por mail** a la alumna cuando sube de la lista de espera (hoy sube sola y se entera con un aviso en pantalla al abrir la app, pero no le llega nada afuera de la app).
 - Mail cuando una profesora (o el staff) suma a alguien a un turno: a la que **ya tiene cuenta**, "te agregaron a este turno"; a la que **no está registrada** (las que quedan en `reservas_invitadas`, con su mail opcional y la columna `aviso_enviado_en` lista para marcar el envío), "te agregaron a un turno en FORTEVA, no estás registrada: registrate con un click".

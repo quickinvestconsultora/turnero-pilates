@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { EstadoCuenta, Perfil } from '../tipos'
-import { actualizarEstadoCuenta, listarClientes, sumarMesDeAbono } from '../servicios/clientes'
+import { actualizarEstadoCuenta, listarClientes } from '../servicios/clientes'
 import { obtenerUrlDeslinde } from '../servicios/deslinde'
 import { abonoVencido, diaMes } from '../cuenta'
 import { fechaCorta, hoyIso, sumarDias } from '../fechas'
@@ -8,6 +8,8 @@ import { nombreCompleto } from '../personas'
 import { mensajeCliente } from '../whatsapp'
 import EnlaceWhatsApp from './EnlaceWhatsApp'
 import FichaCliente from './FichaCliente'
+import RegistrarPago from './RegistrarPago'
+import type { ModoPago } from './RegistrarPago'
 
 const ETIQUETA_ESTADO: Record<EstadoCuenta, string> = {
   prueba: 'Prueba',
@@ -171,6 +173,7 @@ function ClienteItem({
   const [ocupado, setOcupado] = useState(false)
   const [errorDeslinde, setErrorDeslinde] = useState('')
   const [fichaAbierta, setFichaAbierta] = useState(false)
+  const [pagando, setPagando] = useState<ModoPago | null>(null)
 
   const vencido = abonoVencido(cliente)
 
@@ -187,13 +190,16 @@ function ClienteItem({
     }
   }
 
-  const cambiarEstado = (estado: EstadoCuenta) => {
-    // Con el abono vencido, tocar "Al día" lo renueva hasta fin de este mes.
-    if (estado === cliente.estado_cuenta && !(estado === 'al_dia' && vencido)) return
+  const cambiarEstado = (estado: 'prueba' | 'pendiente') => {
+    if (estado === cliente.estado_cuenta) return
     return conManejo(() => actualizarEstadoCuenta(cliente.id, estado))
   }
 
-  const sumarMes = () => conManejo(() => sumarMesDeAbono(cliente.id, cliente.al_dia_hasta))
+  // "Al día" y "+1 mes" siempre registran el pago (monto, medio, hasta cuándo).
+  const pedirPago = (modo: ModoPago) => {
+    if (modo === 'este-mes' && cliente.estado_cuenta === 'al_dia' && !vencido) return
+    setPagando(modo)
+  }
 
   const etiquetaEstado =
     cliente.estado_cuenta === 'al_dia' && cliente.al_dia_hasta
@@ -270,7 +276,7 @@ function ClienteItem({
           type="button"
           className={cliente.estado_cuenta === 'al_dia' ? 'activo-si' : ''}
           disabled={ocupado}
-          onClick={() => cambiarEstado('al_dia')}
+          onClick={() => pedirPago('este-mes')}
         >
           Al día
         </button>
@@ -283,11 +289,28 @@ function ClienteItem({
           Debe
         </button>
         {cliente.estado_cuenta === 'al_dia' && (
-          <button type="button" className="boton-mini" disabled={ocupado} onClick={sumarMes}>
+          <button
+            type="button"
+            className="boton-mini"
+            disabled={ocupado}
+            onClick={() => pedirPago('sumar')}
+          >
             +1 mes
           </button>
         )}
       </div>
+      )}
+
+      {pagando && !paraProfesora && (
+        <RegistrarPago
+          cliente={cliente}
+          modo={pagando}
+          onRegistrado={() => {
+            setPagando(null)
+            onCambio()
+          }}
+          onCerrar={() => setPagando(null)}
+        />
       )}
 
       {fichaAbierta && (

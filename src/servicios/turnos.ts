@@ -49,6 +49,12 @@ export async function reservarSerie(turnoId: string): Promise<ResultadoSerie> {
   return data as ResultadoSerie
 }
 
+// La alumna ya vio el aviso de "se liberó un lugar y quedaste anotada".
+export async function marcarPromocionVista(turnoId: string): Promise<void> {
+  const { error } = await supabase.rpc('marcar_promocion_vista', { p_turno_id: turnoId })
+  if (error) throw new Error(limpiarError(error.message))
+}
+
 export async function cancelar(turnoId: string): Promise<void> {
   const { error } = await supabase.rpc('cancelar_reserva', { p_turno_id: turnoId })
   if (error) throw new Error(limpiarError(error.message))

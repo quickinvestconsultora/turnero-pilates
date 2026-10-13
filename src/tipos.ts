@@ -65,6 +65,7 @@ export type TurnoDisponible = {
   nota: string | null
   ocupados: number
   mi_estado: EstadoReserva | null
+  promovida_sin_ver: boolean | null // subió de la lista de espera y todavía no vio el aviso
 }
 
 export type PlantillaTurno = {

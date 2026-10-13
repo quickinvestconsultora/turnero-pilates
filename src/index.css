@@ -1471,3 +1471,27 @@ label {
   align-items: center;
   gap: 10px;
 }
+
+/* ---- Aviso de lista de espera y registro de pagos ---- */
+.aviso-promocion {
+  margin: 0 4px 16px;
+  padding: 14px 16px;
+  background: rgba(77, 124, 74, 0.1);
+  border: 1px solid rgba(77, 124, 74, 0.3);
+  border-radius: var(--radio);
+  font-size: 14px;
+}
+
+.aviso-promocion p {
+  margin: 0 0 6px;
+}
+
+.aviso-promocion ul {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.registrar-pago {
+  flex: 1 1 100%;
+  margin-top: 6px;
+}

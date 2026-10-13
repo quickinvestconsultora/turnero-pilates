@@ -275,6 +275,13 @@ alter table public.reservas
 alter table public.reservas
   add column if not exists recordatorio_enviado_en timestamptz;
 
+-- Cuando una alumna estaba en lista de espera y se libera un lugar, la base la
+-- sube sola: promovida_en guarda cuándo, y aviso_promocion_visto_en cuándo vio
+-- el aviso en pantalla (así se le muestra una sola vez).
+alter table public.reservas
+  add column if not exists promovida_en timestamptz,
+  add column if not exists aviso_promocion_visto_en timestamptz;
+
 -- Observaciones del estudio sobre cada alumna (notas internas con fecha).
 -- Tabla aparte y no una columna de perfiles: la alumna puede leer su propio
 -- perfil, y estas notas son solo para el staff.
@@ -288,6 +295,24 @@ create table if not exists public.observaciones_clientes (
 
 create index if not exists observaciones_alumna_idx
   on public.observaciones_clientes (alumna_id, creado_en desc);
+
+-- Registro de cada cobro que el estudio confirma: cuánto, cómo y hasta cuándo
+-- cubre. Lo carga el staff al marcar "Al día" o "+1 mes" desde Clientes. Es un
+-- historial para contabilidad; el estado de la alumna sigue en perfiles.
+create table if not exists public.pagos_clientes (
+  id             uuid primary key default gen_random_uuid(),
+  alumna_id      uuid not null references public.perfiles (id) on delete cascade,
+  monto          numeric(12, 2) check (monto is null or monto >= 0),
+  medio          text not null default 'transferencia'
+                 check (medio in ('transferencia', 'mercado_pago', 'efectivo', 'otro')),
+  nota           text,
+  abono_hasta    date,
+  registrado_por uuid references auth.users (id) on delete set null default auth.uid(),
+  creado_en      timestamptz not null default now()
+);
+
+create index if not exists pagos_clientes_alumna_idx
+  on public.pagos_clientes (alumna_id, creado_en desc);
 
 -- Galería de fotos de cada profesora (la que ven las alumnas en su ficha).
 -- Los archivos están en el bucket público "profes"; acá se guarda la lista.
@@ -363,6 +388,12 @@ alter table public.reservas        enable row level security;
 alter table public.observaciones_clientes enable row level security;
 alter table public.fotos_profesoras enable row level security;
 alter table public.reservas_invitadas enable row level security;
+alter table public.pagos_clientes enable row level security;
+
+-- Pagos: solo el staff los ve y los maneja (ni la alumna ni las profesoras).
+drop policy if exists pagos_staff on public.pagos_clientes;
+create policy pagos_staff on public.pagos_clientes
+  for all using (public.es_staff()) with check (public.es_staff());
 
 -- ¿Puede el usuario actual manejar las anotadas de este turno? El staff, en
 -- cualquiera; una profesora, solo en los suyos.
@@ -884,23 +915,104 @@ begin
     raise exception 'Ya no se puede cancelar: faltan menos de 2 horas para el turno. Escribile al estudio.';
   end if;
 
+  -- Si liberó un lugar "de verdad", el trigger promover_lista_espera sube
+  -- solo a la primera de la lista de espera.
   update public.reservas
     set estado = 'cancelada'
   where turno_id = p_turno_id and alumno_id = auth.uid();
+end;
+$$;
 
-  -- Si liberé un lugar "de verdad" y hay gente esperando, promovemos al
-  -- que se anotó primero.
-  if v_estado_previo = 'reservada' then
+-- --- Lista de espera: subir a la primera cuando se libera un lugar ---------------
+-- Lo dispara cualquier baja de un lugar confirmado: la alumna que cancela, el
+-- staff o la profesora que la sacan, o una persona "sin registrar" que se borra.
+-- La promovida queda marcada (promovida_en) para avisarle en pantalla.
+create or replace function public.promover_siguiente_en_espera(p_turno_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_turno public.turnos;
+  v_id    uuid;
+begin
+  select * into v_turno from public.turnos where id = p_turno_id for update;
+  if not found or v_turno.cancelado then
+    return;
+  end if;
+  if (v_turno.fecha + v_turno.hora) < (now() at time zone 'America/Argentina/Buenos_Aires') then
+    return;
+  end if;
+  if public.ocupados_turno(p_turno_id) >= v_turno.cupo then
+    return;
+  end if;
+
+  select id into v_id
+  from public.reservas
+  where turno_id = p_turno_id and estado = 'lista_espera'
+  order by creado_en asc
+  limit 1
+  for update skip locked;
+
+  if v_id is not null then
     update public.reservas
-      set estado = 'reservada'
-    where id = (
-      select id from public.reservas
-      where turno_id = p_turno_id and estado = 'lista_espera'
-      order by creado_en asc
-      limit 1
-    );
+      set estado = 'reservada',
+          promovida_en = now(),
+          aviso_promocion_visto_en = null
+    where id = v_id;
   end if;
 end;
+$$;
+
+create or replace function public.trg_reserva_liberada()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.promover_siguiente_en_espera(new.turno_id);
+  return new;
+end;
+$$;
+
+drop trigger if exists reserva_liberada on public.reservas;
+create trigger reserva_liberada
+  after update of estado on public.reservas
+  for each row
+  when (old.estado = 'reservada' and new.estado = 'cancelada')
+  execute function public.trg_reserva_liberada();
+
+create or replace function public.trg_invitada_borrada()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.promover_siguiente_en_espera(old.turno_id);
+  return old;
+end;
+$$;
+
+drop trigger if exists invitada_borrada on public.reservas_invitadas;
+create trigger invitada_borrada
+  after delete on public.reservas_invitadas
+  for each row execute function public.trg_invitada_borrada();
+
+-- La alumna marca que ya vio el aviso de "se liberó un lugar y te anotamos".
+create or replace function public.marcar_promocion_vista(p_turno_id uuid)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.reservas
+    set aviso_promocion_visto_en = now()
+  where turno_id = p_turno_id
+    and alumno_id = auth.uid()
+    and promovida_en is not null;
 $$;
 
 -- --- Listar turnos para el alumno -----------------------------------------
@@ -919,7 +1031,8 @@ returns table (
   plantilla_id uuid,
   nota         text,
   ocupados     bigint,
-  mi_estado    text
+  mi_estado    text,
+  promovida_sin_ver boolean
 )
 language sql
 security definer
@@ -931,7 +1044,11 @@ as $$
     public.ocupados_turno(t.id) as ocupados,
     (select r.estado from public.reservas r
        where r.turno_id = t.id and r.alumno_id = auth.uid()
-       and r.estado in ('reservada', 'lista_espera')) as mi_estado
+       and r.estado in ('reservada', 'lista_espera')) as mi_estado,
+    coalesce((select r.promovida_en is not null and r.aviso_promocion_visto_en is null
+       from public.reservas r
+       where r.turno_id = t.id and r.alumno_id = auth.uid()
+       and r.estado = 'reservada'), false) as promovida_sin_ver
   from public.turnos t
   where t.cancelado = false
     and t.fecha between p_desde and p_hasta
@@ -1182,6 +1299,49 @@ begin
 end;
 $$;
 
+-- --- Registrar un pago y dejar a la alumna "al día" ----------------------------
+-- En un solo paso (atómico): guarda el cobro en el historial y actualiza el
+-- estado de la alumna con la fecha hasta la que queda cubierta.
+create or replace function public.registrar_pago(
+  p_alumna_id uuid,
+  p_monto numeric,
+  p_medio text,
+  p_nota text,
+  p_hasta date
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede registrar pagos.';
+  end if;
+  if not exists (select 1 from public.perfiles where id = p_alumna_id and rol = 'alumno') then
+    raise exception 'No encontramos a esa alumna.';
+  end if;
+  if p_hasta is null then
+    raise exception 'Falta la fecha hasta la que cubre el pago.';
+  end if;
+
+  insert into public.pagos_clientes (alumna_id, monto, medio, nota, abono_hasta)
+  values (
+    p_alumna_id,
+    p_monto,
+    coalesce(nullif(p_medio, ''), 'transferencia'),
+    nullif(btrim(coalesce(p_nota, '')), ''),
+    p_hasta
+  );
+
+  update public.perfiles
+    set estado_cuenta = 'al_dia',
+        al_dia_hasta = p_hasta,
+        pago_actualizado_en = now()
+  where id = p_alumna_id;
+end;
+$$;
+
 -- --- Recordatorio de 2 horas antes ---------------------------------------------
 -- Las usa SOLO la Edge Function "enviar-recordatorios" (con la clave de
 -- servicio), que corre cada 10 minutos. Devuelve a quién hay que avisar: los
@@ -1396,5 +1556,7 @@ grant execute on function public.listar_profesoras()           to authenticated;
 grant execute on function public.ocupados_turno(uuid)          to authenticated;
 grant execute on function public.agregar_alumna_a_turno(uuid, uuid) to authenticated;
 grant execute on function public.vincular_invitada(uuid, uuid) to authenticated;
+grant execute on function public.registrar_pago(uuid, numeric, text, text, date) to authenticated;
+grant execute on function public.marcar_promocion_vista(uuid) to authenticated;
 grant execute on function public.agregar_invitada_a_turno(uuid, text, text, text, text) to authenticated;
 grant execute on function public.clientes_para_instructora()   to authenticated;

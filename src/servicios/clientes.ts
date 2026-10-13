@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase'
 import type { EstadoAsistencia, EstadoCuenta, ItemHistorial, Observacion, Perfil } from '../tipos'
-import { finDeMes, hoyIso, yaPaso } from '../fechas'
+import { yaPaso } from '../fechas'
 
 export async function listarObservaciones(alumnaId: string): Promise<Observacion[]> {
   const { data, error } = await supabase
@@ -77,34 +77,76 @@ export async function listarHistorial(alumnaId: string): Promise<ItemHistorial[]
     .sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora))
 }
 
-// Al pasar a "al día" el abono cubre hasta fin del mes actual; con cualquier
-// otro estado se borra la fecha.
-export async function actualizarEstadoCuenta(id: string, estado: EstadoCuenta): Promise<void> {
+// Cambia el estado a "prueba" o "debe" (sin fecha de abono). Pasar a "al día"
+// se hace siempre registrando el pago: ver registrarPago.
+export async function actualizarEstadoCuenta(
+  id: string,
+  estado: Exclude<EstadoCuenta, 'al_dia'>,
+): Promise<void> {
   const { error } = await supabase
     .from('perfiles')
     .update({
       estado_cuenta: estado,
       pago_actualizado_en: new Date().toISOString(),
-      al_dia_hasta: estado === 'al_dia' ? finDeMes(hoyIso()) : null,
+      al_dia_hasta: null,
     })
     .eq('id', id)
 
   if (error) throw new Error(error.message)
 }
 
-// Suma un mes de abono: desde la fecha en que vence (o desde hoy, si ya venció)
-// hasta el fin del mes siguiente.
-export async function sumarMesDeAbono(id: string, alDiaHasta: string | null): Promise<void> {
-  const hoy = hoyIso()
-  const base = alDiaHasta && alDiaHasta > hoy ? alDiaHasta : hoy
-  const { error } = await supabase
-    .from('perfiles')
-    .update({
-      estado_cuenta: 'al_dia',
-      pago_actualizado_en: new Date().toISOString(),
-      al_dia_hasta: finDeMes(base, 1),
-    })
-    .eq('id', id)
+export type MedioPago = 'transferencia' | 'mercado_pago' | 'efectivo' | 'otro'
 
+export const ETIQUETA_MEDIO: Record<MedioPago, string> = {
+  transferencia: 'Transferencia',
+  mercado_pago: 'Mercado Pago',
+  efectivo: 'Efectivo',
+  otro: 'Otro',
+}
+
+export type Pago = {
+  id: string
+  monto: number | null
+  medio: MedioPago
+  nota: string | null
+  abono_hasta: string | null
+  creado_en: string
+}
+
+// Registra el cobro en el historial y deja a la alumna "al día" hasta `hasta`,
+// todo en un paso (lo hace la base, solo el staff).
+export async function registrarPago(datos: {
+  alumnaId: string
+  monto: number | null
+  medio: MedioPago
+  nota: string
+  hasta: string
+}): Promise<void> {
+  const { error } = await supabase.rpc('registrar_pago', {
+    p_alumna_id: datos.alumnaId,
+    p_monto: datos.monto,
+    p_medio: datos.medio,
+    p_nota: datos.nota,
+    p_hasta: datos.hasta,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function listarPagos(alumnaId: string): Promise<Pago[]> {
+  const { data, error } = await supabase
+    .from('pagos_clientes')
+    .select('id, monto, medio, nota, abono_hasta, creado_en')
+    .eq('alumna_id', alumnaId)
+    .order('creado_en', { ascending: false })
+
+  if (error) throw new Error(error.message)
+  // numeric llega como texto desde la base.
+  return ((data ?? []) as unknown as (Omit<Pago, 'monto'> & { monto: string | null })[]).map(
+    (p) => ({ ...p, monto: p.monto === null ? null : Number(p.monto) }),
+  )
+}
+
+export async function borrarPago(id: string): Promise<void> {
+  const { error } = await supabase.from('pagos_clientes').delete().eq('id', id)
   if (error) throw new Error(error.message)
 }
