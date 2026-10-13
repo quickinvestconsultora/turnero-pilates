@@ -1342,3 +1342,10 @@ label {
   background: rgba(180, 71, 46, 0.12);
   color: var(--error);
 }
+
+.turno-acciones {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}

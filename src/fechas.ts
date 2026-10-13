@@ -30,6 +30,18 @@ export function sumarDias(iso: string, dias: number): string {
   return isoLocal(fecha)
 }
 
+// '2026-10-19' -> 'lunes' (en plural: 'lunes', 'martes', 'sábados', 'domingos'…)
+export function diaSemanaPlural(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dia = DIAS[new Date(y, m - 1, d).getDay()].toLowerCase()
+  return dia.endsWith('s') ? dia : `${dia}s`
+}
+
+// '2026-10-19' -> 'octubre'
+export function nombreMes(iso: string): string {
+  return MESES[Number(iso.split('-')[1]) - 1]
+}
+
 // Primer y último día del mes (calendario) que está `mesesDespues` meses
 // adelante del de la fecha dada. 0 = el mismo mes, 1 = el que viene.
 export function inicioDeMes(iso: string, mesesDespues = 0): string {

@@ -61,6 +61,7 @@ export type TurnoDisponible = {
   cupo: number
   instructor: string | null
   instructora_id: string | null
+  plantilla_id: string | null
   nota: string | null
   ocupados: number
   mi_estado: EstadoReserva | null

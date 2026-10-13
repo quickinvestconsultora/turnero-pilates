@@ -7,10 +7,19 @@ import {
   cancelar,
   listarTurnos,
   reservar,
+  reservarSerie,
   DIAS_VISIBLES,
   HORAS_LIMITE_CANCELAR,
 } from '../servicios/turnos'
-import { encabezadoDia, faltanMenosDe, horaCorta, yaPaso } from '../fechas'
+import {
+  diaSemanaPlural,
+  encabezadoDia,
+  faltanMenosDe,
+  horaCorta,
+  nombreMes,
+  yaPaso,
+} from '../fechas'
+import { abonoVencido, diaMes } from '../cuenta'
 import CabeceraApp from './CabeceraApp'
 import EditarPerfil from './EditarPerfil'
 import AvisoPago from './AvisoPago'
@@ -29,6 +38,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   const [turnos, setTurnos] = useState<TurnoDisponible[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  const [aviso, setAviso] = useState('')
   const [ocupadoId, setOcupadoId] = useState<string | null>(null)
   const [editandoPerfil, setEditandoPerfil] = useState(false)
   const [pagoRequerido, setPagoRequerido] = useState(false)
@@ -62,9 +72,39 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
     cargar()
   }, [cargar])
 
+  const accionSerie = async (turno: TurnoDisponible) => {
+    setOcupadoId(turno.id)
+    setError('')
+    setAviso('')
+    try {
+      const r = await reservarSerie(turno.id)
+      const partes = [
+        r.reservadas > 0
+          ? `Te anotamos en ${r.reservadas} turno${r.reservadas === 1 ? '' : 's'}.`
+          : 'No quedó ningún turno nuevo para anotarte.',
+      ]
+      if (r.ya_anotada > 0) partes.push(`Ya estabas anotada en ${r.ya_anotada}.`)
+      if (r.sin_lugar.length > 0) {
+        partes.push(`No había lugar el ${r.sin_lugar.map(diaMes).join(', ')}.`)
+      }
+      if (r.sin_cobertura.length > 0) {
+        partes.push(`Tu abono no cubre el ${r.sin_cobertura.map(diaMes).join(', ')}.`)
+      }
+      setAviso(partes.join(' '))
+      await cargar()
+    } catch (e) {
+      const mensaje = e instanceof Error ? e.message : 'No se pudo completar la acción.'
+      if (mensaje === 'PAGO_REQUERIDO') setPagoRequerido(true)
+      else setError(mensaje)
+    } finally {
+      setOcupadoId(null)
+    }
+  }
+
   const accion = async (turno: TurnoDisponible, quiere: 'reservar' | 'cancelar') => {
     setOcupadoId(turno.id)
     setError('')
+    setAviso('')
     try {
       if (quiere === 'reservar') await reservar(turno.id)
       else await cancelar(turno.id)
@@ -88,6 +128,30 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   )
 
   const lista = vista === 'disponibles' ? disponibles : mios
+
+  // "Reservar todo el mes": solo con abono al día. Para cada turno que viene de
+  // un turno fijo, cuántos del mismo horario y mes podría sumar hoy (sin
+  // reserva, con lugar y dentro de lo que cubre el abono).
+  const puedeSerie = perfil.estado_cuenta === 'al_dia' && !abonoVencido(perfil)
+  const seriePorTurno = useMemo(() => {
+    const cuenta = new Map<string, number>()
+    if (!puedeSerie) return cuenta
+    const hasta = perfil.al_dia_hasta
+    const reservables = disponibles.filter(
+      (t) =>
+        t.plantilla_id &&
+        !t.mi_estado &&
+        Number(t.ocupados) < t.cupo &&
+        (!hasta || t.fecha <= hasta),
+    )
+    for (const t of reservables) {
+      const n = reservables.filter(
+        (o) => o.plantilla_id === t.plantilla_id && o.fecha.slice(0, 7) === t.fecha.slice(0, 7),
+      ).length
+      cuenta.set(t.id, n)
+    }
+    return cuenta
+  }, [disponibles, puedeSerie, perfil.al_dia_hasta])
 
   return (
     <div className="app">
@@ -130,6 +194,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
 
       <main className="contenido">
         {error && <p className="mensaje-error">{error}</p>}
+        {aviso && <p className="mensaje-ok">{aviso}</p>}
 
         {cargando ? (
           <p className="vacio">Cargando turnos...</p>
@@ -145,6 +210,8 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
             ocupadoId={ocupadoId}
             profesoras={profesoras}
             onVerProfesora={setProfesoraAbierta}
+            seriePorTurno={seriePorTurno}
+            onReservarSerie={accionSerie}
             onReservar={(t) => accion(t, 'reservar')}
             onCancelar={(t) => accion(t, 'cancelar')}
           />
@@ -180,6 +247,8 @@ function ListaTurnos({
   ocupadoId,
   profesoras,
   onVerProfesora,
+  seriePorTurno,
+  onReservarSerie,
   onReservar,
   onCancelar,
 }: {
@@ -187,6 +256,8 @@ function ListaTurnos({
   ocupadoId: string | null
   profesoras: Profesora[]
   onVerProfesora: (p: Profesora) => void
+  seriePorTurno: Map<string, number>
+  onReservarSerie: (t: TurnoDisponible) => void
   onReservar: (t: TurnoDisponible) => void
   onCancelar: (t: TurnoDisponible) => void
 }) {
@@ -253,13 +324,22 @@ function ListaTurnos({
                       {ocupado ? '...' : 'Cancelar'}
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      disabled={ocupado}
-                      onClick={() => onReservar(t)}
-                    >
-                      {ocupado ? '...' : libres > 0 ? 'Reservar' : 'Anotarme en espera'}
-                    </button>
+                    <div className="turno-acciones">
+                      <button type="button" disabled={ocupado} onClick={() => onReservar(t)}>
+                        {ocupado ? '...' : libres > 0 ? 'Reservar' : 'Anotarme en espera'}
+                      </button>
+                      {(seriePorTurno.get(t.id) ?? 0) >= 2 && (
+                        <button
+                          type="button"
+                          className="link-secundario"
+                          disabled={ocupado}
+                          onClick={() => onReservarSerie(t)}
+                        >
+                          Reservar los {seriePorTurno.get(t.id)} {diaSemanaPlural(t.fecha)} de{' '}
+                          {nombreMes(t.fecha)}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </li>
               )

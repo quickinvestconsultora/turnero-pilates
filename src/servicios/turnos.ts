@@ -35,6 +35,20 @@ export async function reservar(turnoId: string): Promise<ResultadoReserva> {
   return { estado: resultado.estado, primeraClase: resultado.primera_clase }
 }
 
+export type ResultadoSerie = {
+  reservadas: number
+  ya_anotada: number
+  sin_lugar: string[] // fechas 'YYYY-MM-DD' que estaban completas
+  sin_cobertura: string[] // fechas posteriores al fin del abono
+}
+
+// Anota a la alumna en todos los turnos del mismo turno fijo dentro del mes.
+export async function reservarSerie(turnoId: string): Promise<ResultadoSerie> {
+  const { data, error } = await supabase.rpc('reservar_serie', { p_turno_id: turnoId })
+  if (error) throw new Error(limpiarError(error.message))
+  return data as ResultadoSerie
+}
+
 export async function cancelar(turnoId: string): Promise<void> {
   const { error } = await supabase.rpc('cancelar_reserva', { p_turno_id: turnoId })
   if (error) throw new Error(limpiarError(error.message))

@@ -715,6 +715,90 @@ begin
 end;
 $$;
 
+-- --- Reservar todo el mes de un turno fijo -----------------------------------
+-- Para alumnas con abono "al día": las anota en TODOS los turnos del mismo
+-- turno fijo dentro del mes del turno elegido que todavía no pasaron. Se
+-- saltea los que ya tienen (ya_anotada), los que están completos (sin_lugar,
+-- no se anota en espera) y los posteriores al fin de su abono
+-- (sin_cobertura). Devuelve el resumen para mostrárselo.
+create or replace function public.reservar_serie(p_turno_id uuid)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ref            public.turnos;
+  v_rol            text;
+  v_estado_cuenta  text;
+  v_hasta          date;
+  v_ahora          timestamp := (now() at time zone 'America/Argentina/Buenos_Aires');
+  t                public.turnos;
+  v_estado_actual  text;
+  v_reservadas     int := 0;
+  v_ya             int := 0;
+  v_sin_lugar      date[] := '{}';
+  v_sin_cobertura  date[] := '{}';
+begin
+  if auth.uid() is null then
+    raise exception 'Necesitás iniciar sesión.';
+  end if;
+
+  select * into v_ref from public.turnos where id = p_turno_id;
+  if not found then
+    raise exception 'El turno no existe.';
+  end if;
+  if v_ref.plantilla_id is null then
+    raise exception 'Este turno no es parte de un turno fijo.';
+  end if;
+
+  select rol, estado_cuenta, al_dia_hasta into v_rol, v_estado_cuenta, v_hasta
+  from public.perfiles where id = auth.uid();
+
+  if v_rol <> 'alumno' then
+    raise exception 'Solo las alumnas pueden reservar turnos.';
+  end if;
+  if v_estado_cuenta <> 'al_dia' or v_hasta is null or v_hasta < v_ahora::date then
+    raise exception 'PAGO_REQUERIDO';
+  end if;
+
+  for t in
+    select * from public.turnos
+    where plantilla_id = v_ref.plantilla_id
+      and not cancelado
+      and date_trunc('month', fecha) = date_trunc('month', v_ref.fecha)
+      and (fecha + hora) >= v_ahora
+    order by fecha, hora
+    for update
+  loop
+    select estado into v_estado_actual
+    from public.reservas
+    where turno_id = t.id and alumno_id = auth.uid();
+
+    if v_estado_actual in ('reservada', 'lista_espera') then
+      v_ya := v_ya + 1;
+    elsif t.fecha > v_hasta then
+      v_sin_cobertura := v_sin_cobertura || t.fecha;
+    elsif public.ocupados_turno(t.id) >= t.cupo then
+      v_sin_lugar := v_sin_lugar || t.fecha;
+    else
+      insert into public.reservas (turno_id, alumno_id, estado)
+      values (t.id, auth.uid(), 'reservada')
+      on conflict (turno_id, alumno_id)
+        do update set estado = 'reservada', creado_en = now();
+      v_reservadas := v_reservadas + 1;
+    end if;
+  end loop;
+
+  return json_build_object(
+    'reservadas', v_reservadas,
+    'ya_anotada', v_ya,
+    'sin_lugar', to_json(v_sin_lugar),
+    'sin_cobertura', to_json(v_sin_cobertura)
+  );
+end;
+$$;
+
 -- --- Cancelar mi reserva ----------------------------------------------------
 -- Al liberarse un lugar, sube automáticamente al primero de la lista de espera.
 create or replace function public.cancelar_reserva(p_turno_id uuid)
@@ -787,6 +871,7 @@ returns table (
   cupo         smallint,
   instructor   text,
   instructora_id uuid,
+  plantilla_id uuid,
   nota         text,
   ocupados     bigint,
   mi_estado    text
@@ -796,7 +881,8 @@ security definer
 set search_path = public
 as $$
   select
-    t.id, t.fecha, t.hora, t.duracion_min, t.cupo, t.instructor, t.instructora_id, t.nota,
+    t.id, t.fecha, t.hora, t.duracion_min, t.cupo, t.instructor, t.instructora_id,
+    t.plantilla_id, t.nota,
     public.ocupados_turno(t.id) as ocupados,
     (select r.estado from public.reservas r
        where r.turno_id = t.id and r.alumno_id = auth.uid()
@@ -1139,6 +1225,7 @@ $$;
 -- por defecto en Supabase, pero lo dejamos explícito).
 grant execute on function public.reservar_turno(uuid)          to authenticated;
 grant execute on function public.cancelar_reserva(uuid)        to authenticated;
+grant execute on function public.reservar_serie(uuid)          to authenticated;
 grant execute on function public.listar_turnos(date, date)     to authenticated;
 grant execute on function public.generar_turnos(uuid, date, date) to authenticated;
 grant execute on function public.estadisticas(date, date)      to authenticated;
