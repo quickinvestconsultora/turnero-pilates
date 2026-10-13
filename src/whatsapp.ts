@@ -75,3 +75,18 @@ export function mensajeTurno(nombre: string, fecha: string, hora: string): strin
     `${fechaLarga(fecha)} a las ${horaCorta(hora)}.`
   )
 }
+
+// Aviso de que se canceló una clase (con el motivo, si se cargó uno).
+export function mensajeCancelacion(
+  nombre: string,
+  fecha: string,
+  hora: string,
+  motivo: string,
+): string {
+  const razon = motivo.trim() ? ` Motivo: ${motivo.trim()}.` : ''
+  return (
+    `Hola ${nombre.trim() || 'hola'}! Te avisamos de ${FIRMA} que se canceló tu clase del ` +
+    `${fechaLarga(fecha)} a las ${horaCorta(hora)}.${razon} Disculpá las molestias, ` +
+    `cualquier cosa nos escribís.`
+  )
+}

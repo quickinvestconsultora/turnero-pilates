@@ -1407,3 +1407,67 @@ label {
 .boton-vincular {
   margin-left: 8px;
 }
+
+/* ---- Abono, instalar app y cancelar día ---- */
+.estado-abono {
+  margin: 0 4px 14px;
+  font-size: 13px;
+  color: var(--texto-suave);
+}
+
+.estado-abono--pronto {
+  color: var(--acento-oscuro);
+  background: var(--superficie-2);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 10px 14px;
+}
+
+.instalar-app {
+  margin: 0 4px 16px;
+  padding: 12px 14px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.instalar-app p {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.fila-dia {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.aviso-cancelacion {
+  margin: 12px 0;
+  padding: 12px 14px;
+  background: rgba(180, 71, 46, 0.08);
+  border: 1px solid rgba(180, 71, 46, 0.25);
+  border-radius: var(--radio);
+  font-size: 13px;
+}
+
+.aviso-cancelacion p {
+  margin: 0 0 8px;
+}
+
+.aviso-cancelacion ul {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.aviso-cancelacion li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}

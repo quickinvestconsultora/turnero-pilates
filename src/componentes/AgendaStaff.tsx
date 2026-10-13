@@ -4,6 +4,7 @@ import type { TurnoConReservas } from '../tipos'
 import {
   actualizarTurno,
   cancelarTurno,
+  cancelarTurnos,
   crearTurno,
   listarTurnosStaff,
   marcarAsistencia,
@@ -17,9 +18,17 @@ import AgregarAlumna from './AgregarAlumna'
 import EditarTurno from './EditarTurno'
 import EnlaceWhatsApp from './EnlaceWhatsApp'
 import VincularInvitada from './VincularInvitada'
-import { mensajeTurno } from '../whatsapp'
+import { mensajeCancelacion, mensajeTurno } from '../whatsapp'
 import CampoProfesora from './CampoProfesora'
 import type { ValorProfesora } from './CampoProfesora'
+
+// A quién avisar después de cancelar un día entero.
+type AvisoDia = {
+  fecha: string
+  motivo: string
+  cantidad: number
+  personas: { nombre: string; primerNombre: string; telefono: string; hora: string }[]
+}
 
 // instructoraId: cuando una profesora usa esta pantalla ve toda la agenda,
 // pero solo maneja (cupo, cancelar, anotadas, asistencia) los turnos suyos y
@@ -31,6 +40,52 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
   const [mostrarAlta, setMostrarAlta] = useState(false)
   const [verPasados, setVerPasados] = useState(false)
   const [soloMios, setSoloMios] = useState(false)
+  const [avisoDia, setAvisoDia] = useState<AvisoDia | null>(null)
+
+  const cancelarDia = async (fecha: string, delDia: TurnoConReservas[]) => {
+    const aCancelar = delDia.filter((t) => !t.cancelado && !yaPaso(t.fecha, t.hora))
+    if (aCancelar.length === 0) return
+
+    const motivo = prompt(
+      `Vas a cancelar ${aCancelar.length} turno${aCancelar.length === 1 ? '' : 's'} del ` +
+        `${encabezadoDia(fecha)}.\n\nMotivo (opcional, va en el mensaje a las alumnas). ` +
+        'Tocá Cancelar para no hacer nada.',
+      'Feriado',
+    )
+    if (motivo === null) return
+
+    // Armamos la lista de a quién avisar ANTES de cancelar, con lo que hay anotado.
+    const personas: AvisoDia['personas'] = []
+    for (const t of aCancelar) {
+      for (const r of t.reservas.filter((x) => x.estado === 'reservada')) {
+        if (r.perfiles) {
+          personas.push({
+            nombre: nombreCompleto(r.perfiles),
+            primerNombre: r.perfiles.nombre,
+            telefono: r.perfiles.telefono,
+            hora: t.hora,
+          })
+        }
+      }
+      for (const i of t.reservas_invitadas ?? []) {
+        personas.push({
+          nombre: nombreCompleto(i),
+          primerNombre: i.nombre,
+          telefono: i.telefono,
+          hora: t.hora,
+        })
+      }
+    }
+
+    setError('')
+    try {
+      await cancelarTurnos(aCancelar.map((t) => t.id))
+      setAvisoDia({ fecha, motivo, cantidad: aCancelar.length, personas })
+      await cargar()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo cancelar el día.')
+    }
+  }
 
   const cargar = useCallback(async () => {
     setError('')
@@ -97,6 +152,48 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
 
       {error && <p className="mensaje-error">{error}</p>}
 
+      {avisoDia && (
+        <div className="aviso-cancelacion">
+          <p>
+            <strong>
+              Se cancelaron {avisoDia.cantidad} turno{avisoDia.cantidad === 1 ? '' : 's'} del{' '}
+              {encabezadoDia(avisoDia.fecha)}.
+            </strong>{' '}
+            {avisoDia.personas.length > 0
+              ? 'Avisale a cada una por WhatsApp:'
+              : 'No había nadie anotado, no hay a quién avisar.'}
+          </p>
+          {avisoDia.personas.length > 0 && (
+            <ul>
+              {avisoDia.personas.map((p, n) => (
+                <li key={n}>
+                  <span>
+                    {p.nombre} <span className="ayuda">· {horaCorta(p.hora)}</span>
+                  </span>
+                  {p.telefono ? (
+                    <EnlaceWhatsApp
+                      telefono={p.telefono}
+                      mensaje={mensajeCancelacion(
+                        p.primerNombre,
+                        avisoDia.fecha,
+                        p.hora,
+                        avisoDia.motivo,
+                      )}
+                      etiqueta="Avisar"
+                    />
+                  ) : (
+                    <span className="ayuda">sin celular</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <button type="button" className="link-secundario" onClick={() => setAvisoDia(null)}>
+            Listo, cerrar
+          </button>
+        </div>
+      )}
+
       {cargando ? (
         <p className="vacio">Cargando...</p>
       ) : turnos.length === 0 ? (
@@ -107,7 +204,18 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
         <div className="grupos-dia">
           {[...porDia.entries()].map(([fecha, delDia]) => (
             <section key={fecha} className="grupo-dia">
-              <h2>{encabezadoDia(fecha)}</h2>
+              <div className="fila-dia">
+                <h2>{encabezadoDia(fecha)}</h2>
+                {!instructoraId && delDia.some((t) => !t.cancelado && !yaPaso(t.fecha, t.hora)) && (
+                  <button
+                    type="button"
+                    className="boton-mini"
+                    onClick={() => void cancelarDia(fecha, delDia)}
+                  >
+                    Cancelar todo el día
+                  </button>
+                )}
+              </div>
               {delDia.map((t) => (
                 <TurnoStaff
                   key={t.id}

@@ -118,6 +118,13 @@ export async function actualizarTurno(
   if (error) throw new Error(error.message)
 }
 
+// Cancela varios turnos de una vez (por ejemplo, un día entero por feriado).
+export async function cancelarTurnos(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+  const { error } = await supabase.from('turnos').update({ cancelado: true }).in('id', ids)
+  if (error) throw new Error(error.message)
+}
+
 // Cancela el turno (no lo borra: preserva el historial de reservas).
 export async function cancelarTurno(id: string): Promise<void> {
   await actualizarTurno(id, { cancelado: true })

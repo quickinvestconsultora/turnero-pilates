@@ -23,6 +23,8 @@ import { abonoVencido, diaMes } from '../cuenta'
 import CabeceraApp from './CabeceraApp'
 import EditarPerfil from './EditarPerfil'
 import AvisoPago from './AvisoPago'
+import EstadoAbono from './EstadoAbono'
+import InstalarApp from './InstalarApp'
 import ModalPago from './ModalPago'
 import ModalProfesora from './ModalProfesora'
 
@@ -174,6 +176,8 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       />
 
       <AvisoPago perfil={perfil} />
+      <EstadoAbono perfil={perfil} />
+      <InstalarApp />
 
       <nav className="tabs">
         <button
