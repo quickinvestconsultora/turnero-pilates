@@ -15,6 +15,7 @@ export type Perfil = {
   contacto_emergencia_telefono: string | null
   estado_cuenta: EstadoCuenta
   pago_actualizado_en: string | null
+  al_dia_hasta: string | null // 'YYYY-MM-DD': el abono cubre turnos hasta esta fecha
   deslinde_aceptado_en: string | null
   deslinde_pdf_subido: boolean
   bio: string | null

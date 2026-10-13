@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase'
 import type { EstadoAsistencia, PlantillaTurno, TurnoConReservas } from '../tipos'
-import { hoyIso, sumarDias } from '../fechas'
+import { finDeMes, hoyIso, inicioDeMes, sumarDias } from '../fechas'
 
 // ---------------------------------------------------------------------------
 // Turnos concretos (la agenda que ve y edita el staff)
@@ -13,7 +13,7 @@ export async function listarTurnosStaff(opciones?: {
   instructoraId?: string
 }): Promise<TurnoConReservas[]> {
   const desde = opciones?.desde ?? hoyIso()
-  const hasta = sumarDias(desde, opciones?.dias ?? 21)
+  const hasta = sumarDias(desde, opciones?.dias ?? 45)
 
   let consulta = supabase
     .from('turnos')
@@ -171,11 +171,18 @@ export async function borrarPlantilla(id: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
-// Genera turnos concretos desde una plantilla, desde hoy hasta N semanas.
-// Devuelve cuántos turnos nuevos se crearon.
-export async function generarTurnos(plantillaId: string, semanas = 4): Promise<number> {
-  const desde = hoyIso()
-  const hasta = sumarDias(desde, semanas * 7)
+// Genera turnos concretos desde una plantilla para el período indicado:
+// "este-mes" va de hoy al último día del mes; "mes-que-viene" cubre el mes
+// calendario siguiente completo. Devuelve cuántos turnos nuevos se crearon.
+export type PeriodoGenerar = 'este-mes' | 'mes-que-viene'
+
+export async function generarTurnos(
+  plantillaId: string,
+  periodo: PeriodoGenerar,
+): Promise<number> {
+  const hoy = hoyIso()
+  const desde = periodo === 'este-mes' ? hoy : inicioDeMes(hoy, 1)
+  const hasta = finDeMes(hoy, periodo === 'este-mes' ? 0 : 1)
 
   const { data, error } = await supabase.rpc('generar_turnos', {
     p_plantilla_id: plantillaId,

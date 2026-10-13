@@ -13,7 +13,7 @@ function pasos(nombre: string): Paso[] {
     {
       titulo: 'Tu agenda',
       texto:
-        'En "Mis turnos" ves la agenda del estudio de las próximas 3 semanas, con cuántas alumnas hay anotadas en cada clase.',
+        'En "Mis turnos" ves la agenda del estudio de los próximos 45 días, con cuántas alumnas hay anotadas en cada clase.',
       detalle: [
         'Tus turnos se abren y podés ver quién viene.',
         'Los de otras profes los ves, pero no los modificás.',
@@ -29,10 +29,10 @@ function pasos(nombre: string): Paso[] {
     {
       titulo: 'Turnos fijos',
       texto:
-        'Para las clases que repetís todas las semanas, andá a "Turnos fijos", cargá el día y la hora y tocá "Generar".',
+        'Para las clases que repetís todas las semanas, andá a "Turnos fijos", cargá el día y la hora y publicalos con "Este mes" o "Mes que viene".',
       detalle: [
-        'Se publican las próximas 4 semanas de una vez.',
-        'Cuando quieras sumar más semanas, volvé a tocar "Generar".',
+        'Se publican todos los de ese mes de una vez.',
+        'Si volvés a tocar el botón no duplica los que ya estaban.',
       ],
     },
     {

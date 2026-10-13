@@ -2,7 +2,7 @@
 
 App de reservas para FORTEVA Studio (Pilates & Strength).
 
-- **Alumno**: se registra, ve los turnos de los próximos 14 días y se anota (o se pone en lista de espera si está completo). Puede cancelar o cambiar un lugar confirmado hasta **2 horas antes** del turno (lo hace cumplir `cancelar_reserva` en la base; la lista de espera se puede dejar siempre). Pasado ese límite, solo el staff puede sacarla.
+- **Alumno**: se registra, ve los turnos de los próximos 31 días y se anota (o se pone en lista de espera si está completo). Puede cancelar o cambiar un lugar confirmado hasta **2 horas antes** del turno (lo hace cumplir `cancelar_reserva` en la base; la lista de espera se puede dejar siempre). Pasado ese límite, solo el staff puede sacarla.
 - **Staff**: arma la agenda con turnos sueltos y/o turnos fijos semanales, ve quién se anotó en cada turno y puede cancelar un turno o sacar a alguien.
 - **Profesora** (`rol = instructora`): se registra como cualquier alumna y el staff la convierte desde **Clientes → Ver ficha → Más opciones → Convertir en profesora** (escondido a propósito para no tocarlo sin querer). Su pantalla tiene: **Mis turnos** (ve toda la agenda del estudio, pero solo abre, edita y marca asistencia en los suyos), **Turnos fijos**, **Clientes** (fichas, historial y observaciones, **sin estado de cuenta, pagos ni deslinde**) y **Mi perfil** (su ficha: foto, galería de hasta 8 fotos, frase, especialidades, formación, experiencia, Instagram y descripción, con vista previa de cómo la ven las alumnas). No ve estadísticas. Al primer ingreso ve un tutorial de bienvenida (botón "Tutorial" para volver a verlo). Los turnos que crea quedan a su nombre, y en cada uno puede **sumar alumnas**: las ya registradas (buscándolas) o, si todavía no tienen cuenta, cargando nombre, apellido y celular (quedan anotadas con la marca "Sin registrar" y cuentan para el cupo); al staff, al crear un turno, le aparece un selector de profesora. Las alumnas ven "Profesora: X" debajo de cada turno y, al tocarlo, su foto y descripción. Los permisos los hace cumplir la base (RLS y funciones), no la pantalla. El staff las ve en la pestaña **Profesores**.
 
@@ -134,9 +134,9 @@ Pestaña **Clientes** (staff): lista todas las alumnas registradas, con su nivel
 
 - `Prueba`: la **primera** reserva (la que sea) es gratis. De la segunda en adelante, se bloquea y le aparece una ventana pidiendo que abone.
 - `Debe`: siempre bloqueada, misma ventana.
-- `Al día`: sin límite, reserva lo que quiera.
+- `Al día`: reserva turnos **hasta la fecha en que vence su abono** (por defecto, el fin del mes en que se la marcó). Un turno posterior a esa fecha le muestra el cartel de pago.
 
-El staff pasa a una alumna a `Al día` desde **Clientes** cuando confirma que pagó el mes, y eso le desbloquea la agenda. Si en algún momento deja de pagar, se la vuelve a pasar a `Debe`.
+El staff pasa a una alumna a `Al día` desde **Clientes** cuando confirma que pagó el mes. **El abono no se renueva solo**: cuando vence hay que volver a confirmar el pago (tocando "Al día" otra vez, o "+1 mes" para sumar el mes siguiente) y, si ya venció y nadie lo renovó, queda como "Venció el dd/mm" y se bloquean las reservas nuevas sin necesidad de marcarla "Debe". Si deja de pagar antes, se la pasa a `Debe`.
 
 Cuando queda bloqueada (`Debe`, o `Prueba` después de la primera clase), la alumna ve las formas de pago que estén cargadas en **`src/config/pagos.ts`**, tanto en el cartel permanente (`Debe`) como en la ventana que aparece al intentar reservar:
 

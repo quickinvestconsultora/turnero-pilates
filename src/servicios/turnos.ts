@@ -3,7 +3,7 @@ import type { TurnoDisponible } from '../tipos'
 import { hoyIso, sumarDias } from '../fechas'
 
 // Ventana de días hacia adelante que ve el alumno.
-export const DIAS_VISIBLES = 14
+export const DIAS_VISIBLES = 31
 
 // Hasta cuántas horas antes del turno se puede cancelar o cambiar un lugar
 // confirmado. Tiene que coincidir con el margen de cancelar_reserva() en

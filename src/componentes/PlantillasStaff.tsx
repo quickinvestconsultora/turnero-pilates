@@ -53,8 +53,9 @@ export default function PlantillasStaff({ instructoraId }: { instructoraId?: str
     <div>
       <h2>Turnos fijos semanales</h2>
       <p className="ayuda">
-        Definí acá los turnos que se repiten todas las semanas. Después tocá{' '}
-        <em>Generar</em> para publicarlos en la agenda de las próximas 4 semanas.
+        Definí acá los turnos que se repiten todas las semanas. Después publicalos en la
+        agenda con <em>Este mes</em> (de hoy hasta fin de mes) o <em>Mes que viene</em> (el mes
+        entero). Si lo volvés a tocar, no duplica los que ya estaban.
       </p>
 
       <FormAltaPlantilla onCreada={cargar} instructoraId={instructoraId} />
@@ -81,22 +82,25 @@ export default function PlantillasStaff({ instructoraId }: { instructoraId?: str
                 </span>
               </div>
               <div className="barra-acciones">
-                <button
-                  type="button"
-                  disabled={ocupadoId === p.id}
-                  onClick={() =>
-                    conManejo(p.id, async () => {
-                      const creados = await generarTurnos(p.id, 4)
-                      setAviso(
-                        creados > 0
-                          ? `Se publicaron ${creados} turno${creados === 1 ? '' : 's'} en la agenda.`
-                          : 'No había turnos nuevos para publicar (ya estaban todos).',
-                      )
-                    })
-                  }
-                >
-                  Generar
-                </button>
+                {(['este-mes', 'mes-que-viene'] as const).map((periodo) => (
+                  <button
+                    key={periodo}
+                    type="button"
+                    disabled={ocupadoId === p.id}
+                    onClick={() =>
+                      conManejo(p.id, async () => {
+                        const creados = await generarTurnos(p.id, periodo)
+                        setAviso(
+                          creados > 0
+                            ? `Se publicaron ${creados} turno${creados === 1 ? '' : 's'} en la agenda.`
+                            : 'No había turnos nuevos para publicar (ya estaban todos).',
+                        )
+                      })
+                    }
+                  >
+                    {periodo === 'este-mes' ? 'Este mes' : 'Mes que viene'}
+                  </button>
+                ))}
                 <button
                   type="button"
                   className="link-secundario"

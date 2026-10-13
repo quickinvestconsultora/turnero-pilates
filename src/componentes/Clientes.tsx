@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { EstadoCuenta, Perfil } from '../tipos'
-import { actualizarEstadoCuenta, listarClientes } from '../servicios/clientes'
+import { actualizarEstadoCuenta, listarClientes, sumarMesDeAbono } from '../servicios/clientes'
 import { obtenerUrlDeslinde } from '../servicios/deslinde'
+import { abonoVencido, diaMes } from '../cuenta'
 import { fechaCorta } from '../fechas'
 import { nombreCompleto } from '../personas'
 import FichaCliente from './FichaCliente'
@@ -115,12 +116,13 @@ function ClienteItem({
   const [errorDeslinde, setErrorDeslinde] = useState('')
   const [fichaAbierta, setFichaAbierta] = useState(false)
 
-  const cambiarEstado = async (estado: EstadoCuenta) => {
-    if (estado === cliente.estado_cuenta) return
+  const vencido = abonoVencido(cliente)
+
+  const conManejo = async (accion: () => Promise<void>) => {
     setOcupado(true)
     onError('')
     try {
-      await actualizarEstadoCuenta(cliente.id, estado)
+      await accion()
       onCambio()
     } catch (e) {
       onError(e instanceof Error ? e.message : 'No se pudo actualizar.')
@@ -128,6 +130,21 @@ function ClienteItem({
       setOcupado(false)
     }
   }
+
+  const cambiarEstado = (estado: EstadoCuenta) => {
+    // Con el abono vencido, tocar "Al día" lo renueva hasta fin de este mes.
+    if (estado === cliente.estado_cuenta && !(estado === 'al_dia' && vencido)) return
+    return conManejo(() => actualizarEstadoCuenta(cliente.id, estado))
+  }
+
+  const sumarMes = () => conManejo(() => sumarMesDeAbono(cliente.id, cliente.al_dia_hasta))
+
+  const etiquetaEstado =
+    cliente.estado_cuenta === 'al_dia' && cliente.al_dia_hasta
+      ? vencido
+        ? `Venció el ${diaMes(cliente.al_dia_hasta)}`
+        : `Al día hasta el ${diaMes(cliente.al_dia_hasta)}`
+      : ETIQUETA_ESTADO[cliente.estado_cuenta]
 
   const verDeslinde = async () => {
     setErrorDeslinde('')
@@ -168,8 +185,10 @@ function ClienteItem({
       </div>
 
       {!paraProfesora && (
-        <div className={`estado-cuenta estado-cuenta--${cliente.estado_cuenta}`}>
-          {ETIQUETA_ESTADO[cliente.estado_cuenta]}
+        <div
+          className={`estado-cuenta estado-cuenta--${vencido ? 'pendiente' : cliente.estado_cuenta}`}
+        >
+          {etiquetaEstado}
         </div>
       )}
 
@@ -199,6 +218,11 @@ function ClienteItem({
         >
           Debe
         </button>
+        {cliente.estado_cuenta === 'al_dia' && (
+          <button type="button" className="boton-mini" disabled={ocupado} onClick={sumarMes}>
+            +1 mes
+          </button>
+        )}
       </div>
       )}
 

@@ -57,7 +57,7 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
   return (
     <div>
       <div className="fila-titulo">
-        <h2>{verPasados ? 'Última semana' : 'Próximas 3 semanas'}</h2>
+        <h2>{verPasados ? 'Última semana' : 'Próximos 45 días'}</h2>
         <div className="barra-acciones">
           <button
             type="button"

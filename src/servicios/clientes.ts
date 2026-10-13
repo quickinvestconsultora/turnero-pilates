@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase'
 import type { EstadoAsistencia, EstadoCuenta, ItemHistorial, Observacion, Perfil } from '../tipos'
-import { yaPaso } from '../fechas'
+import { finDeMes, hoyIso, yaPaso } from '../fechas'
 
 export async function listarObservaciones(alumnaId: string): Promise<Observacion[]> {
   const { data, error } = await supabase
@@ -77,10 +77,33 @@ export async function listarHistorial(alumnaId: string): Promise<ItemHistorial[]
     .sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora))
 }
 
+// Al pasar a "al día" el abono cubre hasta fin del mes actual; con cualquier
+// otro estado se borra la fecha.
 export async function actualizarEstadoCuenta(id: string, estado: EstadoCuenta): Promise<void> {
   const { error } = await supabase
     .from('perfiles')
-    .update({ estado_cuenta: estado, pago_actualizado_en: new Date().toISOString() })
+    .update({
+      estado_cuenta: estado,
+      pago_actualizado_en: new Date().toISOString(),
+      al_dia_hasta: estado === 'al_dia' ? finDeMes(hoyIso()) : null,
+    })
+    .eq('id', id)
+
+  if (error) throw new Error(error.message)
+}
+
+// Suma un mes de abono: desde la fecha en que vence (o desde hoy, si ya venció)
+// hasta el fin del mes siguiente.
+export async function sumarMesDeAbono(id: string, alDiaHasta: string | null): Promise<void> {
+  const hoy = hoyIso()
+  const base = alDiaHasta && alDiaHasta > hoy ? alDiaHasta : hoy
+  const { error } = await supabase
+    .from('perfiles')
+    .update({
+      estado_cuenta: 'al_dia',
+      pago_actualizado_en: new Date().toISOString(),
+      al_dia_hasta: finDeMes(base, 1),
+    })
     .eq('id', id)
 
   if (error) throw new Error(error.message)

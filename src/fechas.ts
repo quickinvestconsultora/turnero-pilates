@@ -30,6 +30,18 @@ export function sumarDias(iso: string, dias: number): string {
   return isoLocal(fecha)
 }
 
+// Primer y último día del mes (calendario) que está `mesesDespues` meses
+// adelante del de la fecha dada. 0 = el mismo mes, 1 = el que viene.
+export function inicioDeMes(iso: string, mesesDespues = 0): string {
+  const [y, m] = iso.split('-').map(Number)
+  return isoLocal(new Date(y, m - 1 + mesesDespues, 1))
+}
+
+export function finDeMes(iso: string, mesesDespues = 0): string {
+  const [y, m] = iso.split('-').map(Number)
+  return isoLocal(new Date(y, m + mesesDespues, 0))
+}
+
 // 'HH:MM:SS' o 'HH:MM' -> 'HH:MM'
 export function horaCorta(hora: string): string {
   return hora.slice(0, 5)

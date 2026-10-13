@@ -39,6 +39,20 @@ alter table public.perfiles
     check (estado_cuenta in ('prueba', 'al_dia', 'pendiente')),
   add column if not exists pago_actualizado_en timestamptz;
 
+-- El abono "al día" no se renueva solo: cubre turnos hasta esta fecha
+-- (por defecto, fin del mes en que se marcó). Pasada la fecha hay que volver
+-- a confirmar el pago desde Clientes. Las cuentas que ya estaban "al día"
+-- quedan cubiertas hasta fin del mes actual.
+alter table public.perfiles
+  add column if not exists al_dia_hasta date;
+
+update public.perfiles
+set al_dia_hasta = (
+  date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires')
+  + interval '1 month - 1 day'
+)::date
+where estado_cuenta = 'al_dia' and al_dia_hasta is null;
+
 -- Datos de identidad + deslinde de responsabilidad, obligatorios desde el
 -- registro. deslinde_pdf_subido queda en false hasta que la app suba el PDF
 -- a Storage (puede demorar si falta confirmar el mail: se reintenta solo la
@@ -407,6 +421,9 @@ begin
     if new.estado_cuenta is distinct from old.estado_cuenta then
       new.estado_cuenta := old.estado_cuenta;
     end if;
+    if new.al_dia_hasta is distinct from old.al_dia_hasta then
+      new.al_dia_hasta := old.al_dia_hasta;
+    end if;
   end if;
   return new;
 end;
@@ -619,6 +636,7 @@ declare
   v_estado   text;
   v_rol           text;
   v_estado_cuenta text;
+  v_al_dia_hasta  date;
   v_reservas_previas int;
   v_primera_clase boolean := false;
 begin
@@ -655,11 +673,19 @@ begin
   -- regularizar. "pendiente" siempre bloquea. El frontend reconoce el
   -- mensaje 'PAGO_REQUERIDO' y muestra la ventana de pago en vez de un
   -- error genérico.
-  select rol, estado_cuenta into v_rol, v_estado_cuenta
+  select rol, estado_cuenta, al_dia_hasta into v_rol, v_estado_cuenta, v_al_dia_hasta
   from public.perfiles where id = auth.uid();
 
   if v_rol = 'alumno' then
     if v_estado_cuenta = 'pendiente' then
+      raise exception 'PAGO_REQUERIDO';
+    end if;
+
+    -- "Al día" cubre turnos hasta al_dia_hasta; uno posterior necesita que el
+    -- estudio confirme un nuevo pago (el abono no se renueva solo).
+    if v_estado_cuenta = 'al_dia'
+       and v_al_dia_hasta is not null
+       and v_turno.fecha > v_al_dia_hasta then
       raise exception 'PAGO_REQUERIDO';
     end if;
 
