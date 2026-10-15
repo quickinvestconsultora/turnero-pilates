@@ -18,6 +18,8 @@ export async function registrarse(datos: {
     email: datos.email.trim(),
     password: datos.password,
     options: {
+      // El link del mail de confirmación vuelve al turnero (no a la presentación).
+      emailRedirectTo: `${window.location.origin}/app/`,
       // El trigger crear_perfil_para_usuario_nuevo lee estos campos.
       data: {
         nombre: datos.nombre.trim(),

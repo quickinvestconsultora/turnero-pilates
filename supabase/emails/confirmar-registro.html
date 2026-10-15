@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Confirmá tu cuenta en FORTEVA Studio</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f5f1e8;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f1e8;">
+      <tr>
+        <td align="center" style="padding:28px 16px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:480px;background:#fffdf7;border:1px solid #e7dece;border-radius:14px;">
+            <tr>
+              <td align="center" style="padding:32px 28px 8px;">
+                <img src="https://turnero-pilates.vercel.app/forteva-logo-email.png" width="170" alt="FORTEVA Studio" style="display:block;border:0;height:auto;max-width:100%;" />
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:12px 32px 4px;font-family:Georgia,'Times New Roman',serif;color:#1c1813;text-align:center;">
+                <h1 style="margin:14px 0 10px;font-size:26px;font-weight:normal;line-height:1.25;">¡Te registraste correctamente!</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 8px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#3d362c;text-align:center;">
+                Gracias por sumarte a FORTEVA Studio. Solo falta un paso: confirmá tu correo
+                y entrá al turnero para reservar tus clases.
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:22px 32px 10px;">
+                <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 28px;background:#1c1813;color:#f7f3ea;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;text-decoration:none;border-radius:999px;">
+                  Confirmar y entrar al turnero
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:14px 32px 6px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#6d6455;text-align:center;">
+                Si el botón no funciona, copiá y pegá este link en tu navegador:<br />
+                <a href="{{ .ConfirmationURL }}" style="color:#948077;word-break:break-all;">{{ .ConfirmationURL }}</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 32px 30px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#8a8070;text-align:center;border-top:1px solid #eee5d6;">
+                Si no fuiste vos quien se registró, podés ignorar este mensaje.<br />
+                <span style="letter-spacing:.12em;text-transform:uppercase;font-size:11px;color:#948077;">FORTEVA Studio · Pilates &amp; Strength</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

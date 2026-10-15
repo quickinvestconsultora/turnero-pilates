@@ -95,7 +95,14 @@ Ahí es a donde vuelven los links de confirmación de registro y de **"Olvidé m
 
 ### 3. Plantilla del mail
 
-**Authentication → Email Templates → Confirm signup**: editá asunto y cuerpo con el nombre y los colores del estudio. Variables disponibles: `{{ .ConfirmationURL }}`, `{{ .SiteURL }}`.
+**Authentication → Email Templates**: ya hay plantillas en español, con el logo y los colores de FORTEVA, listas para pegar en [`supabase/emails/`](supabase/emails):
+
+| Plantilla de Supabase | Archivo | Asunto sugerido |
+|---|---|---|
+| **Confirm signup** | `confirmar-registro.html` | `Confirmá tu cuenta en FORTEVA Studio` |
+| **Reset Password** | `recuperar-contrasena.html` | `Elegí tu contraseña nueva - FORTEVA Studio` |
+
+Se pega todo el contenido del archivo en el campo *Message body* (pestaña *Source*) y el asunto en *Subject*. El logo se carga desde `https://turnero-pilates.vercel.app/forteva-logo-email.png` (archivo en `public/`); si el sitio cambia de dirección, hay que actualizar esa URL en las plantillas. El botón de confirmación lleva directo al turnero: la app manda `emailRedirectTo` = `/app/` al registrarse. Variables disponibles: `{{ .ConfirmationURL }}`, `{{ .SiteURL }}`, `{{ .Email }}`.
 
 ### 4. Subir el límite
 
