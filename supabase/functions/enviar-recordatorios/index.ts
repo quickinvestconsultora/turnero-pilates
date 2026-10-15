@@ -14,6 +14,9 @@
 //
 // Para probar sin mandar nada: invocarla con el cuerpo {"prueba": true} y te
 // devuelve la lista de quién recibiría un mail.
+//
+// Nota: este archivo no usa acentos graves ni plantillas de texto a propósito,
+// para que se pueda copiar y pegar en el editor de Supabase sin que se rompa.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -45,37 +48,40 @@ function escapar(texto: string): string {
 function fechaLarga(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
   const dia = DIAS[new Date(y, m - 1, d).getDay()]
-  return `${dia} ${d} de ${MESES[m - 1]}`
+  return dia + ' ' + d + ' de ' + MESES[m - 1]
 }
 
 function armarMail(p: Pendiente) {
   const hora = p.hora.slice(0, 5)
-  const cuando = `${fechaLarga(p.fecha)} a las ${hora}`
+  const cuando = fechaLarga(p.fecha) + ' a las ' + hora
   const nombre = p.nombre.trim() || 'hola'
-  const profesora = p.profesora?.trim()
+  const profesora = (p.profesora || '').trim()
 
   const texto =
-    `Hola ${nombre}!\n\n` +
-    `Te recordamos que en 2 horas tenés clase en ${NOMBRE_ESTUDIO}.\n\n` +
-    `${cuando}${profesora ? ` con ${profesora}` : ''}.\n\n` +
-    `¡Te esperamos!`
+    'Hola ' + nombre + '!\n\n' +
+    'Te recordamos que en 2 horas tenés clase en ' + NOMBRE_ESTUDIO + '.\n\n' +
+    cuando + (profesora ? ' con ' + profesora : '') + '.\n\n' +
+    '¡Te esperamos!'
 
-  const html = `<!doctype html>
-<html lang="es"><body style="margin:0;background:#f5f1e8;font-family:Arial,Helvetica,sans-serif;color:#1c1813;">
-  <div style="max-width:480px;margin:0 auto;padding:28px 20px;">
-    <div style="background:#fffdf7;border:1px solid #e7dece;border-radius:12px;padding:28px 24px;">
-      <p style="margin:0 0 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#948077;">${NOMBRE_ESTUDIO}</p>
-      <h1 style="margin:0 0 16px;font-size:22px;">Tu clase es en 2 horas</h1>
-      <p style="margin:0 0 14px;font-size:15px;line-height:1.5;">Hola ${escapar(nombre)}, te recordamos tu turno de hoy:</p>
-      <p style="margin:0 0 18px;padding:14px 16px;background:#f7f3ea;border-radius:8px;font-size:16px;font-weight:bold;">
-        ${escapar(cuando)}${profesora ? `<br><span style="font-weight:normal;font-size:14px;color:#6d6455;">con ${escapar(profesora)}</span>` : ''}
-      </p>
-      <p style="margin:0;font-size:15px;">¡Te esperamos!</p>
-    </div>
-  </div>
-</body></html>`
+  const lineaProfesora = profesora
+    ? '<br><span style="font-weight:normal;font-size:14px;color:#6d6455;">con ' + escapar(profesora) + '</span>'
+    : ''
 
-  return { asunto: `Hoy a las ${hora}: tu clase en ${NOMBRE_ESTUDIO}`, texto, html }
+  const html =
+    '<!doctype html>' +
+    '<html lang="es"><body style="margin:0;background:#f5f1e8;font-family:Arial,Helvetica,sans-serif;color:#1c1813;">' +
+    '<div style="max-width:480px;margin:0 auto;padding:28px 20px;">' +
+    '<div style="background:#fffdf7;border:1px solid #e7dece;border-radius:12px;padding:28px 24px;">' +
+    '<p style="margin:0 0 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#948077;">' + NOMBRE_ESTUDIO + '</p>' +
+    '<h1 style="margin:0 0 16px;font-size:22px;">Tu clase es en 2 horas</h1>' +
+    '<p style="margin:0 0 14px;font-size:15px;line-height:1.5;">Hola ' + escapar(nombre) + ', te recordamos tu turno de hoy:</p>' +
+    '<p style="margin:0 0 18px;padding:14px 16px;background:#f7f3ea;border-radius:8px;font-size:16px;font-weight:bold;">' +
+    escapar(cuando) + lineaProfesora +
+    '</p>' +
+    '<p style="margin:0;font-size:15px;">¡Te esperamos!</p>' +
+    '</div></div></body></html>'
+
+  return { asunto: 'Hoy a las ' + hora + ': tu clase en ' + NOMBRE_ESTUDIO, texto, html }
 }
 
 async function enviarPorBrevo(p: Pendiente, apiKey: string, remitente: string): Promise<void> {
@@ -92,7 +98,8 @@ async function enviarPorBrevo(p: Pendiente, apiKey: string, remitente: string): 
     }),
   })
   if (!respuesta.ok) {
-    throw new Error(`Brevo respondió ${respuesta.status}: ${(await respuesta.text()).slice(0, 300)}`)
+    const detalle = (await respuesta.text()).slice(0, 300)
+    throw new Error('Brevo respondió ' + respuesta.status + ': ' + detalle)
   }
 }
 
@@ -110,7 +117,7 @@ Deno.serve(async (req) => {
   }
 
   const cuerpo = await req.json().catch(() => ({}))
-  const prueba = Boolean(cuerpo?.prueba)
+  const prueba = Boolean(cuerpo && cuerpo.prueba)
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
