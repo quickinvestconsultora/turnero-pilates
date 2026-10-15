@@ -147,6 +147,12 @@ El staff pasa a una alumna a `Al día` desde **Clientes** cuando confirma que pa
 
 **Historial de pagos:** "Al día" y "+1 mes" ya no cambian el estado directo: abren un panel para confirmar el cobro (monto, con atajos de los precios de `config/precios.ts`; medio: transferencia, Mercado Pago, efectivo u otro; y una nota). Queda guardado en `pagos_clientes` y se ve en **la ficha de la alumna → Historial de pagos**, donde también se puede borrar un registro cargado por error (no cambia su estado). Lo ve solo el staff. `registrar_pago` hace las dos cosas de una vez en la base.
 
+**Clase de prueba, una sola vez:** la primera reserva es gratis y muestra un aviso ("esta es tu clase de prueba; para reservar la siguiente hay que abonar la cuota o avisar en administración", con el mail de `config/pagos.ts`); el turno queda con la etiqueta "Clase de prueba". Cancelarla **no** devuelve la clase gratis (la base recuerda `cancelada_por_alumna`), salvo que el turno lo haya cancelado el estudio o se anote de nuevo en ese mismo turno.
+
+**Pantallas de inicio del estudio:** el staff y las profesoras abren en **Hoy** (las clases del día, con anotadas, lesiones, quién viene de prueba y —solo el staff— quién debe o tiene el abono vencido) y tienen **Semana**, una grilla de la semana con colores según el lugar que queda (verde con lugar, amarillo casi lleno, rojo completo). La profesora ve el detalle de sus clases y solo el conteo de las demás.
+
+**Cartel de "versión de prueba":** una franja finita arriba de toda la app invita a dejar sugerencias. El botón abre WhatsApp si cargás el número en `src/config/feedback.ts` (`WHATSAPP_FEEDBACK`); mientras esté vacío, manda un mail a la dirección de administración. Se puede cerrar y vuelve en la próxima visita.
+
 **Lista de espera:** cuando se libera un lugar (cancela una alumna, o el staff o la profesora sacan a alguien, o se borra una "sin registrar"), la base sube sola a la primera en espera (trigger `promover_lista_espera`) y, al abrir la app, ella ve "¡Se liberó un lugar! Ya quedaste anotada en…" una sola vez.
 
 **WhatsApp con un toque:** en cada alumna de **Clientes** y en cada anotada de la agenda hay un botón "WhatsApp" que abre el chat con el mensaje ya escrito (sin ninguna API: se arma un link `wa.me`, convirtiendo el celular al formato argentino `549…`, ver `src/whatsapp.ts`). En Clientes el mensaje se adapta: si el abono venció o debe, es un aviso de cobro con el link de Mercado Pago y el alias que haya en `config/pagos.ts`; si no, un saludo. La profesora lo ve con un saludo simple.

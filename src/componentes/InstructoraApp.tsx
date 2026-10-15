@@ -3,13 +3,24 @@ import type { Perfil } from '../tipos'
 import { cerrarSesion } from '../servicios/perfil'
 import { nombreCompleto } from '../personas'
 import CabeceraApp from './CabeceraApp'
+import Hoy from './Hoy'
 import AgendaStaff from './AgendaStaff'
+import SemanaGrilla from './SemanaGrilla'
 import PlantillasStaff from './PlantillasStaff'
 import Clientes from './Clientes'
 import PerfilProfe from './PerfilProfe'
 import BienvenidaProfe from './BienvenidaProfe'
 
-type Vista = 'agenda' | 'plantillas' | 'clientes' | 'perfil'
+type Vista = 'hoy' | 'agenda' | 'semana' | 'plantillas' | 'clientes' | 'perfil'
+
+const PESTAÑAS: [Vista, string][] = [
+  ['hoy', 'Hoy'],
+  ['agenda', 'Mis turnos'],
+  ['semana', 'Semana'],
+  ['plantillas', 'Turnos fijos'],
+  ['clientes', 'Clientes'],
+  ['perfil', 'Mi perfil'],
+]
 
 const claveBienvenida = (id: string) => `forteva-bienvenida-profe-${id}`
 
@@ -30,7 +41,7 @@ export default function InstructoraApp({
   perfil: Perfil
   onPerfilActualizado: (p: Perfil) => void
 }) {
-  const [vista, setVista] = useState<Vista>('agenda')
+  const [vista, setVista] = useState<Vista>('hoy')
   const [mostrarBienvenida, setMostrarBienvenida] = useState(() => !yaVioBienvenida(perfil.id))
 
   const cerrarBienvenida = () => {
@@ -69,38 +80,22 @@ export default function InstructoraApp({
         }
       />
 
-      <nav className="tabs">
-        <button
-          type="button"
-          className={vista === 'agenda' ? 'tab activa' : 'tab'}
-          onClick={() => setVista('agenda')}
-        >
-          Mis turnos
-        </button>
-        <button
-          type="button"
-          className={vista === 'plantillas' ? 'tab activa' : 'tab'}
-          onClick={() => setVista('plantillas')}
-        >
-          Turnos fijos
-        </button>
-        <button
-          type="button"
-          className={vista === 'clientes' ? 'tab activa' : 'tab'}
-          onClick={() => setVista('clientes')}
-        >
-          Clientes
-        </button>
-        <button
-          type="button"
-          className={vista === 'perfil' ? 'tab activa' : 'tab'}
-          onClick={() => setVista('perfil')}
-        >
-          Mi perfil
-        </button>
+      <nav className="tabs tabs-scroll">
+        {PESTAÑAS.map(([clave, etiqueta]) => (
+          <button
+            key={clave}
+            type="button"
+            className={vista === clave ? 'tab activa' : 'tab'}
+            onClick={() => setVista(clave)}
+          >
+            {etiqueta}
+          </button>
+        ))}
       </nav>
 
       <main className="contenido">
+        {vista === 'hoy' && <Hoy instructoraId={perfil.id} />}
+        {vista === 'semana' && <SemanaGrilla instructoraId={perfil.id} />}
         {vista === 'agenda' && <AgendaStaff instructoraId={perfil.id} />}
         {vista === 'plantillas' && <PlantillasStaff instructoraId={perfil.id} />}
         {vista === 'clientes' && <Clientes paraProfesora miId={perfil.id} />}

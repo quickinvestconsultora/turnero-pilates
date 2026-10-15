@@ -10,6 +10,7 @@ import AlumnoApp from './componentes/AlumnoApp'
 import AdminApp from './componentes/AdminApp'
 import InstructoraApp from './componentes/InstructoraApp'
 import Cargando from './componentes/Cargando'
+import BannerPrueba from './componentes/BannerPrueba'
 
 type EstadoPerfil =
   | { estado: 'cargando' }
@@ -18,6 +19,15 @@ type EstadoPerfil =
   | { estado: 'error'; mensaje: string }
 
 export default function App() {
+  return (
+    <>
+      <BannerPrueba />
+      <Contenido />
+    </>
+  )
+}
+
+function Contenido() {
   const [session, setSession] = useState<Session | null>(null)
   const [cargandoSesion, setCargandoSesion] = useState(true)
   const [perfilState, setPerfilState] = useState<EstadoPerfil>({ estado: 'cargando' })

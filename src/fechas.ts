@@ -42,6 +42,14 @@ export function nombreMes(iso: string): string {
   return MESES[Number(iso.split('-')[1]) - 1]
 }
 
+// Lunes de la semana de la fecha dada ('YYYY-MM-DD').
+export function lunesDeLaSemana(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const fecha = new Date(y, m - 1, d)
+  const atras = (fecha.getDay() + 6) % 7 // lunes = 0 ... domingo = 6
+  return isoLocal(new Date(y, m - 1, d - atras))
+}
+
 // Primer y último día del mes (calendario) que está `mesesDespues` meses
 // adelante del de la fecha dada. 0 = el mismo mes, 1 = el que viene.
 export function inicioDeMes(iso: string, mesesDespues = 0): string {

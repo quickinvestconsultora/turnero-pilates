@@ -2,16 +2,28 @@ import { useState } from 'react'
 import type { Perfil } from '../tipos'
 import { cerrarSesion } from '../servicios/perfil'
 import CabeceraApp from './CabeceraApp'
+import Hoy from './Hoy'
 import AgendaStaff from './AgendaStaff'
+import SemanaGrilla from './SemanaGrilla'
 import PlantillasStaff from './PlantillasStaff'
 import Estadisticas from './Estadisticas'
 import Clientes from './Clientes'
 import Profesores from './Profesores'
 
-type Vista = 'agenda' | 'plantillas' | 'clientes' | 'profesores' | 'estadisticas'
+type Vista = 'hoy' | 'agenda' | 'semana' | 'plantillas' | 'clientes' | 'profesores' | 'estadisticas'
+
+const PESTAÑAS: [Vista, string][] = [
+  ['hoy', 'Hoy'],
+  ['agenda', 'Agenda'],
+  ['semana', 'Semana'],
+  ['plantillas', 'Turnos fijos'],
+  ['clientes', 'Clientes'],
+  ['profesores', 'Profesores'],
+  ['estadisticas', 'Estadísticas'],
+]
 
 export default function AdminApp({ perfil }: { perfil: Perfil }) {
-  const [vista, setVista] = useState<Vista>('agenda')
+  const [vista, setVista] = useState<Vista>('hoy')
 
   return (
     <div className="app">
@@ -29,46 +41,23 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
         }
       />
 
-      <nav className="tabs">
-        <button
-          type="button"
-          className={vista === 'agenda' ? 'tab activa' : 'tab'}
-          onClick={() => setVista('agenda')}
-        >
-          Agenda
-        </button>
-        <button
-          type="button"
-          className={vista === 'plantillas' ? 'tab activa' : 'tab'}
-          onClick={() => setVista('plantillas')}
-        >
-          Turnos fijos
-        </button>
-        <button
-          type="button"
-          className={vista === 'clientes' ? 'tab activa' : 'tab'}
-          onClick={() => setVista('clientes')}
-        >
-          Clientes
-        </button>
-        <button
-          type="button"
-          className={vista === 'profesores' ? 'tab activa' : 'tab'}
-          onClick={() => setVista('profesores')}
-        >
-          Profesores
-        </button>
-        <button
-          type="button"
-          className={vista === 'estadisticas' ? 'tab activa' : 'tab'}
-          onClick={() => setVista('estadisticas')}
-        >
-          Estadísticas
-        </button>
+      <nav className="tabs tabs-scroll">
+        {PESTAÑAS.map(([clave, etiqueta]) => (
+          <button
+            key={clave}
+            type="button"
+            className={vista === clave ? 'tab activa' : 'tab'}
+            onClick={() => setVista(clave)}
+          >
+            {etiqueta}
+          </button>
+        ))}
       </nav>
 
       <main className="contenido">
+        {vista === 'hoy' && <Hoy />}
         {vista === 'agenda' && <AgendaStaff />}
+        {vista === 'semana' && <SemanaGrilla />}
         {vista === 'plantillas' && <PlantillasStaff />}
         {vista === 'clientes' && <Clientes />}
         {vista === 'profesores' && <Profesores />}

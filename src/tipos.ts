@@ -120,6 +120,8 @@ export type TurnoConReservas = {
       apellido: string
       telefono: string
       lesiones: string | null
+      estado_cuenta: EstadoCuenta
+      al_dia_hasta: string | null
     } | null
   }[]
 }

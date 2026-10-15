@@ -1507,3 +1507,232 @@ label {
   background: rgba(148, 128, 119, 0.18);
   color: var(--acento-oscuro);
 }
+
+/* ---- Cartelito de versión de prueba ---- */
+.banner-prueba {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 6px 36px 6px 12px;
+  position: relative;
+  background: var(--superficie-2);
+  border-bottom: 1px solid var(--borde);
+  color: var(--texto-suave);
+  font-size: 12px;
+  text-align: center;
+}
+
+.banner-prueba-boton {
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--acento);
+  color: var(--acento-oscuro);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.banner-prueba-cerrar {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--texto-suave);
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* ---- Pestañas con scroll cuando son muchas ---- */
+.tabs-scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs-scroll .tab {
+  flex: 1 0 auto;
+  white-space: nowrap;
+}
+
+/* ---- Vista Hoy ---- */
+.hoy-fecha {
+  margin: -6px 0 10px;
+  text-transform: capitalize;
+}
+
+.hoy-resumen {
+  margin: 0 0 14px;
+  font-size: 14px;
+}
+
+.hoy-alerta {
+  color: var(--error);
+  font-weight: 700;
+}
+
+.hoy-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hoy-turno {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 13px 15px;
+}
+
+.hoy-turno--pasado {
+  opacity: 0.6;
+}
+
+.hoy-turno-cabecera {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.hoy-anotadas {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+/* ---- Semana en grilla ---- */
+.grilla-semana-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+}
+
+.grilla-semana {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.grilla-semana th,
+.grilla-semana td {
+  border: 1px solid var(--borde);
+  padding: 4px;
+  text-align: center;
+  font-size: 12px;
+  vertical-align: middle;
+}
+
+.grilla-semana thead th {
+  background: var(--superficie-2);
+  font-weight: 700;
+}
+
+.grilla-semana thead th span {
+  font-weight: 400;
+  color: var(--texto-suave);
+}
+
+.grilla-semana thead th.hoy {
+  background: var(--primario);
+  color: var(--primario-texto);
+}
+
+.grilla-semana thead th.hoy span {
+  color: var(--primario-texto);
+}
+
+.grilla-semana tbody th {
+  width: 54px;
+  background: var(--superficie-2);
+}
+
+.grilla-semana td.vacia {
+  background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(0, 0, 0, 0.03) 6px 7px);
+}
+
+.celda-turno {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 2px;
+  border-radius: 8px;
+  line-height: 1.2;
+}
+
+.celda-turno span {
+  font-size: 10px;
+  color: var(--texto-suave);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.celda-turno--libre {
+  background: rgba(77, 124, 74, 0.16);
+}
+
+.celda-turno--casi {
+  background: rgba(214, 160, 40, 0.22);
+}
+
+.celda-turno--lleno {
+  background: rgba(180, 71, 46, 0.2);
+}
+
+.celda-turno--cancelado {
+  background: var(--superficie-2);
+  color: var(--texto-suave);
+  text-decoration: line-through;
+}
+
+.celda-turno--mio {
+  outline: 2px solid var(--acento-oscuro);
+}
+
+.leyenda-grilla {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--texto-suave);
+}
+
+.punto-leyenda {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin: 0 3px 0 8px;
+  vertical-align: middle;
+}
+
+.punto-leyenda--libre {
+  background: rgba(77, 124, 74, 0.5);
+}
+
+.punto-leyenda--casi {
+  background: rgba(214, 160, 40, 0.6);
+}
+
+.punto-leyenda--lleno {
+  background: rgba(180, 71, 46, 0.55);
+}
+
+.punto-leyenda--cancelado {
+  background: var(--borde);
+}

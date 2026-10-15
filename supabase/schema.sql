@@ -282,6 +282,11 @@ alter table public.reservas
   add column if not exists promovida_en timestamptz,
   add column if not exists aviso_promocion_visto_en timestamptz;
 
+-- true si la propia alumna canceló un lugar que tenía confirmado. Sirve para
+-- que la clase de prueba no se pueda "reciclar" cancelando y reservando otra.
+alter table public.reservas
+  add column if not exists cancelada_por_alumna boolean not null default false;
+
 -- Observaciones del estudio sobre cada alumna (notas internas con fecha).
 -- Tabla aparte y no una columna de perfiles: la alumna puede leer su propio
 -- perfil, y estas notas son solo para el staff.
@@ -766,9 +771,17 @@ begin
     end if;
 
     if v_estado_cuenta = 'prueba' then
+      -- La clase de prueba se usa una sola vez: cuentan las reservas vigentes y
+      -- también las que la propia alumna canceló estando confirmadas. No
+      -- cuentan las de turnos que canceló el estudio, ni las de lista de espera,
+      -- ni este mismo turno (puede volver a anotarse si se arrepintió).
       select count(*) into v_reservas_previas
-      from public.reservas
-      where alumno_id = auth.uid() and estado <> 'cancelada';
+      from public.reservas r
+      join public.turnos t on t.id = r.turno_id
+      where r.alumno_id = auth.uid()
+        and r.turno_id <> p_turno_id
+        and not t.cancelado
+        and (r.estado <> 'cancelada' or r.cancelada_por_alumna);
 
       if v_reservas_previas >= 1 then
         raise exception 'PAGO_REQUERIDO';
@@ -918,7 +931,8 @@ begin
   -- Si liberó un lugar "de verdad", el trigger promover_lista_espera sube
   -- solo a la primera de la lista de espera.
   update public.reservas
-    set estado = 'cancelada'
+    set estado = 'cancelada',
+        cancelada_por_alumna = (v_estado_previo = 'reservada')
   where turno_id = p_turno_id and alumno_id = auth.uid();
 end;
 $$;
