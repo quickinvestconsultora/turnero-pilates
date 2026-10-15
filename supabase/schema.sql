@@ -319,6 +319,46 @@ create table if not exists public.pagos_clientes (
 create index if not exists pagos_clientes_alumna_idx
   on public.pagos_clientes (alumna_id, creado_en desc);
 
+-- Comprobantes de pago que sube la alumna (foto o PDF de la transferencia) para
+-- que el estudio los confirme. El archivo está en el bucket privado
+-- "comprobantes"; acá queda la fila y su estado. Aprobarlo (y registrar el pago)
+-- lo hace el staff desde Clientes.
+create table if not exists public.comprobantes_pago (
+  id           uuid primary key default gen_random_uuid(),
+  alumna_id    uuid not null references public.perfiles (id) on delete cascade default auth.uid(),
+  ruta         text not null,
+  nota         text,
+  estado       text not null default 'pendiente'
+               check (estado in ('pendiente', 'aprobado', 'rechazado')),
+  creado_en    timestamptz not null default now(),
+  resuelto_en  timestamptz,
+  resuelto_por uuid references auth.users (id) on delete set null
+);
+
+create index if not exists comprobantes_estado_idx
+  on public.comprobantes_pago (estado, creado_en);
+
+-- Tope de 5 comprobantes pendientes por alumna, para evitar el spam.
+create or replace function public.limitar_comprobantes_pendientes()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if (select count(*) from public.comprobantes_pago
+      where alumna_id = new.alumna_id and estado = 'pendiente') >= 5 then
+    raise exception 'Ya tenés comprobantes esperando confirmación. Cuando el estudio los revise podés mandar otro.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists limitar_comprobantes on public.comprobantes_pago;
+create trigger limitar_comprobantes
+  before insert on public.comprobantes_pago
+  for each row execute function public.limitar_comprobantes_pendientes();
+
 -- Galería de fotos de cada profesora (la que ven las alumnas en su ficha).
 -- Los archivos están en el bucket público "profes"; acá se guarda la lista.
 create table if not exists public.fotos_profesoras (
@@ -399,6 +439,21 @@ alter table public.pagos_clientes enable row level security;
 drop policy if exists pagos_staff on public.pagos_clientes;
 create policy pagos_staff on public.pagos_clientes
   for all using (public.es_staff()) with check (public.es_staff());
+
+-- Comprobantes: la alumna sube y ve los suyos; el staff ve y resuelve todos.
+alter table public.comprobantes_pago enable row level security;
+
+drop policy if exists comprobantes_ver on public.comprobantes_pago;
+create policy comprobantes_ver on public.comprobantes_pago
+  for select using (alumna_id = auth.uid() or public.es_staff());
+
+drop policy if exists comprobantes_crea on public.comprobantes_pago;
+create policy comprobantes_crea on public.comprobantes_pago
+  for insert with check (alumna_id = auth.uid() and estado = 'pendiente');
+
+drop policy if exists comprobantes_staff_resuelve on public.comprobantes_pago;
+create policy comprobantes_staff_resuelve on public.comprobantes_pago
+  for update using (public.es_staff()) with check (public.es_staff());
 
 -- ¿Puede el usuario actual manejar las anotadas de este turno? El staff, en
 -- cualquiera; una profesora, solo en los suyos.
@@ -676,6 +731,34 @@ create policy profes_foto_actualiza on storage.objects
   ) with check (
     bucket_id = 'profes'
     and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- Comprobantes de pago: bucket PRIVADO, máximo 5 MB, solo imágenes y PDF. Cada
+-- alumna sube a su carpeta "<id>/..."; ella y el staff pueden verlos.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'comprobantes', 'comprobantes', false, 5242880,
+  array['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+)
+on conflict (id) do update
+  set file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists comprobantes_bucket_visible on storage.buckets;
+create policy comprobantes_bucket_visible on storage.buckets
+  for select using (id = 'comprobantes');
+
+drop policy if exists comprobantes_sube on storage.objects;
+create policy comprobantes_sube on storage.objects
+  for insert with check (
+    bucket_id = 'comprobantes' and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists comprobantes_ver_objeto on storage.objects;
+create policy comprobantes_ver_objeto on storage.objects
+  for select using (
+    bucket_id = 'comprobantes'
+    and ((storage.foldername(name))[1] = auth.uid()::text or public.es_staff())
   );
 
 -- ============================================================================
@@ -1356,6 +1439,77 @@ begin
 end;
 $$;
 
+-- --- Informe por profesora (staff) ---------------------------------------------
+-- Por cada profesora (y los turnos sin asignar o con nombre escrito a mano) y
+-- dentro del período: clases ya dadas, anotadas, y cuántas asistieron o
+-- faltaron según lo que se cargó. Solo cuenta turnos que ya empezaron y no
+-- fueron cancelados; incluye a las personas "sin registrar".
+create or replace function public.informe_profesoras(p_desde date, p_hasta date)
+returns table (
+  clave      text,
+  nombre     text,
+  clases     bigint,
+  anotadas   bigint,
+  asistieron bigint,
+  ausentes   bigint
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede ver el informe.';
+  end if;
+
+  return query
+  with tt as (
+    select t.id, t.instructora_id, t.instructor
+    from public.turnos t
+    where t.fecha between p_desde and p_hasta
+      and not t.cancelado
+      and (t.fecha + t.hora) < (now() at time zone 'America/Argentina/Buenos_Aires')
+  ),
+  de_alumnas as (
+    select r.turno_id,
+           count(*) as anot,
+           count(*) filter (where r.asistencia = 'asistio') as asis,
+           count(*) filter (where r.asistencia = 'ausente') as aus
+    from public.reservas r
+    join tt on tt.id = r.turno_id
+    where r.estado = 'reservada'
+    group by r.turno_id
+  ),
+  de_invitadas as (
+    select i.turno_id,
+           count(*) as anot,
+           count(*) filter (where i.asistencia = 'asistio') as asis,
+           count(*) filter (where i.asistencia = 'ausente') as aus
+    from public.reservas_invitadas i
+    join tt on tt.id = i.turno_id
+    group by i.turno_id
+  )
+  select
+    coalesce(tt.instructora_id::text, 'txt:' || coalesce(tt.instructor, '')),
+    coalesce(
+      nullif(btrim(max(p.nombre || ' ' || p.apellido)), ''),
+      nullif(max(tt.instructor), ''),
+      'Sin asignar'
+    ),
+    count(*)::bigint,
+    coalesce(sum(coalesce(da.anot, 0) + coalesce(di.anot, 0)), 0)::bigint,
+    coalesce(sum(coalesce(da.asis, 0) + coalesce(di.asis, 0)), 0)::bigint,
+    coalesce(sum(coalesce(da.aus, 0) + coalesce(di.aus, 0)), 0)::bigint
+  from tt
+  left join public.perfiles p on p.id = tt.instructora_id
+  left join de_alumnas da on da.turno_id = tt.id
+  left join de_invitadas di on di.turno_id = tt.id
+  group by 1
+  order by 2;
+end;
+$$;
+
 -- --- Recordatorio de 2 horas antes ---------------------------------------------
 -- Las usa SOLO la Edge Function "enviar-recordatorios" (con la clave de
 -- servicio), que corre cada 10 minutos. Devuelve a quién hay que avisar: los
@@ -1570,6 +1724,7 @@ grant execute on function public.listar_profesoras()           to authenticated;
 grant execute on function public.ocupados_turno(uuid)          to authenticated;
 grant execute on function public.agregar_alumna_a_turno(uuid, uuid) to authenticated;
 grant execute on function public.vincular_invitada(uuid, uuid) to authenticated;
+grant execute on function public.informe_profesoras(date, date) to authenticated;
 grant execute on function public.registrar_pago(uuid, numeric, text, text, date) to authenticated;
 grant execute on function public.marcar_promocion_vista(uuid) to authenticated;
 grant execute on function public.agregar_invitada_a_turno(uuid, text, text, text, text) to authenticated;

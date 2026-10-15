@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Perfil, Profesora, TurnoDisponible } from '../tipos'
 import { cerrarSesion } from '../servicios/perfil'
 import { listarFotosGaleria, listarProfesoras } from '../servicios/profesoras'
+import { listarMisComprobantes } from '../servicios/comprobantes'
 import type { FotoGaleria } from '../servicios/profesoras'
 import {
   cancelar,
@@ -52,6 +53,20 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   const [profesoraAbierta, setProfesoraAbierta] = useState<Profesora | null>(null)
 
   const [galeria, setGaleria] = useState<FotoGaleria[]>([])
+  const [comprobantePendiente, setComprobantePendiente] = useState(false)
+
+  const cargarComprobantes = useCallback(async () => {
+    try {
+      const mios = await listarMisComprobantes()
+      setComprobantePendiente(mios.some((c) => c.estado === 'pendiente'))
+    } catch {
+      setComprobantePendiente(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    cargarComprobantes()
+  }, [cargarComprobantes])
 
   useEffect(() => {
     // Si falla, el nombre de la profesora se ve igual, solo que sin ficha.
@@ -198,7 +213,12 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       />
 
       <AvisoPromocion turnos={promovidas} onEntendido={entenderPromociones} />
-      <AvisoPago perfil={perfil} />
+      <AvisoPago perfil={perfil} onComprobante={cargarComprobantes} />
+      {comprobantePendiente && (
+        <p className="estado-abono estado-abono--pronto">
+          Mandaste un comprobante de pago: el estudio lo está revisando y te habilita los turnos.
+        </p>
+      )}
       <EstadoAbono perfil={perfil} />
       <InstalarApp />
 
@@ -257,7 +277,13 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
         />
       )}
 
-      {pagoRequerido && <ModalPago perfil={perfil} onCerrar={() => setPagoRequerido(false)} />}
+      {pagoRequerido && (
+        <ModalPago
+          perfil={perfil}
+          onCerrar={() => setPagoRequerido(false)}
+          onComprobante={cargarComprobantes}
+        />
+      )}
 
       {avisoPrimeraClase && (
         <AvisoPrimeraClase perfil={perfil} onCerrar={() => setAvisoPrimeraClase(false)} />

@@ -1,10 +1,17 @@
 import type { Perfil } from '../tipos'
 import OpcionesPago from './OpcionesPago'
+import SubirComprobante from './SubirComprobante'
 import { abonoVencido, diaMes } from '../cuenta'
 
 // Cartel para la alumna cuando el staff la marcó como "pendiente" de pago o
 // cuando su abono mensual ya venció.
-export default function AvisoPago({ perfil }: { perfil: Perfil }) {
+export default function AvisoPago({
+  perfil,
+  onComprobante,
+}: {
+  perfil: Perfil
+  onComprobante: () => void
+}) {
   const vencido = abonoVencido(perfil)
   if (perfil.estado_cuenta !== 'pendiente' && !vencido) return null
 
@@ -23,6 +30,7 @@ export default function AvisoPago({ perfil }: { perfil: Perfil }) {
         )}
       </p>
       <OpcionesPago perfil={perfil} />
+      <SubirComprobante alumnaId={perfil.id} onSubido={onComprobante} />
     </div>
   )
 }

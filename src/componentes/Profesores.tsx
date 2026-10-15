@@ -3,6 +3,7 @@ import type { Profesora } from '../tipos'
 import { listarProfesoras } from '../servicios/profesoras'
 import { actualizarRol } from '../servicios/clientes'
 import FotoProfe from './FotoProfe'
+import InformeProfesoras from './InformeProfesoras'
 
 // Pestaña de administración: las profesoras del estudio. Cada una arma sus
 // turnos desde su propia pantalla; acá se las ve y, si hace falta, se las
@@ -81,6 +82,8 @@ export default function Profesores() {
           ))}
         </ul>
       )}
+
+      <InformeProfesoras />
     </div>
   )
 }

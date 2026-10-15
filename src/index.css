@@ -1736,3 +1736,82 @@ label {
 .punto-leyenda--cancelado {
   background: var(--borde);
 }
+
+/* ---- Comprobantes de pago e informe por profesora ---- */
+.subir-comprobante {
+  margin-top: 10px;
+}
+
+.subir-comprobante-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.comprobantes-pendientes {
+  margin: 8px 0 14px;
+  padding: 12px 14px;
+  background: rgba(214, 160, 40, 0.12);
+  border: 1px solid rgba(214, 160, 40, 0.4);
+  border-radius: var(--radio);
+}
+
+.comprobantes-pendientes h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.comprobantes-pendientes ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.comprobantes-pendientes li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.comprobante-datos {
+  display: flex;
+  flex-direction: column;
+}
+
+.informe-profesoras {
+  margin-top: 28px;
+}
+
+.tabla-informe {
+  width: 100%;
+  min-width: 460px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.tabla-informe th,
+.tabla-informe td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--borde);
+  text-align: center;
+}
+
+.tabla-informe th:first-child,
+.tabla-informe tbody th {
+  text-align: left;
+}
+
+.tabla-informe thead th {
+  background: var(--superficie-2);
+  font-size: 12px;
+}
+
+.tabla-informe tfoot th,
+.tabla-informe tfoot td {
+  font-weight: 700;
+  background: var(--superficie-2);
+}

@@ -7,6 +7,8 @@ import { fechaCorta, hoyIso, sumarDias } from '../fechas'
 import { nombreCompleto } from '../personas'
 import { mensajeCliente } from '../whatsapp'
 import EnlaceWhatsApp from './EnlaceWhatsApp'
+import { descargarCsv } from '../csv'
+import ComprobantesPendientes from './ComprobantesPendientes'
 import FichaCliente from './FichaCliente'
 import RegistrarPago from './RegistrarPago'
 import type { ModoPago } from './RegistrarPago'
@@ -102,12 +104,44 @@ export default function Clientes({
     return lista
   }, [clientes, busqueda, filtro, paraProfesora, resumen])
 
+  // Exporta lo que se está viendo (respeta el filtro y la búsqueda).
+  const exportar = () => {
+    const estadoTexto = (c: Perfil) =>
+      abonoVencido(c)
+        ? 'Abono vencido'
+        : c.estado_cuenta === 'al_dia'
+          ? 'Al día'
+          : ETIQUETA_ESTADO[c.estado_cuenta]
+    descargarCsv(`clientes-${hoyIso()}.csv`, [
+      ['Apellido', 'Nombre', 'DNI', 'Celular', 'Nivel', 'Estado de cuenta', 'Abono cubre hasta', 'Alta'],
+      ...filtrados.map((c) => [
+        c.apellido,
+        c.nombre,
+        c.dni,
+        c.telefono,
+        c.nivel ? ETIQUETA_NIVEL[c.nivel] : '',
+        estadoTexto(c),
+        c.al_dia_hasta ? c.al_dia_hasta.split('-').reverse().join('/') : '',
+        c.creado_en.slice(0, 10).split('-').reverse().join('/'),
+      ]),
+    ])
+  }
+
   return (
     <div>
       <div className="fila-titulo">
         <h2>Clientes</h2>
-        <span className="turno-detalle">{clientes.length} en total</span>
+        <div className="barra-acciones">
+          <span className="turno-detalle">{clientes.length} en total</span>
+          {!paraProfesora && (
+            <button type="button" className="link-secundario" onClick={exportar}>
+              Descargar para Excel
+            </button>
+          )}
+        </div>
       </div>
+
+      {!paraProfesora && <ComprobantesPendientes onCambio={cargar} />}
 
       {!paraProfesora && (
         <div className="filtros-clientes" role="group" aria-label="Filtrar por estado de cuenta">

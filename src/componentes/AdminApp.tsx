@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Perfil } from '../tipos'
 import { cerrarSesion } from '../servicios/perfil'
+import { contarComprobantesPendientes } from '../servicios/comprobantes'
 import CabeceraApp from './CabeceraApp'
 import Hoy from './Hoy'
 import AgendaStaff from './AgendaStaff'
@@ -24,6 +25,15 @@ const PESTAÑAS: [Vista, string][] = [
 
 export default function AdminApp({ perfil }: { perfil: Perfil }) {
   const [vista, setVista] = useState<Vista>('hoy')
+  const [pendientes, setPendientes] = useState(0)
+
+  // Cantidad de comprobantes esperando confirmación (se ve en la pestaña Clientes).
+  // Se actualiza al cambiar de pestaña, que es cuando se resuelven.
+  useEffect(() => {
+    contarComprobantesPendientes()
+      .then(setPendientes)
+      .catch(() => setPendientes(0))
+  }, [vista])
 
   return (
     <div className="app">
@@ -50,6 +60,7 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
             onClick={() => setVista(clave)}
           >
             {etiqueta}
+            {clave === 'clientes' && pendientes > 0 && <span className="pastilla">{pendientes}</span>}
           </button>
         ))}
       </nav>
