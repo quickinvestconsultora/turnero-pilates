@@ -27,6 +27,7 @@ import AvisoPago from './AvisoPago'
 import AvisoPromocion from './AvisoPromocion'
 import EstadoAbono from './EstadoAbono'
 import InstalarApp from './InstalarApp'
+import AvisoPrimeraClase from './AvisoPrimeraClase'
 import ModalPago from './ModalPago'
 import ModalProfesora from './ModalProfesora'
 
@@ -46,6 +47,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   const [ocupadoId, setOcupadoId] = useState<string | null>(null)
   const [editandoPerfil, setEditandoPerfil] = useState(false)
   const [pagoRequerido, setPagoRequerido] = useState(false)
+  const [avisoPrimeraClase, setAvisoPrimeraClase] = useState(false)
   const [profesoras, setProfesoras] = useState<Profesora[]>([])
   const [profesoraAbierta, setProfesoraAbierta] = useState<Profesora | null>(null)
 
@@ -110,8 +112,12 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
     setError('')
     setAviso('')
     try {
-      if (quiere === 'reservar') await reservar(turno.id)
-      else await cancelar(turno.id)
+      if (quiere === 'reservar') {
+        const resultado = await reservar(turno.id)
+        if (resultado.primeraClase) setAvisoPrimeraClase(true)
+      } else {
+        await cancelar(turno.id)
+      }
       await cargar()
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : 'No se pudo completar la acción.'
@@ -232,6 +238,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
             profesoras={profesoras}
             onVerProfesora={setProfesoraAbierta}
             seriePorTurno={seriePorTurno}
+            esPrueba={perfil.estado_cuenta === 'prueba'}
             onReservarSerie={accionSerie}
             onReservar={(t) => accion(t, 'reservar')}
             onCancelar={(t) => accion(t, 'cancelar')}
@@ -252,6 +259,10 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
 
       {pagoRequerido && <ModalPago perfil={perfil} onCerrar={() => setPagoRequerido(false)} />}
 
+      {avisoPrimeraClase && (
+        <AvisoPrimeraClase perfil={perfil} onCerrar={() => setAvisoPrimeraClase(false)} />
+      )}
+
       {profesoraAbierta && (
         <ModalProfesora
           profesora={profesoraAbierta}
@@ -269,6 +280,7 @@ function ListaTurnos({
   profesoras,
   onVerProfesora,
   seriePorTurno,
+  esPrueba,
   onReservarSerie,
   onReservar,
   onCancelar,
@@ -278,6 +290,7 @@ function ListaTurnos({
   profesoras: Profesora[]
   onVerProfesora: (p: Profesora) => void
   seriePorTurno: Map<string, number>
+  esPrueba: boolean
   onReservarSerie: (t: TurnoDisponible) => void
   onReservar: (t: TurnoDisponible) => void
   onCancelar: (t: TurnoDisponible) => void
@@ -310,6 +323,9 @@ function ListaTurnos({
                           ? `${libres} lugar${libres === 1 ? '' : 'es'}`
                           : 'Completo'}
                     </span>
+                    {esPrueba && t.mi_estado === 'reservada' && (
+                      <span className="etiqueta-prueba">Clase de prueba</span>
+                    )}
                     {t.instructor &&
                       (() => {
                         const ficha = profesoras.find((p) => p.id === t.instructora_id)

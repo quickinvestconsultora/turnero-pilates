@@ -6,6 +6,9 @@ export const LINK_MERCADO_PAGO = 'https://mpago.la/2yrkbKh'
 export const TRANSFERENCIA_ALIAS = 'vanesa.vieyra'
 export const TRANSFERENCIA_TITULAR = 'Vanesa Vieyra'
 
+// A dónde avisar cuando una alumna ya pagó pero la app todavía no lo refleja.
+export const EMAIL_ADMINISTRACION = 'fortevastudio@gmail.com'
+
 // Con código de país, sin espacios ni signos: ej. '5492291234567'.
 export const WHATSAPP_NUMERO = ''
 
