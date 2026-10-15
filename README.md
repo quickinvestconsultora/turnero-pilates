@@ -223,7 +223,11 @@ select cron.schedule(
 );
 ```
 
-Para apagarla: `select cron.unschedule('recordatorios-turnos');`.
+Para apagarla del todo: `select cron.unschedule('recordatorios-turnos');`.
+
+**Interruptor de emergencia:** en **Clientes**, arriba, hay un cuadro "Recordatorios por mail: activos" con el botón **Pausar** (y **Reanudar**). Pausados, la tarea sigue corriendo cada 10 minutos pero `recordatorios_pendientes` no devuelve a nadie, así que no se manda ningún mail; no hace falta tocar la función ni la tarea. El estado se guarda en la tabla `configuracion` (clave `recordatorios_activos`) y solo lo cambia el staff.
+
+Para ver qué pasó en las últimas corridas, en el SQL Editor: `select status, return_message, start_time from cron.job_run_details order by start_time desc limit 5;` y `select status_code, content, created from net._http_response order by created desc limit 5;`.
 
 Antes de activarlo en serio conviene arreglar el remitente: con un Gmail, Brevo puede reescribir el "De". Lo prolijo es una dirección del dominio (`turnos@fortevastudio.com.ar`) con sus registros DNS.
 

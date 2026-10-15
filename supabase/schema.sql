@@ -359,6 +359,15 @@ create trigger limitar_comprobantes
   before insert on public.comprobantes_pago
   for each row execute function public.limitar_comprobantes_pendientes();
 
+-- Ajustes del sistema que el staff puede cambiar (por ahora, el interruptor de
+-- los recordatorios automáticos). Una fila por ajuste, con su valor en JSON.
+create table if not exists public.configuracion (
+  clave           text primary key,
+  valor           jsonb not null,
+  actualizado_en  timestamptz not null default now(),
+  actualizado_por uuid references auth.users (id) on delete set null
+);
+
 -- Galería de fotos de cada profesora (la que ven las alumnas en su ficha).
 -- Los archivos están en el bucket público "profes"; acá se guarda la lista.
 create table if not exists public.fotos_profesoras (
@@ -439,6 +448,14 @@ alter table public.pagos_clientes enable row level security;
 drop policy if exists pagos_staff on public.pagos_clientes;
 create policy pagos_staff on public.pagos_clientes
   for all using (public.es_staff()) with check (public.es_staff());
+
+-- Configuración: solo el staff la ve; se cambia por funciones (ver
+-- cambiar_recordatorios), no se escribe directo.
+alter table public.configuracion enable row level security;
+
+drop policy if exists configuracion_staff_ve on public.configuracion;
+create policy configuracion_staff_ve on public.configuracion
+  for select using (public.es_staff());
 
 -- Comprobantes: la alumna sube y ve los suyos; el staff ve y resuelve todos.
 alter table public.comprobantes_pago enable row level security;
@@ -1510,12 +1527,49 @@ begin
 end;
 $$;
 
+-- --- Interruptor de los recordatorios automáticos -------------------------------
+-- Con los recordatorios pausados, recordatorios_pendientes() no devuelve a nadie
+-- y la función programada simplemente no manda nada. Se maneja desde Clientes.
+create or replace function public.recordatorios_activos()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select valor = 'true'::jsonb from public.configuracion where clave = 'recordatorios_activos'),
+    true
+  );
+$$;
+
+create or replace function public.cambiar_recordatorios(p_activos boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede pausar o reanudar los recordatorios.';
+  end if;
+
+  insert into public.configuracion (clave, valor, actualizado_por)
+  values ('recordatorios_activos', to_jsonb(p_activos), auth.uid())
+  on conflict (clave) do update
+    set valor = excluded.valor,
+        actualizado_en = now(),
+        actualizado_por = auth.uid();
+end;
+$$;
+
 -- --- Recordatorio de 2 horas antes ---------------------------------------------
 -- Las usa SOLO la Edge Function "enviar-recordatorios" (con la clave de
 -- servicio), que corre cada 10 minutos. Devuelve a quién hay que avisar: los
 -- turnos que empiezan en las próximas 2 horas (hora argentina), con reserva
 -- confirmada (o invitada con mail) que todavía no recibió el aviso. No avisa
--- a quien reservó dentro de las últimas 2 horas: recién se anotó.
+-- a quien reservó dentro de las últimas 2 horas: recién se anotó. Si los
+-- recordatorios están pausados, no devuelve a nadie.
 create or replace function public.recordatorios_pendientes()
 returns table (
   tipo       text,
@@ -1536,7 +1590,8 @@ as $$
   join public.turnos t on t.id = r.turno_id
   join public.perfiles p on p.id = r.alumno_id
   join auth.users u on u.id = r.alumno_id
-  where r.estado = 'reservada'
+  where public.recordatorios_activos()
+    and r.estado = 'reservada'
     and r.recordatorio_enviado_en is null
     and not t.cancelado
     and u.email is not null
@@ -1547,7 +1602,8 @@ as $$
   select 'invitada'::text, i.id, i.nombre, i.email, t.fecha, t.hora, t.instructor
   from public.reservas_invitadas i
   join public.turnos t on t.id = i.turno_id
-  where i.recordatorio_enviado_en is null
+  where public.recordatorios_activos()
+    and i.recordatorio_enviado_en is null
     and i.email is not null
     and not t.cancelado
     and ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') > now()
@@ -1727,5 +1783,6 @@ grant execute on function public.vincular_invitada(uuid, uuid) to authenticated;
 grant execute on function public.informe_profesoras(date, date) to authenticated;
 grant execute on function public.registrar_pago(uuid, numeric, text, text, date) to authenticated;
 grant execute on function public.marcar_promocion_vista(uuid) to authenticated;
+grant execute on function public.cambiar_recordatorios(boolean) to authenticated;
 grant execute on function public.agregar_invitada_a_turno(uuid, text, text, text, text) to authenticated;
 grant execute on function public.clientes_para_instructora()   to authenticated;

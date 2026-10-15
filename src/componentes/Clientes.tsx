@@ -9,6 +9,7 @@ import { mensajeCliente } from '../whatsapp'
 import EnlaceWhatsApp from './EnlaceWhatsApp'
 import { descargarCsv } from '../csv'
 import ComprobantesPendientes from './ComprobantesPendientes'
+import ControlRecordatorios from './ControlRecordatorios'
 import FichaCliente from './FichaCliente'
 import RegistrarPago from './RegistrarPago'
 import type { ModoPago } from './RegistrarPago'
@@ -140,6 +141,8 @@ export default function Clientes({
           )}
         </div>
       </div>
+
+      {!paraProfesora && <ControlRecordatorios />}
 
       {!paraProfesora && <ComprobantesPendientes onCambio={cargar} />}
 

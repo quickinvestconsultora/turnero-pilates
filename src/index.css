@@ -1815,3 +1815,45 @@ label {
   font-weight: 700;
   background: var(--superficie-2);
 }
+
+/* ---- Interruptor de recordatorios ---- */
+.control-recordatorios {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  font-size: 13px;
+}
+
+.control-recordatorios--pausado {
+  background: rgba(180, 71, 46, 0.08);
+  border-color: rgba(180, 71, 46, 0.35);
+}
+
+.control-recordatorios-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.punto-estado {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 7px;
+}
+
+.punto-estado--ok {
+  background: var(--ok);
+}
+
+.punto-estado--pausa {
+  background: var(--error);
+}
