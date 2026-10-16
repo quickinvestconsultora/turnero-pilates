@@ -6,6 +6,7 @@ import {
   agregarObservacion,
   borrarObservacion,
   borrarPago,
+  ETIQUETA_CONCEPTO,
   ETIQUETA_MEDIO,
   listarHistorial,
   listarObservaciones,
@@ -14,6 +15,8 @@ import {
 import type { Pago } from '../servicios/clientes'
 import { diaMes } from '../cuenta'
 import DocumentosAlumna from './DocumentosAlumna'
+import EditarDatosAlumna from './EditarDatosAlumna'
+import PagoManual from './PagoManual'
 import FotoAlumna from './FotoAlumna'
 import { fechaCorta, horaCorta } from '../fechas'
 
@@ -49,6 +52,8 @@ export default function FichaCliente({
 }) {
   const [historial, setHistorial] = useState<ItemHistorial[] | null>(null)
   const [pagos, setPagos] = useState<Pago[] | null>(null)
+  const [cargandoPago, setCargandoPago] = useState(false)
+  const [editandoDatos, setEditandoDatos] = useState(false)
   const [verTodo, setVerTodo] = useState(false)
   const [observaciones, setObservaciones] = useState<Observacion[]>([])
   const [cargando, setCargando] = useState(true)
@@ -84,6 +89,12 @@ export default function FichaCliente({
       .then(setPagos)
       .catch((e) => setError(e instanceof Error ? e.message : 'No se pudieron cargar los pagos.'))
   }, [cliente.id, paraProfesora, cliente.al_dia_hasta])
+
+  const recargarPagos = () => {
+    listarPagos(cliente.id)
+      .then(setPagos)
+      .catch((e) => setError(e instanceof Error ? e.message : 'No se pudieron cargar los pagos.'))
+  }
 
   const quitarPago = async (p: Pago) => {
     if (!window.confirm('¿Borrar este pago del historial? No cambia el estado de la alumna.')) return
@@ -159,7 +170,27 @@ export default function FichaCliente({
               : 'Sin fecha de nacimiento'}
           </span>
         </div>
+        {!paraProfesora && (
+          <button
+            type="button"
+            className="link-secundario ficha-editar"
+            onClick={() => setEditandoDatos((v) => !v)}
+          >
+            {editandoDatos ? 'Cerrar' : 'Editar datos'}
+          </button>
+        )}
       </div>
+
+      {editandoDatos && !paraProfesora && (
+        <EditarDatosAlumna
+          alumna={cliente}
+          onGuardado={() => {
+            setEditandoDatos(false)
+            onCambio()
+          }}
+          onCerrar={() => setEditandoDatos(false)}
+        />
+      )}
 
       <dl className="ficha-datos">
         <dt>Objetivo</dt>
@@ -215,7 +246,23 @@ export default function FichaCliente({
 
       {!paraProfesora && (
         <>
-          <h3>Historial de pagos</h3>
+          <div className="fila-titulo">
+            <h3>Historial de pagos</h3>
+            <button type="button" className="link-secundario" onClick={() => setCargandoPago((v) => !v)}>
+              {cargandoPago ? 'Cerrar' : '+ Cargar un pago'}
+            </button>
+          </div>
+          {cargandoPago && (
+            <PagoManual
+              alumna={{ id: cliente.id, nombre: cliente.nombre }}
+              onRegistrado={() => {
+                setCargandoPago(false)
+                recargarPagos()
+                onCambio()
+              }}
+              onCerrar={() => setCargandoPago(false)}
+            />
+          )}
           {pagos === null ? (
             <p className="ayuda">Cargando...</p>
           ) : pagos.length === 0 ? (
@@ -227,7 +274,7 @@ export default function FichaCliente({
                   <span>
                     {new Date(p.creado_en).toLocaleDateString('es-AR')} ·{' '}
                     <strong>{p.monto === null ? 'Sin monto' : formatoPesos(p.monto)}</strong> ·{' '}
-                    {ETIQUETA_MEDIO[p.medio]}
+                    {ETIQUETA_MEDIO[p.medio]} · {ETIQUETA_CONCEPTO[p.concepto]}
                     {p.abono_hasta && ` · cubre hasta el ${diaMes(p.abono_hasta)}`}
                     {p.nota && <span className="ayuda"> · {p.nota}</span>}
                   </span>

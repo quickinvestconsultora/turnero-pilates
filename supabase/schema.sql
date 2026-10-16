@@ -339,6 +339,11 @@ create table if not exists public.pagos_clientes (
 create index if not exists pagos_clientes_alumna_idx
   on public.pagos_clientes (alumna_id, creado_en desc);
 
+-- Qué se pagó: el mes, una clase suelta u otra cosa (los pagos viejos son "mes").
+alter table public.pagos_clientes
+  add column if not exists concepto text not null default 'mes'
+  check (concepto in ('mes', 'clase', 'otro'));
+
 -- Comprobantes de pago que sube la alumna (foto o PDF de la transferencia) para
 -- que el estudio los confirme. El archivo está en el bucket privado
 -- "comprobantes"; acá queda la fila y su estado. Aprobarlo (y registrar el pago)
@@ -1761,6 +1766,63 @@ begin
 end;
 $$;
 
+-- --- Registrar un pago a mano (staff) -------------------------------------------
+-- Para cargar cobros con la fecha real (aunque sea de otro día), el concepto
+-- (mes, clase suelta u otro) y hasta cuándo cubre. Opcionalmente deja a la
+-- alumna "al día" hasta esa fecha; si no, solo queda en el historial y el
+-- estado de la alumna no cambia.
+create or replace function public.registrar_pago_manual(
+  p_alumna_id uuid,
+  p_monto numeric,
+  p_medio text,
+  p_concepto text,
+  p_nota text,
+  p_fecha date,
+  p_hasta date,
+  p_dejar_al_dia boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_fecha date := coalesce(p_fecha, (now() at time zone 'America/Argentina/Buenos_Aires')::date);
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede registrar pagos.';
+  end if;
+  if not exists (select 1 from public.perfiles where id = p_alumna_id and rol = 'alumno') then
+    raise exception 'No encontramos a esa alumna.';
+  end if;
+  if p_concepto not in ('mes', 'clase', 'otro') then
+    raise exception 'El concepto tiene que ser mes, clase u otro.';
+  end if;
+  if p_dejar_al_dia and p_hasta is null then
+    raise exception 'Para dejarla al día hay que indicar hasta cuándo cubre el pago.';
+  end if;
+
+  insert into public.pagos_clientes (alumna_id, monto, medio, concepto, nota, abono_hasta, creado_en)
+  values (
+    p_alumna_id,
+    p_monto,
+    coalesce(nullif(p_medio, ''), 'transferencia'),
+    p_concepto,
+    nullif(btrim(coalesce(p_nota, '')), ''),
+    p_hasta,
+    ((v_fecha + time '12:00') at time zone 'America/Argentina/Buenos_Aires')
+  );
+
+  if p_dejar_al_dia then
+    update public.perfiles
+      set estado_cuenta = 'al_dia',
+          al_dia_hasta = p_hasta,
+          pago_actualizado_en = now()
+    where id = p_alumna_id;
+  end if;
+end;
+$$;
+
 -- --- Cuántas horas antes se avisa (1, 2 o 3) -------------------------------------
 -- Se cambia desde Clientes. Por defecto, 2 horas.
 create or replace function public.recordatorio_horas()
@@ -2138,6 +2200,7 @@ grant execute on function public.informe_profesoras(date, date) to authenticated
 grant execute on function public.registrar_pago(uuid, numeric, text, text, date) to authenticated;
 grant execute on function public.marcar_promocion_vista(uuid) to authenticated;
 grant execute on function public.cambiar_recordatorios(boolean) to authenticated;
+grant execute on function public.registrar_pago_manual(uuid, numeric, text, text, text, date, date, boolean) to authenticated;
 grant execute on function public.cambiar_recordatorio_horas(int) to authenticated;
 grant execute on function public.mi_historial() to authenticated;
 grant execute on function public.mis_pagos() to authenticated;

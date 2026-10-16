@@ -1959,3 +1959,12 @@ label {
   flex-wrap: wrap;
   gap: 6px 10px;
 }
+
+/* ---- Ficha: editar datos y cargar pago ---- */
+.ficha-editar {
+  margin-left: auto;
+}
+
+.editar-datos-alumna {
+  margin-bottom: 14px;
+}

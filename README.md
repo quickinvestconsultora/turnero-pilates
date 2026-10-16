@@ -145,6 +145,11 @@ Pestaña **Clientes** (staff): lista todas las alumnas registradas, con su nivel
 
 El staff pasa a una alumna a `Al día` desde **Clientes** cuando confirma que pagó el mes. **El abono no se renueva solo**: cuando vence hay que volver a confirmar el pago (tocando "Al día" otra vez, o "+1 mes" para sumar el mes siguiente) y, si ya venció y nadie lo renovó, queda como "Venció el dd/mm" y se bloquean las reservas nuevas sin necesidad de marcarla "Debe". Si deja de pagar antes, se la pasa a `Debe`.
 
+**Cargar un pago a mano y editar los datos (staff, en la ficha de Clientes):**
+
+- **+ Cargar un pago** (en "Historial de pagos"): se elige la **fecha real** del pago (puede ser de días atrás; el pago cuenta en ese mes en Cobros), **qué pagó** (mes completo, clase suelta u otro), el monto (con atajos de los precios), el medio, una nota, y hasta cuándo cubre. Con la casilla "Dejarla al día" también la deja al día hasta esa fecha; destildada, el pago solo queda en el historial y su estado no cambia (sirve para anotar un cobro cualquiera). Lo hace `registrar_pago_manual`. Cada pago muestra su concepto.
+- **Editar datos** (arriba de la ficha): el staff corrige o completa nombre, apellido, DNI, celular, nivel, fecha de nacimiento, objetivo, experiencia previa, lesiones, contacto de emergencia y la foto, por ejemplo de una alumna que no usa la app.
+
 **Historial de pagos:** "Al día" y "+1 mes" ya no cambian el estado directo: abren un panel para confirmar el cobro (monto, con atajos de los precios de `config/precios.ts`; medio: transferencia, Mercado Pago, efectivo u otro; y una nota). Queda guardado en `pagos_clientes` y se ve en **la ficha de la alumna → Historial de pagos**, donde también se puede borrar un registro cargado por error (no cambia su estado). Lo ve solo el staff. `registrar_pago` hace las dos cosas de una vez en la base.
 
 **Clase de prueba, una sola vez:** la primera reserva es gratis y muestra un aviso ("esta es tu clase de prueba; para reservar la siguiente hay que abonar la cuota o avisar en administración", con el mail de `config/pagos.ts`); el turno queda con la etiqueta "Clase de prueba". Cancelarla **no** devuelve la clase gratis (la base recuerda `cancelada_por_alumna`), salvo que el turno lo haya cancelado el estudio o se anote de nuevo en ese mismo turno.

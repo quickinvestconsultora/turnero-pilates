@@ -1,5 +1,12 @@
 import { supabase } from '../lib/supabase'
-import type { EstadoAsistencia, EstadoCuenta, ItemHistorial, Observacion, Perfil } from '../tipos'
+import type {
+  EstadoAsistencia,
+  EstadoCuenta,
+  ItemHistorial,
+  Nivel,
+  Observacion,
+  Perfil,
+} from '../tipos'
 import { yaPaso } from '../fechas'
 
 export async function listarObservaciones(alumnaId: string): Promise<Observacion[]> {
@@ -104,13 +111,83 @@ export const ETIQUETA_MEDIO: Record<MedioPago, string> = {
   otro: 'Otro',
 }
 
+export type ConceptoPago = 'mes' | 'clase' | 'otro'
+
+export const ETIQUETA_CONCEPTO: Record<ConceptoPago, string> = {
+  mes: 'Mes completo',
+  clase: 'Clase suelta',
+  otro: 'Otro',
+}
+
 export type Pago = {
   id: string
   monto: number | null
   medio: MedioPago
+  concepto: ConceptoPago
   nota: string | null
   abono_hasta: string | null
   creado_en: string
+}
+
+// Carga un pago a mano: con fecha real, concepto y hasta cuándo cubre. Si
+// `dejarAlDia` es true, además la deja al día hasta esa fecha; si no, solo
+// queda en el historial.
+export async function registrarPagoManual(datos: {
+  alumnaId: string
+  monto: number | null
+  medio: MedioPago
+  concepto: ConceptoPago
+  nota: string
+  fecha: string
+  hasta: string | null
+  dejarAlDia: boolean
+}): Promise<void> {
+  const { error } = await supabase.rpc('registrar_pago_manual', {
+    p_alumna_id: datos.alumnaId,
+    p_monto: datos.monto,
+    p_medio: datos.medio,
+    p_concepto: datos.concepto,
+    p_nota: datos.nota,
+    p_fecha: datos.fecha,
+    p_hasta: datos.hasta,
+    p_dejar_al_dia: datos.dejarAlDia,
+  })
+  if (error) throw new Error(error.message)
+}
+
+// El staff corrige los datos de una alumna desde su ficha.
+export type DatosAlumna = {
+  nombre: string
+  apellido: string
+  dni: string
+  telefono: string
+  nivel: Nivel | null
+  fecha_nacimiento: string | null
+  objetivo: string
+  experiencia_previa: string
+  lesiones: string
+  contacto_emergencia_nombre: string
+  contacto_emergencia_telefono: string
+}
+
+export async function actualizarDatosAlumna(id: string, d: DatosAlumna): Promise<void> {
+  const { error } = await supabase
+    .from('perfiles')
+    .update({
+      nombre: d.nombre.trim(),
+      apellido: d.apellido.trim(),
+      dni: d.dni.trim() || null,
+      telefono: d.telefono.trim(),
+      nivel: d.nivel,
+      fecha_nacimiento: d.fecha_nacimiento || null,
+      objetivo: d.objetivo.trim() || null,
+      experiencia_previa: d.experiencia_previa.trim() || null,
+      lesiones: d.lesiones.trim() || null,
+      contacto_emergencia_nombre: d.contacto_emergencia_nombre.trim() || null,
+      contacto_emergencia_telefono: d.contacto_emergencia_telefono.trim() || null,
+    })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
 }
 
 // Registra el cobro en el historial y deja a la alumna "al día" hasta `hasta`,
@@ -135,7 +212,7 @@ export async function registrarPago(datos: {
 export async function listarPagos(alumnaId: string): Promise<Pago[]> {
   const { data, error } = await supabase
     .from('pagos_clientes')
-    .select('id, monto, medio, nota, abono_hasta, creado_en')
+    .select('id, monto, medio, concepto, nota, abono_hasta, creado_en')
     .eq('alumna_id', alumnaId)
     .order('creado_en', { ascending: false })
 
