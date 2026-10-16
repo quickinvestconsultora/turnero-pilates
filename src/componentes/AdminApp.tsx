@@ -12,9 +12,10 @@ import Clientes from './Clientes'
 import Profesores from './Profesores'
 import Respaldo from './Respaldo'
 import CobrosDelMes from './CobrosDelMes'
+import Reactivar from './Reactivar'
 
 type Vista = 'hoy' | 'agenda' | 'semana' | 'plantillas' | 'administracion'
-type Seccion = 'clientes' | 'profesores' | 'cobros' | 'estadisticas' | 'respaldo'
+type Seccion = 'clientes' | 'reactivar' | 'profesores' | 'cobros' | 'estadisticas' | 'respaldo'
 
 const PESTAÑAS: [Vista, string][] = [
   ['hoy', 'Hoy'],
@@ -26,6 +27,7 @@ const PESTAÑAS: [Vista, string][] = [
 
 const SECCIONES: [Seccion, string][] = [
   ['clientes', 'Clientes'],
+  ['reactivar', 'Para reactivar'],
   ['profesores', 'Profesores'],
   ['cobros', 'Cobros'],
   ['estadisticas', 'Estadísticas'],
@@ -100,6 +102,7 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
         {vista === 'semana' && <SemanaGrilla />}
         {vista === 'plantillas' && <PlantillasStaff />}
         {vista === 'administracion' && seccion === 'clientes' && <Clientes />}
+        {vista === 'administracion' && seccion === 'reactivar' && <Reactivar />}
         {vista === 'administracion' && seccion === 'profesores' && <Profesores />}
         {vista === 'administracion' && seccion === 'cobros' && <CobrosDelMes />}
         {vista === 'administracion' && seccion === 'estadisticas' && <Estadisticas />}

@@ -17,6 +17,8 @@ import { diaMes } from '../cuenta'
 import DocumentosAlumna from './DocumentosAlumna'
 import EditarDatosAlumna from './EditarDatosAlumna'
 import PagoManual from './PagoManual'
+import BotonRecibo from './BotonRecibo'
+import { proximoCumple } from '../cumple'
 import FotoAlumna from './FotoAlumna'
 import { fechaCorta, horaCorta } from '../fechas'
 
@@ -125,6 +127,9 @@ export default function FichaCliente({
     }
   }
 
+  const proximo = proximoCumple(cliente.fecha_nacimiento)
+  const cumpleCerca = proximo && proximo.dias <= 14 ? proximo : null
+
   const asistio = historial?.filter((h) => h.asistencia === 'asistio').length ?? 0
   const falto = historial?.filter((h) => h.asistencia === 'ausente').length ?? 0
   const sinMarcar = (historial?.length ?? 0) - asistio - falto
@@ -169,6 +174,11 @@ export default function FichaCliente({
               ? `${edadDe(cliente.fecha_nacimiento)} años`
               : 'Sin fecha de nacimiento'}
           </span>
+          {cumpleCerca && (
+            <span className="etiqueta-cumple">
+              🎂 {cumpleCerca.dias === 0 ? 'Cumple años hoy' : `Cumple años en ${cumpleCerca.dias} día${cumpleCerca.dias === 1 ? '' : 's'}`}
+            </span>
+          )}
         </div>
         {!paraProfesora && (
           <button
@@ -278,9 +288,23 @@ export default function FichaCliente({
                     {p.abono_hasta && ` · cubre hasta el ${diaMes(p.abono_hasta)}`}
                     {p.nota && <span className="ayuda"> · {p.nota}</span>}
                   </span>
-                  <button type="button" className="link-secundario" onClick={() => quitarPago(p)}>
-                    Borrar
-                  </button>
+                  <span className="acciones-pago">
+                    <BotonRecibo
+                      datos={{
+                        numero: p.numero,
+                        fecha: p.creado_en,
+                        alumna: `${cliente.nombre} ${cliente.apellido}`.trim(),
+                        dni: cliente.dni,
+                        concepto: p.concepto,
+                        monto: p.monto,
+                        medio: p.medio,
+                        abonoHasta: p.abono_hasta,
+                      }}
+                    />
+                    <button type="button" className="link-secundario" onClick={() => quitarPago(p)}>
+                      Borrar
+                    </button>
+                  </span>
                 </li>
               ))}
             </ul>

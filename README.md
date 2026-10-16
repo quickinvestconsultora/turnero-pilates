@@ -250,6 +250,12 @@ Las funciones SQL son `avisos_vencimiento_pendientes`, `avisos_promocion_pendien
 
 **Interruptor de emergencia:** en **Clientes**, arriba, hay un cuadro "Recordatorios por mail: activos" con el botón **Pausar** (y **Reanudar**). Pausados, la tarea sigue corriendo cada 10 minutos pero `recordatorios_pendientes` no devuelve a nadie, así que no se manda ningún mail; no hace falta tocar la función ni la tarea. El estado se guarda en la tabla `configuracion` (clave `recordatorios_activos`) y solo lo cambia el staff.
 
+**Saludo de cumpleaños (mail):** la misma función manda un mail el día que la alumna cumple años, a partir de las 9 (hora argentina), una sola vez por año (`perfiles.aviso_cumple_anio`). Usa `avisos_cumple_pendientes` y `marcar_avisos_cumple` (solo clave de servicio) y respeta el interruptor de pausa. Además, en **Hoy** aparece la tarjeta "Cumpleaños" con quienes cumplen hoy o en los próximos 7 días y un botón **Saludar** por WhatsApp, y en la ficha se ve la etiqueta cuando falta poco.
+
+**Para reactivar:** en **Administración → Para reactivar** (función `alumnas_para_reactivar`, solo staff) figuran las alumnas sin ninguna clase reservada que dejaron de venir hace 14/21/30/45 días, las de abono vencido hace una semana o más sin renovar, y las que se registraron y nunca tuvieron una clase. Cada una trae el mensaje de WhatsApp armado según el motivo; al tocarlo (o "Ya le escribí") se anota en `perfiles.reactivacion_avisada_en` con `marcar_reactivacion` y la lista la esconde 30 días. Las clases en las que faltó no cuentan como "vino".
+
+**Recibo de pago:** cada pago del historial (ficha del cliente y "Mi cuenta" de la alumna) tiene **Recibo PDF**, y en el celular también **Compartir** (menú del teléfono: WhatsApp, mail…). Lleva el número correlativo (`pagos_clientes.numero`), fecha, nombre y DNI, concepto, medio, importe y hasta cuándo cubre. Es un comprobante interno: aclara que no es factura. Se genera en el navegador con jsPDF (`src/servicios/recibo.ts`).
+
 Para ver qué pasó en las últimas corridas, en el SQL Editor: `select status, return_message, start_time from cron.job_run_details order by start_time desc limit 5;` y `select status_code, content, created from net._http_response order by created desc limit 5;`.
 
 Antes de activarlo en serio conviene arreglar el remitente: con un Gmail, Brevo puede reescribir el "De". Lo prolijo es una dirección del dominio (`turnos@fortevastudio.com.ar`) con sus registros DNS.

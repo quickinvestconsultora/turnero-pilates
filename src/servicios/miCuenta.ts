@@ -9,9 +9,11 @@ export type ClaseMia = {
 }
 
 export type PagoMio = {
+  numero: number | null
   fecha: string
   monto: number | null
   medio: string
+  concepto: string | null
   abono_hasta: string | null
 }
 

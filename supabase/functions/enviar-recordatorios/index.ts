@@ -7,6 +7,7 @@
 //   2. Abono por vencer: tu abono vence en los próximos 3 días.
 //   3. Subió de la lista de espera: se liberó un lugar y quedaste anotada.
 //   4. Deslinde firmado: PDF de cada alumna nueva, a la administradora.
+//   5. Cumpleaños: saludo el día que cumple años (desde las 9, hora argentina).
 //
 // Secretos (Supabase → Edge Functions → Secrets):
 //   BREVO_API_KEY   clave de la API de Brevo (no es la clave SMTP)
@@ -60,6 +61,7 @@ type Promocion = {
   hora: string
   profesora: string | null
 }
+type Cumple = { alumna_id: string; nombre: string; email: string }
 type Deslinde = {
   alumna_id: string
   nombre: string
@@ -206,6 +208,29 @@ function mailPromocion(p: Promocion): Mail {
   }
 }
 
+function mailCumple(c: Cumple): Mail {
+  const nombre = c.nombre.trim() || 'hola'
+  return {
+    para: { email: c.email, nombre: c.nombre },
+    asunto: '¡Feliz cumpleaños, ' + nombre + '!',
+    texto:
+      'Hola ' + nombre + '!
+
+En ' + NOMBRE_ESTUDIO + ' te mandamos un abrazo enorme en tu día. ' +
+      '¡Que tengas un cumpleaños hermoso!
+
+Te esperamos pronto para seguir entrenando juntas.
+
+' + APP_URL,
+    html: envolver(
+      '¡Feliz cumpleaños, ' + nombre + '! 🎂',
+      parrafo('En ' + escapar(NOMBRE_ESTUDIO) + ' te mandamos un abrazo enorme en tu día.') +
+        parrafo('¡Que tengas un cumpleaños hermoso! Te esperamos pronto para seguir entrenando juntas.'),
+      { texto: 'Reservar mi próxima clase', url: APP_URL },
+    ),
+  }
+}
+
 function mailDeslinde(d: Deslinde, adminEmail: string, pdfBase64: string): Mail {
   const nombre = (d.nombre + ' ' + d.apellido).trim()
   const filas: [string, string][] = [
@@ -303,6 +328,7 @@ Deno.serve(async (req) => {
   const vencimientos = await pedir<Vencimiento>('avisos_vencimiento_pendientes')
   const promociones = await pedir<Promocion>('avisos_promocion_pendientes')
   const deslindes = await pedir<Deslinde>('deslindes_pendientes')
+  const cumples = await pedir<Cumple>('avisos_cumple_pendientes')
 
   if (prueba) {
     return json({
@@ -311,11 +337,13 @@ Deno.serve(async (req) => {
       vencimientos: vencimientos.map((v) => ({ nombre: v.nombre, email: v.email, vence: v.al_dia_hasta })),
       promociones: promociones.map((p) => ({ nombre: p.nombre, email: p.email, fecha: p.fecha, hora: p.hora })),
       deslindes: deslindes.map((d) => ({ nombre: d.nombre + ' ' + d.apellido, email: d.email })),
+      cumples: cumples.map((c) => ({ nombre: c.nombre, email: c.email })),
       errores,
     })
   }
 
-  const total = recordatorios.length + vencimientos.length + promociones.length + deslindes.length
+  const total = recordatorios.length + vencimientos.length + promociones.length + deslindes.length +
+    cumples.length
   if (total === 0) return json({ pendientes: 0, enviados: 0, fallidos: [], errores })
 
   const apiKey = Deno.env.get('BREVO_API_KEY')
@@ -373,6 +401,16 @@ Deno.serve(async (req) => {
     }
   }
 
+  const enviadosCumple: string[] = []
+  for (const c of cumples) {
+    try {
+      await enviarPorBrevo(mailCumple(c), apiKey, remitente)
+      enviadosCumple.push(c.alumna_id)
+    } catch (e) {
+      fallidos.push({ email: c.email, error: motivo(e) })
+    }
+  }
+
   if (enviadasAlumnas.length > 0 || enviadasInvitadas.length > 0) {
     const { error } = await supabase.rpc('marcar_recordatorios', {
       p_reservas: enviadasAlumnas,
@@ -389,16 +427,22 @@ Deno.serve(async (req) => {
     if (error) errores.push('marcar_avisos: ' + error.message)
   }
 
+  if (enviadosCumple.length > 0) {
+    const { error } = await supabase.rpc('marcar_avisos_cumple', { p_alumnas: enviadosCumple })
+    if (error) errores.push('marcar_avisos_cumple: ' + error.message)
+  }
+
   return json({
     pendientes: total,
     enviados:
       enviadasAlumnas.length + enviadasInvitadas.length + enviadosVencimiento.length +
-      enviadosPromocion.length + enviadosDeslinde.length,
+      enviadosPromocion.length + enviadosDeslinde.length + enviadosCumple.length,
     detalle: {
       recordatorios: enviadasAlumnas.length + enviadasInvitadas.length,
       vencimientos: enviadosVencimiento.length,
       promociones: enviadosPromocion.length,
       deslindes: enviadosDeslinde.length,
+      cumples: enviadosCumple.length,
     },
     fallidos,
     errores,

@@ -3,7 +3,8 @@ import type { Perfil } from '../tipos'
 import { miHistorial, misPagos } from '../servicios/miCuenta'
 import type { ClaseMia, PagoMio } from '../servicios/miCuenta'
 import { ETIQUETA_MEDIO } from '../servicios/clientes'
-import type { MedioPago } from '../servicios/clientes'
+import type { ConceptoPago, MedioPago } from '../servicios/clientes'
+import BotonRecibo from './BotonRecibo'
 import { abonoVencido, diaMes } from '../cuenta'
 import { fechaCorta, horaCorta } from '../fechas'
 
@@ -95,6 +96,18 @@ export default function MiCuenta({ perfil, onCerrar }: { perfil: Perfil; onCerra
                   {ETIQUETA_MEDIO[p.medio as MedioPago] ?? p.medio}
                   {p.abono_hasta && ` · hasta el ${diaMes(p.abono_hasta)}`}
                 </span>
+                <BotonRecibo
+                  datos={{
+                    numero: p.numero ?? null,
+                    fecha: p.fecha,
+                    alumna: `${perfil.nombre} ${perfil.apellido}`.trim(),
+                    dni: perfil.dni,
+                    concepto: (p.concepto as ConceptoPago | null) ?? 'mes',
+                    monto: p.monto,
+                    medio: p.medio as MedioPago,
+                    abonoHasta: p.abono_hasta,
+                  }}
+                />
               </li>
             ))}
           </ul>

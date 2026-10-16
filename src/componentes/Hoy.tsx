@@ -6,6 +6,7 @@ import { fechaLarga, horaCorta, hoyIso, yaPaso } from '../fechas'
 import { nombreCompleto } from '../personas'
 import { mensajeTurno } from '../whatsapp'
 import EnlaceWhatsApp from './EnlaceWhatsApp'
+import Cumpleanos from './Cumpleanos'
 
 // Pantalla de inicio del estudio: las clases de hoy, con quién viene a cada
 // una, las lesiones a tener presentes y (solo el staff) quién tiene algo para
@@ -54,6 +55,8 @@ export default function Hoy({ instructoraId }: { instructoraId?: string }) {
         </button>
       </div>
       <p className="ayuda hoy-fecha">{fechaLarga(hoyIso())}</p>
+
+      <Cumpleanos paraProfesora={!esStaff} />
 
       {error && <p className="mensaje-error">{error}</p>}
 

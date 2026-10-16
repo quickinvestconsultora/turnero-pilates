@@ -68,6 +68,40 @@ export function mensajeCliente(
   return `Hola ${nombre}! Te escribimos de ${FIRMA}.`
 }
 
+// Mensaje para una alumna que dejó de venir. Según el motivo: abono vencido sin
+// renovar (con los datos de pago), se registró pero nunca reservó, o hace
+// tiempo que no viene.
+export function mensajeReactivar(
+  nombre: string,
+  motivo: 'sin_venir' | 'vencido' | 'sin_empezar',
+  alDiaHasta: string | null,
+): string {
+  const hola = `Hola ${nombre.trim() || 'hola'}! Te escribimos de ${FIRMA}: `
+  const app = `${window.location.origin}/app/`
+  if (motivo === 'vencido' && alDiaHasta) {
+    return (
+      `${hola}hace un tiempo que no te vemos y tu abono venció el ${diaMes(alDiaHasta)}. ` +
+      `¿Querés retomar? Si te sirve, te dejo los datos para renovarlo y ya reservás tus clases en ${app}${datosDePago()}`
+    )
+  }
+  if (motivo === 'sin_empezar') {
+    return (
+      `${hola}vimos que te registraste pero todavía no reservaste tu primera clase (es gratis 💛). ` +
+      `¿Querés que te ayudemos a elegir un horario? También podés reservar directo en ${app}`
+    )
+  }
+  return (
+    `${hola}hace un tiempo que no te vemos por el estudio y te extrañamos 💛 ` +
+    `Tenemos lugares disponibles esta semana, ¿querés que te reservemos uno? ` +
+    `También podés reservar vos en ${app}`
+  )
+}
+
+// Saludo de cumpleaños.
+export function mensajeCumple(nombre: string): string {
+  return `¡Feliz cumpleaños, ${nombre.trim() || 'hola'}! 🎂 Te mandamos un abrazo enorme de parte de todo el equipo de ${FIRMA}.`
+}
+
 // Mensaje para alguien anotada en un turno concreto.
 export function mensajeTurno(nombre: string, fecha: string, hora: string): string {
   return (

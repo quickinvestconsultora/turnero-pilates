@@ -121,6 +121,7 @@ export const ETIQUETA_CONCEPTO: Record<ConceptoPago, string> = {
 
 export type Pago = {
   id: string
+  numero: number | null // número correlativo del recibo
   monto: number | null
   medio: MedioPago
   concepto: ConceptoPago
@@ -212,7 +213,7 @@ export async function registrarPago(datos: {
 export async function listarPagos(alumnaId: string): Promise<Pago[]> {
   const { data, error } = await supabase
     .from('pagos_clientes')
-    .select('id, monto, medio, concepto, nota, abono_hasta, creado_en')
+    .select('id, numero, monto, medio, concepto, nota, abono_hasta, creado_en')
     .eq('alumna_id', alumnaId)
     .order('creado_en', { ascending: false })
 
