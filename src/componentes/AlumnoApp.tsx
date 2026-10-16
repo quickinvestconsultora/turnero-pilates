@@ -10,7 +10,6 @@ import {
   reservar,
   marcarPromocionVista,
   reservarSerie,
-  DIAS_VISIBLES,
   HORAS_LIMITE_CANCELAR,
 } from '../servicios/turnos'
 import {
@@ -248,7 +247,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
         ) : lista.length === 0 ? (
           <p className="vacio">
             {vista === 'disponibles'
-              ? `No hay turnos publicados para los próximos ${DIAS_VISIBLES} días.`
+              ? 'Todavía no hay turnos publicados. Consultale al estudio.'
               : 'Todavía no reservaste ningún turno.'}
           </p>
         ) : (

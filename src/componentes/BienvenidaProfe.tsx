@@ -13,7 +13,7 @@ function pasos(nombre: string): Paso[] {
     {
       titulo: 'Tu agenda',
       texto:
-        'En "Mis turnos" ves la agenda del estudio de los próximos 45 días, con cuántas alumnas hay anotadas en cada clase.',
+        'En "Mis turnos" ves la agenda del estudio de este mes y el que viene, con cuántas alumnas hay anotadas en cada clase.',
       detalle: [
         'Tus turnos se abren y podés ver quién viene.',
         'Los de otras profes los ves, pero no los modificás.',

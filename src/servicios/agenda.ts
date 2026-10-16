@@ -13,7 +13,10 @@ export async function listarTurnosStaff(opciones?: {
   instructoraId?: string
 }): Promise<TurnoConReservas[]> {
   const desde = opciones?.desde ?? hoyIso()
-  const hasta = sumarDias(desde, opciones?.dias ?? 45)
+  // Sin período indicado, la agenda del estudio llega hasta el fin del mes que
+  // viene (igual que lo que ven las alumnas).
+  const hasta =
+    opciones?.dias !== undefined ? sumarDias(desde, opciones.dias) : finDeMes(desde, 1)
 
   let consulta = supabase
     .from('turnos')

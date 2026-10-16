@@ -1,9 +1,13 @@
 import { supabase } from '../lib/supabase'
 import type { TurnoDisponible } from '../tipos'
-import { hoyIso, sumarDias } from '../fechas'
+import { finDeMes, hoyIso } from '../fechas'
 
-// Ventana de días hacia adelante que ve el alumno.
-export const DIAS_VISIBLES = 31
+// La alumna ve los turnos publicados hasta el fin del mes que viene (así, con
+// un abono mensual puede reservar el mes entero que paga, sin importar qué día
+// del mes actual sea).
+export function hastaCuandoVeLaAlumna(): string {
+  return finDeMes(hoyIso(), 1)
+}
 
 // Hasta cuántas horas antes del turno se puede cancelar o cambiar un lugar
 // confirmado. Tiene que coincidir con el margen de cancelar_reserva() en
@@ -12,7 +16,7 @@ export const HORAS_LIMITE_CANCELAR = 2
 
 export async function listarTurnos(): Promise<TurnoDisponible[]> {
   const desde = hoyIso()
-  const hasta = sumarDias(desde, DIAS_VISIBLES)
+  const hasta = hastaCuandoVeLaAlumna()
 
   const { data, error } = await supabase.rpc('listar_turnos', {
     p_desde: desde,
