@@ -1855,3 +1855,14 @@ label {
 .punto-estado--pausa {
   background: var(--error);
 }
+
+/* ---- Segunda fila de solapas (dentro de Administración) ---- */
+.subtabs {
+  margin: -8px 0 18px;
+  background: var(--superficie-2);
+}
+
+.subtabs .tab {
+  font-size: 13px;
+  padding: 6px 10px;
+}

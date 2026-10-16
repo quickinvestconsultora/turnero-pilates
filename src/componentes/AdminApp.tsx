@@ -11,13 +11,18 @@ import Estadisticas from './Estadisticas'
 import Clientes from './Clientes'
 import Profesores from './Profesores'
 
-type Vista = 'hoy' | 'agenda' | 'semana' | 'plantillas' | 'clientes' | 'profesores' | 'estadisticas'
+type Vista = 'hoy' | 'agenda' | 'semana' | 'plantillas' | 'administracion'
+type Seccion = 'clientes' | 'profesores' | 'estadisticas'
 
 const PESTAÑAS: [Vista, string][] = [
   ['hoy', 'Hoy'],
   ['agenda', 'Agenda'],
   ['semana', 'Semana'],
   ['plantillas', 'Turnos fijos'],
+  ['administracion', 'Administración'],
+]
+
+const SECCIONES: [Seccion, string][] = [
   ['clientes', 'Clientes'],
   ['profesores', 'Profesores'],
   ['estadisticas', 'Estadísticas'],
@@ -25,15 +30,17 @@ const PESTAÑAS: [Vista, string][] = [
 
 export default function AdminApp({ perfil }: { perfil: Perfil }) {
   const [vista, setVista] = useState<Vista>('hoy')
+  const [seccion, setSeccion] = useState<Seccion>('clientes')
   const [pendientes, setPendientes] = useState(0)
 
-  // Cantidad de comprobantes esperando confirmación (se ve en la pestaña Clientes).
-  // Se actualiza al cambiar de pestaña, que es cuando se resuelven.
+  // Cantidad de comprobantes esperando confirmación. Se ve como número en
+  // "Administración" y en "Clientes". Se actualiza al cambiar de pantalla,
+  // que es cuando se resuelven.
   useEffect(() => {
     contarComprobantesPendientes()
       .then(setPendientes)
       .catch(() => setPendientes(0))
-  }, [vista])
+  }, [vista, seccion])
 
   return (
     <div className="app">
@@ -60,19 +67,37 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
             onClick={() => setVista(clave)}
           >
             {etiqueta}
-            {clave === 'clientes' && pendientes > 0 && <span className="pastilla">{pendientes}</span>}
+            {clave === 'administracion' && pendientes > 0 && (
+              <span className="pastilla">{pendientes}</span>
+            )}
           </button>
         ))}
       </nav>
+
+      {vista === 'administracion' && (
+        <nav className="tabs subtabs" aria-label="Secciones de administración">
+          {SECCIONES.map(([clave, etiqueta]) => (
+            <button
+              key={clave}
+              type="button"
+              className={seccion === clave ? 'tab activa' : 'tab'}
+              onClick={() => setSeccion(clave)}
+            >
+              {etiqueta}
+              {clave === 'clientes' && pendientes > 0 && <span className="pastilla">{pendientes}</span>}
+            </button>
+          ))}
+        </nav>
+      )}
 
       <main className="contenido">
         {vista === 'hoy' && <Hoy />}
         {vista === 'agenda' && <AgendaStaff />}
         {vista === 'semana' && <SemanaGrilla />}
         {vista === 'plantillas' && <PlantillasStaff />}
-        {vista === 'clientes' && <Clientes />}
-        {vista === 'profesores' && <Profesores />}
-        {vista === 'estadisticas' && <Estadisticas />}
+        {vista === 'administracion' && seccion === 'clientes' && <Clientes />}
+        {vista === 'administracion' && seccion === 'profesores' && <Profesores />}
+        {vista === 'administracion' && seccion === 'estadisticas' && <Estadisticas />}
       </main>
     </div>
   )
