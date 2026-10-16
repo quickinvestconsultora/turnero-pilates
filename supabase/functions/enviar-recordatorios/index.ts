@@ -214,14 +214,8 @@ function mailCumple(c: Cumple): Mail {
     para: { email: c.email, nombre: c.nombre },
     asunto: '¡Feliz cumpleaños, ' + nombre + '!',
     texto:
-      'Hola ' + nombre + '!
-
-En ' + NOMBRE_ESTUDIO + ' te mandamos un abrazo enorme en tu día. ' +
-      '¡Que tengas un cumpleaños hermoso!
-
-Te esperamos pronto para seguir entrenando juntas.
-
-' + APP_URL,
+      'Hola ' + nombre + '!\n\nEn ' + NOMBRE_ESTUDIO + ' te mandamos un abrazo enorme en tu día. ' +
+      '¡Que tengas un cumpleaños hermoso!\n\nTe esperamos pronto para seguir entrenando juntas.\n\n' + APP_URL,
     html: envolver(
       '¡Feliz cumpleaños, ' + nombre + '! 🎂',
       parrafo('En ' + escapar(NOMBRE_ESTUDIO) + ' te mandamos un abrazo enorme en tu día.') +
