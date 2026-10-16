@@ -241,6 +241,8 @@ Las funciones SQL son `avisos_vencimiento_pendientes`, `avisos_promocion_pendien
 
 **Cobros del mes:** en **Administración → Cobros** se ve lo cobrado por mes (total, cantidad de pagos y de alumnas, por medio de pago y el detalle), con selector de mes y descarga para Excel. Sale del historial de pagos que se carga al marcar "Al día".
 
+**Cuántas horas antes se avisa la clase:** en el mismo cuadro de **Clientes** hay tres botones, **1 hora / 2 horas / 3 horas antes** (por defecto, 2). Se guarda en `configuracion` (clave `recordatorio_horas`) y lo leen `recordatorio_horas()` y `recordatorios_pendientes()`; el mail dice la cantidad elegida. Aplica a los avisos que todavía no salieron, y sigue la regla de no avisar a quien reservó dentro de ese mismo margen. Para que el texto del mail cambie hay que tener publicada la última versión de la función (`index.ts`).
+
 **Interruptor de emergencia:** en **Clientes**, arriba, hay un cuadro "Recordatorios por mail: activos" con el botón **Pausar** (y **Reanudar**). Pausados, la tarea sigue corriendo cada 10 minutos pero `recordatorios_pendientes` no devuelve a nadie, así que no se manda ningún mail; no hace falta tocar la función ni la tarea. El estado se guarda en la tabla `configuracion` (clave `recordatorios_activos`) y solo lo cambia el staff.
 
 Para ver qué pasó en las últimas corridas, en el SQL Editor: `select status, return_message, start_time from cron.job_run_details order by start_time desc limit 5;` y `select status_code, content, created from net._http_response order by created desc limit 5;`.

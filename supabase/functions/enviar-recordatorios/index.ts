@@ -49,6 +49,7 @@ type Recordatorio = {
   fecha: string
   hora: string
   profesora: string | null
+  horas: number | null // cuántas horas antes se avisa (1, 2 o 3)
 }
 type Vencimiento = { alumna_id: string; nombre: string; email: string; al_dia_hasta: string }
 type Promocion = {
@@ -130,6 +131,7 @@ function mailRecordatorio(p: Recordatorio): Mail {
   const cuando = fechaLarga(p.fecha) + ' a las ' + hora
   const nombre = p.nombre.trim() || 'hola'
   const profesora = (p.profesora || '').trim()
+  const horas = p.horas === 1 ? '1 hora' : (p.horas || 2) + ' horas'
   const linea = profesora
     ? '<br><span style="font-weight:normal;font-size:14px;color:#6d6455;">con ' + escapar(profesora) + '</span>'
     : ''
@@ -138,10 +140,10 @@ function mailRecordatorio(p: Recordatorio): Mail {
     para: { email: p.email, nombre: p.nombre },
     asunto: 'Hoy a las ' + hora + ': tu clase en ' + NOMBRE_ESTUDIO,
     texto:
-      'Hola ' + nombre + '!\n\nTe recordamos que en 2 horas tenés clase en ' + NOMBRE_ESTUDIO + '.\n\n' +
+      'Hola ' + nombre + '!\n\nTe recordamos que en ' + horas + ' tenés clase en ' + NOMBRE_ESTUDIO + '.\n\n' +
       cuando + (profesora ? ' con ' + profesora : '') + '.\n\n¡Te esperamos!',
     html: envolver(
-      'Tu clase es en 2 horas',
+      'Tu clase es en ' + horas,
       parrafo('Hola ' + escapar(nombre) + ', te recordamos tu turno de hoy:') +
         destacado(escapar(cuando) + linea) +
         parrafo('¡Te esperamos!'),

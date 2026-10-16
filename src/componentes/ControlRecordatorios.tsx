@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { cambiarRecordatorios, leerRecordatorios } from '../servicios/configuracion'
+import {
+  OPCIONES_HORAS,
+  cambiarRecordatorioHoras,
+  cambiarRecordatorios,
+  leerRecordatorios,
+} from '../servicios/configuracion'
 import type { EstadoRecordatorios } from '../servicios/configuracion'
 
 // Interruptor de emergencia de los recordatorios automáticos ("tu clase es en
@@ -45,6 +50,20 @@ export default function ControlRecordatorios() {
     }
   }
 
+  const cambiarHoras = async (horas: number) => {
+    if (horas === estado?.horas) return
+    setError('')
+    setGuardando(true)
+    try {
+      await cambiarRecordatorioHoras(horas)
+      await cargar()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo cambiar.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
   const activos = estado?.activos ?? true
   const desde =
     estado?.actualizadoEn &&
@@ -76,6 +95,23 @@ export default function ControlRecordatorios() {
       >
         {activos ? 'Pausar' : 'Reanudar'}
       </button>
+
+      <div className="control-recordatorios-horas">
+        <span className="ayuda">Avisar la clase</span>
+        <div className="asistencia" role="group" aria-label="Cuántas horas antes avisar">
+          {OPCIONES_HORAS.map((h) => (
+            <button
+              key={h}
+              type="button"
+              className={estado?.horas === h ? 'activo-neutro' : ''}
+              disabled={guardando}
+              onClick={() => cambiarHoras(h)}
+            >
+              {h === 1 ? '1 hora' : h + ' horas'} antes
+            </button>
+          ))}
+        </div>
+      </div>
       {error && <p className="mensaje-error">{error}</p>}
     </div>
   )

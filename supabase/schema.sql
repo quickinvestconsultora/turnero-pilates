@@ -1761,14 +1761,54 @@ begin
 end;
 $$;
 
--- --- Recordatorio de 2 horas antes ---------------------------------------------
+-- --- Cuántas horas antes se avisa (1, 2 o 3) -------------------------------------
+-- Se cambia desde Clientes. Por defecto, 2 horas.
+create or replace function public.recordatorio_horas()
+returns int
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select (valor #>> '{}')::int from public.configuracion where clave = 'recordatorio_horas'),
+    2
+  );
+$$;
+
+create or replace function public.cambiar_recordatorio_horas(p_horas int)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede cambiar cuándo se avisa.';
+  end if;
+  if p_horas not in (1, 2, 3) then
+    raise exception 'Se puede avisar 1, 2 o 3 horas antes.';
+  end if;
+
+  insert into public.configuracion (clave, valor, actualizado_por)
+  values ('recordatorio_horas', to_jsonb(p_horas), auth.uid())
+  on conflict (clave) do update
+    set valor = excluded.valor,
+        actualizado_en = now(),
+        actualizado_por = auth.uid();
+end;
+$$;
+
+-- --- Recordatorio de la clase ----------------------------------------------------
 -- Las usa SOLO la Edge Function "enviar-recordatorios" (con la clave de
 -- servicio), que corre cada 10 minutos. Devuelve a quién hay que avisar: los
--- turnos que empiezan en las próximas 2 horas (hora argentina), con reserva
--- confirmada (o invitada con mail) que todavía no recibió el aviso. No avisa
--- a quien reservó dentro de las últimas 2 horas: recién se anotó. Si los
--- recordatorios están pausados, no devuelve a nadie.
-create or replace function public.recordatorios_pendientes()
+-- turnos que empiezan dentro de las próximas N horas (N = recordatorio_horas(),
+-- por defecto 2; hora argentina), con reserva confirmada (o invitada con mail)
+-- que todavía no recibió el aviso. No avisa a quien reservó dentro de esas
+-- últimas N horas: recién se anotó. Si los avisos están pausados, no devuelve a
+-- nadie. "horas" va en cada fila para que el mail diga la cantidad correcta.
+drop function if exists public.recordatorios_pendientes();
+create function public.recordatorios_pendientes()
 returns table (
   tipo       text,
   reserva_id uuid,
@@ -1776,15 +1816,18 @@ returns table (
   email      text,
   fecha      date,
   hora       time,
-  profesora  text
+  profesora  text,
+  horas      int
 )
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select 'alumna'::text, r.id, p.nombre, u.email::text, t.fecha, t.hora, t.instructor
-  from public.reservas r
+  with h as (select public.recordatorio_horas() as n)
+  select 'alumna'::text, r.id, p.nombre, u.email::text, t.fecha, t.hora, t.instructor, h.n
+  from h
+  cross join public.reservas r
   join public.turnos t on t.id = r.turno_id
   join public.perfiles p on p.id = r.alumno_id
   join auth.users u on u.id = r.alumno_id
@@ -1794,19 +1837,20 @@ as $$
     and not t.cancelado
     and u.email is not null
     and ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') > now()
-    and ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') <= now() + interval '2 hours'
-    and r.creado_en <= ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') - interval '2 hours'
+    and ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') <= now() + make_interval(hours => h.n)
+    and r.creado_en <= ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') - make_interval(hours => h.n)
   union all
-  select 'invitada'::text, i.id, i.nombre, i.email, t.fecha, t.hora, t.instructor
-  from public.reservas_invitadas i
+  select 'invitada'::text, i.id, i.nombre, i.email, t.fecha, t.hora, t.instructor, h.n
+  from h
+  cross join public.reservas_invitadas i
   join public.turnos t on t.id = i.turno_id
   where public.recordatorios_activos()
     and i.recordatorio_enviado_en is null
     and i.email is not null
     and not t.cancelado
     and ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') > now()
-    and ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') <= now() + interval '2 hours'
-    and i.creado_en <= ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') - interval '2 hours';
+    and ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') <= now() + make_interval(hours => h.n)
+    and i.creado_en <= ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') - make_interval(hours => h.n);
 $$;
 
 create or replace function public.marcar_recordatorios(p_reservas uuid[], p_invitadas uuid[])
@@ -2094,6 +2138,7 @@ grant execute on function public.informe_profesoras(date, date) to authenticated
 grant execute on function public.registrar_pago(uuid, numeric, text, text, date) to authenticated;
 grant execute on function public.marcar_promocion_vista(uuid) to authenticated;
 grant execute on function public.cambiar_recordatorios(boolean) to authenticated;
+grant execute on function public.cambiar_recordatorio_horas(int) to authenticated;
 grant execute on function public.mi_historial() to authenticated;
 grant execute on function public.mis_pagos() to authenticated;
 grant execute on function public.respaldo_perfiles() to authenticated;
