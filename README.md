@@ -231,6 +231,16 @@ select cron.schedule(
 
 Para apagarla del todo: `select cron.unschedule('recordatorios-turnos');`.
 
+**Otros avisos por mail (misma función y misma tarea de cada 10 minutos):**
+
+- **Abono por vencer:** a la alumna "al día" cuyo abono vence en los próximos 3 días, una sola vez por vencimiento (`aviso_vencimiento_para`). Trae los datos de pago y un botón al turnero.
+- **Subió de la lista de espera:** mail de "¡Se liberó un lugar!" a la alumna promovida (en las últimas 24 horas, a un turno que no pasó). Una sola vez (`promocion_mail_enviado_en`).
+- **Deslinde firmado:** a la administradora (`MAIL_ADMIN`, por defecto la dirección de Vanesa), con los datos de la alumna nueva y el PDF adjunto. Solo para alumnas registradas después de la primera vez que se corrió el SQL de estos avisos (`configuracion.avisos_desde`), para no mandar los deslindes viejos.
+
+Las funciones SQL son `avisos_vencimiento_pendientes`, `avisos_promocion_pendientes`, `deslindes_pendientes` y `marcar_avisos` (solo clave de servicio). Cada tipo se pide por separado: si uno falla, los demás siguen. Con el cuerpo `{"prueba": true}` la función lista quién recibiría cada uno sin mandar nada. Los datos de pago del mail de vencimiento salen de los secretos opcionales `LINK_MERCADO_PAGO`, `ALIAS_TRANSFERENCIA` y `TITULAR_TRANSFERENCIA` (por defecto, los mismos de `src/config/pagos.ts`; si cambiás uno, cambiá el otro).
+
+**Cobros del mes:** en **Administración → Cobros** se ve lo cobrado por mes (total, cantidad de pagos y de alumnas, por medio de pago y el detalle), con selector de mes y descarga para Excel. Sale del historial de pagos que se carga al marcar "Al día".
+
 **Interruptor de emergencia:** en **Clientes**, arriba, hay un cuadro "Recordatorios por mail: activos" con el botón **Pausar** (y **Reanudar**). Pausados, la tarea sigue corriendo cada 10 minutos pero `recordatorios_pendientes` no devuelve a nadie, así que no se manda ningún mail; no hace falta tocar la función ni la tarea. El estado se guarda en la tabla `configuracion` (clave `recordatorios_activos`) y solo lo cambia el staff.
 
 Para ver qué pasó en las últimas corridas, en el SQL Editor: `select status, return_message, start_time from cron.job_run_details order by start_time desc limit 5;` y `select status_code, content, created from net._http_response order by created desc limit 5;`.

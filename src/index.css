@@ -1929,3 +1929,25 @@ label {
   align-items: flex-start;
   gap: 8px;
 }
+
+/* ---- Cobros del mes ---- */
+.cobros-resumen {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+
+.cobros-resumen div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.cobros-resumen strong {
+  font-size: 18px;
+}

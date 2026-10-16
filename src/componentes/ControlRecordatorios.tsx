@@ -28,7 +28,7 @@ export default function ControlRecordatorios() {
     if (
       !activos &&
       !window.confirm(
-        '¿Pausar los recordatorios? No se va a mandar ningún mail de "tu clase es en 2 horas" hasta que los reanudes.',
+        '¿Pausar los avisos por mail? No se va a mandar ningún aviso automático (recordatorio de clase, abono por vencer, lista de espera, deslinde) hasta que los reanudes.',
       )
     ) {
       return
@@ -60,11 +60,11 @@ export default function ControlRecordatorios() {
       <div className="control-recordatorios-texto">
         <strong>
           <span className={activos ? 'punto-estado punto-estado--ok' : 'punto-estado punto-estado--pausa'} />
-          Recordatorios por mail: {activos ? 'activos' : 'PAUSADOS'}
+          Avisos automáticos por mail: {activos ? 'activos' : 'PAUSADOS'}
         </strong>
         <span className="ayuda">
           {activos
-            ? 'Se avisa a cada alumna 2 horas antes de su clase.'
+            ? 'Recordatorio de clase, abono por vencer, lista de espera y deslinde.'
             : `No se manda ningún aviso${desde ? ` (pausados desde el ${desde})` : ''}.`}
         </span>
       </div>

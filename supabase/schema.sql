@@ -46,6 +46,13 @@ alter table public.perfiles
 alter table public.perfiles
   add column if not exists al_dia_hasta date;
 
+-- Avisos automáticos por mail: para qué vencimiento ya se avisó que el abono
+-- está por vencer (así se avisa una sola vez por período), y cuándo se mandó el
+-- deslinde firmado a la administradora.
+alter table public.perfiles
+  add column if not exists aviso_vencimiento_para date,
+  add column if not exists deslinde_mail_enviado_en timestamptz;
+
 update public.perfiles
 set al_dia_hasta = (
   date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires')
@@ -291,6 +298,10 @@ alter table public.reservas
   add column if not exists promovida_en timestamptz,
   add column if not exists aviso_promocion_visto_en timestamptz;
 
+-- Marca de "ya se mandó el mail de que subió de la lista de espera".
+alter table public.reservas
+  add column if not exists promocion_mail_enviado_en timestamptz;
+
 -- true si la propia alumna canceló un lugar que tenía confirmado. Sirve para
 -- que la clase de prueba no se pueda "reciclar" cancelando y reservando otra.
 alter table public.reservas
@@ -376,6 +387,13 @@ create table if not exists public.configuracion (
   actualizado_en  timestamptz not null default now(),
   actualizado_por uuid references auth.users (id) on delete set null
 );
+
+-- Desde cuándo valen los avisos automáticos de deslinde: se fija una sola vez, la
+-- primera vez que se corre este archivo, para no mandarle a la administradora
+-- el deslinde de todas las alumnas que ya estaban registradas.
+insert into public.configuracion (clave, valor)
+values ('avisos_desde', to_jsonb(now()))
+on conflict (clave) do nothing;
 
 -- Documentos de la alumna (certificado médico, estudios, etc.): los sube ella o
 -- el estudio. Los archivos están en el bucket privado "fichas".
@@ -1806,6 +1824,109 @@ as $$
   where id = any(p_invitadas);
 $$;
 
+-- --- Otros avisos automáticos por mail ---------------------------------------------
+-- Los usa la misma Edge Function de los recordatorios (clave de servicio). Todos
+-- respetan el interruptor de pausa de Clientes.
+
+-- Abono por vencer: alumnas "al día" cuyo abono vence en los próximos 3 días y a
+-- las que todavía no se les avisó por ese vencimiento.
+create or replace function public.avisos_vencimiento_pendientes()
+returns table (alumna_id uuid, nombre text, email text, al_dia_hasta date)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p.id, p.nombre, u.email::text, p.al_dia_hasta
+  from public.perfiles p
+  join auth.users u on u.id = p.id
+  where public.recordatorios_activos()
+    and p.rol = 'alumno'
+    and p.estado_cuenta = 'al_dia'
+    and p.al_dia_hasta is not null
+    and u.email is not null
+    and p.al_dia_hasta >= (now() at time zone 'America/Argentina/Buenos_Aires')::date
+    and p.al_dia_hasta <= (now() at time zone 'America/Argentina/Buenos_Aires')::date + 3
+    and p.aviso_vencimiento_para is distinct from p.al_dia_hasta;
+$$;
+
+-- Subió de la lista de espera: alumnas promovidas en las últimas 24 horas a un
+-- turno que todavía no pasó, a las que no se les mandó el mail.
+create or replace function public.avisos_promocion_pendientes()
+returns table (reserva_id uuid, nombre text, email text, fecha date, hora time, profesora text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select r.id, p.nombre, u.email::text, t.fecha, t.hora, t.instructor
+  from public.reservas r
+  join public.turnos t on t.id = r.turno_id
+  join public.perfiles p on p.id = r.alumno_id
+  join auth.users u on u.id = r.alumno_id
+  where public.recordatorios_activos()
+    and r.estado = 'reservada'
+    and r.promovida_en is not null
+    and r.promocion_mail_enviado_en is null
+    and r.promovida_en > now() - interval '1 day'
+    and not t.cancelado
+    and u.email is not null
+    and ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') > now();
+$$;
+
+-- Deslinde firmado: alumnas nuevas (registradas desde que se activaron estos
+-- avisos) cuyo PDF ya se subió y todavía no se le mandó a la administradora.
+create or replace function public.deslindes_pendientes()
+returns table (
+  alumna_id uuid,
+  nombre text,
+  apellido text,
+  dni text,
+  telefono text,
+  email text,
+  aceptado_en timestamptz
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p.id, p.nombre, p.apellido, p.dni, p.telefono, u.email::text, p.deslinde_aceptado_en
+  from public.perfiles p
+  join auth.users u on u.id = p.id
+  where public.recordatorios_activos()
+    and p.rol = 'alumno'
+    and p.deslinde_pdf_subido
+    and p.deslinde_mail_enviado_en is null
+    and p.creado_en >= coalesce(
+      (select (c.valor #>> '{}')::timestamptz from public.configuracion c where c.clave = 'avisos_desde'),
+      now()
+    );
+$$;
+
+create or replace function public.marcar_avisos(
+  p_vencimiento uuid[],
+  p_promocion uuid[],
+  p_deslinde uuid[]
+)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.perfiles
+    set aviso_vencimiento_para = al_dia_hasta
+  where id = any(p_vencimiento);
+
+  update public.reservas
+    set promocion_mail_enviado_en = now()
+  where id = any(p_promocion);
+
+  update public.perfiles
+    set deslinde_mail_enviado_en = now()
+  where id = any(p_deslinde);
+$$;
+
 -- --- Generar turnos desde una plantilla (staff) --------------------------
 -- Crea un turno por cada fecha entre p_desde y p_hasta que caiga en el día
 -- de semana de la plantilla. Los que ya existen (misma fecha/hora) se saltean.
@@ -1955,6 +2076,15 @@ revoke execute on function public.recordatorios_pendientes() from public, anon, 
 revoke execute on function public.marcar_recordatorios(uuid[], uuid[]) from public, anon, authenticated;
 grant execute on function public.recordatorios_pendientes() to service_role;
 grant execute on function public.marcar_recordatorios(uuid[], uuid[]) to service_role;
+
+revoke execute on function public.avisos_vencimiento_pendientes() from public, anon, authenticated;
+revoke execute on function public.avisos_promocion_pendientes() from public, anon, authenticated;
+revoke execute on function public.deslindes_pendientes() from public, anon, authenticated;
+revoke execute on function public.marcar_avisos(uuid[], uuid[], uuid[]) from public, anon, authenticated;
+grant execute on function public.avisos_vencimiento_pendientes() to service_role;
+grant execute on function public.avisos_promocion_pendientes() to service_role;
+grant execute on function public.deslindes_pendientes() to service_role;
+grant execute on function public.marcar_avisos(uuid[], uuid[], uuid[]) to service_role;
 
 grant execute on function public.listar_profesoras()           to authenticated;
 grant execute on function public.ocupados_turno(uuid)          to authenticated;
