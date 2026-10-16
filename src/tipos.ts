@@ -18,6 +18,10 @@ export type Perfil = {
   al_dia_hasta: string | null // 'YYYY-MM-DD': el abono cubre turnos hasta esta fecha
   deslinde_aceptado_en: string | null
   deslinde_pdf_subido: boolean
+  fecha_nacimiento: string | null
+  objetivo: string | null
+  experiencia_previa: string | null
+  foto_ruta: string | null // ruta en el bucket privado "fichas"
   bio: string | null
   foto_url: string | null
   formacion: string | null

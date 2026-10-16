@@ -90,6 +90,15 @@ alter table public.perfiles
   add column if not exists frase text,
   add column if not exists instagram text;
 
+-- Ficha de la alumna (la completa ella desde "Mis datos"; la ven el estudio y
+-- las profesoras): fecha de nacimiento, objetivo, experiencia previa y foto
+-- opcional. La foto está en el bucket PRIVADO "fichas"; acá queda solo la ruta.
+alter table public.perfiles
+  add column if not exists fecha_nacimiento date,
+  add column if not exists objetivo text,
+  add column if not exists experiencia_previa text,
+  add column if not exists foto_ruta text;
+
 -- Cuando alguien se registra, le creamos el perfil automáticamente con los
 -- datos que mandó en el formulario (van en raw_user_meta_data). Si vino con
 -- 'acepta_deslinde', queda marcado el momento de la aceptación — el
@@ -368,6 +377,42 @@ create table if not exists public.configuracion (
   actualizado_por uuid references auth.users (id) on delete set null
 );
 
+-- Documentos de la alumna (certificado médico, estudios, etc.): los sube ella o
+-- el estudio. Los archivos están en el bucket privado "fichas".
+create table if not exists public.documentos_alumnas (
+  id          uuid primary key default gen_random_uuid(),
+  alumna_id   uuid not null references public.perfiles (id) on delete cascade default auth.uid(),
+  nombre      text not null check (length(btrim(nombre)) > 0),
+  categoria   text not null default 'otro'
+              check (categoria in ('certificado', 'estudio', 'otro')),
+  ruta        text not null,
+  subido_por  uuid references auth.users (id) on delete set null default auth.uid(),
+  creado_en   timestamptz not null default now()
+);
+
+create index if not exists documentos_alumna_idx
+  on public.documentos_alumnas (alumna_id, creado_en desc);
+
+-- Tope de 20 documentos por alumna.
+create or replace function public.limitar_documentos_alumna()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if (select count(*) from public.documentos_alumnas where alumna_id = new.alumna_id) >= 20 then
+    raise exception 'Se llegó al máximo de 20 documentos. Borrá alguno para subir otro.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists limitar_documentos on public.documentos_alumnas;
+create trigger limitar_documentos
+  before insert on public.documentos_alumnas
+  for each row execute function public.limitar_documentos_alumna();
+
 -- Galería de fotos de cada profesora (la que ven las alumnas en su ficha).
 -- Los archivos están en el bucket público "profes"; acá se guarda la lista.
 create table if not exists public.fotos_profesoras (
@@ -456,6 +501,22 @@ alter table public.configuracion enable row level security;
 drop policy if exists configuracion_staff_ve on public.configuracion;
 create policy configuracion_staff_ve on public.configuracion
   for select using (public.es_staff());
+
+-- Documentos de la alumna: los ve ella, el staff y las profesoras (igual que sus
+-- lesiones); los sube y borra ella o el staff. Una profesora no los modifica.
+alter table public.documentos_alumnas enable row level security;
+
+drop policy if exists documentos_ver on public.documentos_alumnas;
+create policy documentos_ver on public.documentos_alumnas
+  for select using (alumna_id = auth.uid() or public.es_staff() or public.es_instructora());
+
+drop policy if exists documentos_crea on public.documentos_alumnas;
+create policy documentos_crea on public.documentos_alumnas
+  for insert with check (alumna_id = auth.uid() or public.es_staff());
+
+drop policy if exists documentos_borra on public.documentos_alumnas;
+create policy documentos_borra on public.documentos_alumnas
+  for delete using (alumna_id = auth.uid() or public.es_staff());
 
 -- Comprobantes: la alumna sube y ve los suyos; el staff ve y resuelve todos.
 alter table public.comprobantes_pago enable row level security;
@@ -748,6 +809,57 @@ create policy profes_foto_actualiza on storage.objects
   ) with check (
     bucket_id = 'profes'
     and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- Ficha de la alumna (foto y documentos): bucket PRIVADO, máximo 8 MB, solo
+-- imágenes y PDF. Cada archivo va en la carpeta "<id de la alumna>/..."; lo
+-- sube ella o el staff, y lo ven ella, el staff y las profesoras.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'fichas', 'fichas', false, 8388608,
+  array['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+)
+on conflict (id) do update
+  set file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists fichas_bucket_visible on storage.buckets;
+create policy fichas_bucket_visible on storage.buckets
+  for select using (id = 'fichas');
+
+drop policy if exists fichas_sube on storage.objects;
+create policy fichas_sube on storage.objects
+  for insert with check (
+    bucket_id = 'fichas'
+    and ((storage.foldername(name))[1] = auth.uid()::text or public.es_staff())
+  );
+
+drop policy if exists fichas_ver_objeto on storage.objects;
+create policy fichas_ver_objeto on storage.objects
+  for select using (
+    bucket_id = 'fichas'
+    and (
+      (storage.foldername(name))[1] = auth.uid()::text
+      or public.es_staff()
+      or public.es_instructora()
+    )
+  );
+
+drop policy if exists fichas_actualiza_objeto on storage.objects;
+create policy fichas_actualiza_objeto on storage.objects
+  for update using (
+    bucket_id = 'fichas'
+    and ((storage.foldername(name))[1] = auth.uid()::text or public.es_staff())
+  ) with check (
+    bucket_id = 'fichas'
+    and ((storage.foldername(name))[1] = auth.uid()::text or public.es_staff())
+  );
+
+drop policy if exists fichas_borra_objeto on storage.objects;
+create policy fichas_borra_objeto on storage.objects
+  for delete using (
+    bucket_id = 'fichas'
+    and ((storage.foldername(name))[1] = auth.uid()::text or public.es_staff())
   );
 
 -- Comprobantes de pago: bucket PRIVADO, máximo 5 MB, solo imágenes y PDF. Cada
@@ -1200,7 +1312,8 @@ $$;
 -- --- Clientes para profesoras ---------------------------------------------------
 -- Lo que una profesora ve de las alumnas: datos y ficha, SIN estado de cuenta
 -- ni nada de pagos (eso es solo del staff).
-create or replace function public.clientes_para_instructora()
+drop function if exists public.clientes_para_instructora();
+create function public.clientes_para_instructora()
 returns table (
   id uuid,
   nombre text,
@@ -1211,6 +1324,10 @@ returns table (
   lesiones text,
   contacto_emergencia_nombre text,
   contacto_emergencia_telefono text,
+  fecha_nacimiento date,
+  objetivo text,
+  experiencia_previa text,
+  foto_ruta text,
   creado_en timestamptz
 )
 language plpgsql
@@ -1225,7 +1342,8 @@ begin
 
   return query
   select p.id, p.nombre, p.apellido, p.dni, p.telefono, p.nivel, p.lesiones,
-         p.contacto_emergencia_nombre, p.contacto_emergencia_telefono, p.creado_en
+         p.contacto_emergencia_nombre, p.contacto_emergencia_telefono,
+         p.fecha_nacimiento, p.objetivo, p.experiencia_previa, p.foto_ruta, p.creado_en
   from public.perfiles p
   where p.rol = 'alumno'
   order by p.nombre;

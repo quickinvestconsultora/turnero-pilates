@@ -32,7 +32,7 @@ export default function Respaldo() {
         // Pausa corta: algunos navegadores bloquean varias descargas seguidas.
         await new Promise((r) => setTimeout(r, 600))
       }
-      setAviso('Listo: se descargaron los 7 archivos. Guardalos en un lugar seguro.')
+      setAviso('Listo: se descargaron todos los archivos. Guardalos en un lugar seguro.')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo completar la descarga.')
     } finally {

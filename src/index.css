@@ -1903,3 +1903,29 @@ label {
   margin: 16px 0 8px;
   font-size: 15px;
 }
+
+/* ---- Ficha completa de la alumna ---- */
+.ficha-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ficha-cabecera div {
+  display: flex;
+  flex-direction: column;
+}
+
+.documentos-titulo {
+  margin: 18px 0 4px;
+  font-size: 15px;
+}
+
+.documentos-subir {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}

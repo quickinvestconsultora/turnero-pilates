@@ -13,12 +13,24 @@ import {
 } from '../servicios/clientes'
 import type { Pago } from '../servicios/clientes'
 import { diaMes } from '../cuenta'
+import DocumentosAlumna from './DocumentosAlumna'
+import FotoAlumna from './FotoAlumna'
 import { fechaCorta, horaCorta } from '../fechas'
 
 const formatoPesos = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
 
 const ETIQUETA_ASISTENCIA = { asistio: 'Asistió', ausente: 'Faltó' } as const
+
+// Edad en años a partir de 'YYYY-MM-DD' (null si no hay fecha).
+function edadDe(nacimiento: string | null): number | null {
+  if (!nacimiento) return null
+  const [y, m, d] = nacimiento.split('-').map(Number)
+  const hoy = new Date()
+  let edad = hoy.getFullYear() - y
+  if (hoy.getMonth() + 1 < m || (hoy.getMonth() + 1 === m && hoy.getDate() < d)) edad -= 1
+  return edad >= 0 ? edad : null
+}
 
 // Ficha completa de una alumna para el estudio: lo que ella cargó en "Mis
 // datos" (solo lectura), su historial de asistencia y las observaciones
@@ -137,7 +149,23 @@ export default function FichaCliente({
 
   return (
     <div className="ficha-cliente">
+      <div className="ficha-cabecera">
+        <FotoAlumna ruta={cliente.foto_ruta} nombre={cliente.nombre} tam={64} />
+        <div>
+          <strong>{`${cliente.nombre} ${cliente.apellido}`.trim()}</strong>
+          <span className="ayuda">
+            {edadDe(cliente.fecha_nacimiento) !== null
+              ? `${edadDe(cliente.fecha_nacimiento)} años`
+              : 'Sin fecha de nacimiento'}
+          </span>
+        </div>
+      </div>
+
       <dl className="ficha-datos">
+        <dt>Objetivo</dt>
+        <dd>{cliente.objetivo || 'Sin datos'}</dd>
+        <dt>Experiencia previa</dt>
+        <dd>{cliente.experiencia_previa || 'Sin datos'}</dd>
         <dt>Lesiones o condiciones</dt>
         <dd>{cliente.lesiones || 'Sin datos'}</dd>
         <dt>Contacto de emergencia</dt>
@@ -147,6 +175,9 @@ export default function FichaCliente({
             : 'Sin datos'}
         </dd>
       </dl>
+
+      <h3>Documentos</h3>
+      <DocumentosAlumna alumnaId={cliente.id} puedeEditar={!paraProfesora} />
 
       <h3>Historial de asistencia</h3>
       {historial === null ? (

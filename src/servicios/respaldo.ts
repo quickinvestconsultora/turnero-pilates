@@ -11,6 +11,7 @@ export const TABLAS_RESPALDO: { clave: string; etiqueta: string; descripcion: st
   { clave: 'reservas', etiqueta: 'Reservas', descripcion: 'Quién se anotó en cada turno y su asistencia' },
   { clave: 'reservas_invitadas', etiqueta: 'Anotadas sin registrar', descripcion: 'Personas anotadas por las profesoras sin cuenta' },
   { clave: 'pagos_clientes', etiqueta: 'Pagos', descripcion: 'Historial de cobros registrados' },
+  { clave: 'documentos_alumnas', etiqueta: 'Documentos de alumnas', descripcion: 'La lista de documentos subidos (los archivos se bajan desde cada ficha)' },
   { clave: 'observaciones_clientes', etiqueta: 'Observaciones', descripcion: 'Notas internas sobre cada alumna' },
   { clave: 'plantillas_turno', etiqueta: 'Turnos fijos', descripcion: 'Los horarios que se repiten cada semana' },
 ]

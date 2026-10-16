@@ -1,7 +1,10 @@
 import { useState } from 'react'
-import type { FormEvent } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
 import type { Nivel, Perfil } from '../tipos'
 import { actualizarMiPerfil } from '../servicios/perfil'
+import { quitarFotoAlumna, subirFotoAlumna } from '../servicios/ficha'
+import DocumentosAlumna from './DocumentosAlumna'
+import FotoAlumna from './FotoAlumna'
 
 type Props = {
   perfil: Perfil
@@ -18,8 +21,39 @@ export default function EditarPerfil({ perfil, onCerrar, onGuardado }: Props) {
   const [contactoTelefono, setContactoTelefono] = useState(
     perfil.contacto_emergencia_telefono ?? '',
   )
+  const [fechaNacimiento, setFechaNacimiento] = useState(perfil.fecha_nacimiento ?? '')
+  const [objetivo, setObjetivo] = useState(perfil.objetivo ?? '')
+  const [experiencia, setExperiencia] = useState(perfil.experiencia_previa ?? '')
+  const [fotoRuta, setFotoRuta] = useState(perfil.foto_ruta)
+  const [subiendoFoto, setSubiendoFoto] = useState(false)
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
+
+  const elegirFoto = async (e: ChangeEvent<HTMLInputElement>) => {
+    const archivo = e.target.files?.[0]
+    e.target.value = ''
+    if (!archivo) return
+    setError('')
+    setSubiendoFoto(true)
+    try {
+      setFotoRuta(await subirFotoAlumna(perfil.id, archivo))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo subir la foto.')
+    } finally {
+      setSubiendoFoto(false)
+    }
+  }
+
+  const sacarFoto = async () => {
+    if (!fotoRuta || !window.confirm('¿Sacar tu foto?')) return
+    setError('')
+    try {
+      await quitarFotoAlumna(perfil.id, fotoRuta)
+      setFotoRuta(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo sacar la foto.')
+    }
+  }
 
   const guardar = async (e: FormEvent) => {
     e.preventDefault()
@@ -33,12 +67,19 @@ export default function EditarPerfil({ perfil, onCerrar, onGuardado }: Props) {
         lesiones,
         contactoEmergenciaNombre: contactoNombre,
         contactoEmergenciaTelefono: contactoTelefono,
+        fechaNacimiento,
+        objetivo,
+        experienciaPrevia: experiencia,
       })
       onGuardado({
         ...perfil,
         nombre: nombre.trim(),
         telefono: telefono.trim(),
         nivel: nivel || null,
+        fecha_nacimiento: fechaNacimiento || null,
+        objetivo: objetivo.trim() || null,
+        experiencia_previa: experiencia.trim() || null,
+        foto_ruta: fotoRuta,
         lesiones: lesiones.trim() || null,
         contacto_emergencia_nombre: contactoNombre.trim() || null,
         contacto_emergencia_telefono: contactoTelefono.trim() || null,
@@ -51,8 +92,33 @@ export default function EditarPerfil({ perfil, onCerrar, onGuardado }: Props) {
 
   return (
     <div className="modal-fondo" onClick={onCerrar}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal mi-cuenta" onClick={(e) => e.stopPropagation()}>
         <h2>Mis datos</h2>
+
+        <div className="perfil-profe-foto">
+          <FotoAlumna ruta={fotoRuta} nombre={nombre} tam={72} />
+          <div className="barra-acciones">
+            <label className="boton-archivo">
+              {subiendoFoto ? 'Subiendo...' : fotoRuta ? 'Cambiar foto' : 'Subir foto (opcional)'}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={elegirFoto}
+                disabled={subiendoFoto}
+                className="oculto-visualmente"
+              />
+            </label>
+            {fotoRuta && (
+              <button type="button" className="link-secundario" onClick={sacarFoto}>
+                Sacar
+              </button>
+            )}
+          </div>
+        </div>
+        <p className="ayuda">
+          Tu foto, tus datos y tus documentos solo los ven el estudio y tus profesoras.
+        </p>
+
         <form onSubmit={guardar}>
           <label htmlFor="p-nombre">Nombre y apellido</label>
           <input
@@ -78,6 +144,35 @@ export default function EditarPerfil({ perfil, onCerrar, onGuardado }: Props) {
             <option value="intermedio">Intermedio</option>
             <option value="avanzado">Avanzado</option>
           </select>
+
+          <label htmlFor="p-nacimiento">Fecha de nacimiento</label>
+          <input
+            id="p-nacimiento"
+            type="date"
+            value={fechaNacimiento}
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setFechaNacimiento(e.target.value)}
+          />
+
+          <label htmlFor="p-objetivo">¿Qué querés lograr?</label>
+          <textarea
+            id="p-objetivo"
+            value={objetivo}
+            onChange={(e) => setObjetivo(e.target.value)}
+            rows={2}
+            maxLength={400}
+            placeholder="Ej: fortalecer la espalda, mejorar la postura, bajar el estrés"
+          />
+
+          <label htmlFor="p-experiencia">Experiencia previa</label>
+          <textarea
+            id="p-experiencia"
+            value={experiencia}
+            onChange={(e) => setExperiencia(e.target.value)}
+            rows={2}
+            maxLength={400}
+            placeholder="Ej: hice pilates 2 años, nunca entrené con máquinas"
+          />
 
           <label htmlFor="p-lesiones">Lesiones u observaciones</label>
           <input
@@ -116,6 +211,12 @@ export default function EditarPerfil({ perfil, onCerrar, onGuardado }: Props) {
             </button>
           </div>
         </form>
+
+        <h3 className="documentos-titulo">Mis documentos</h3>
+        <p className="ayuda">
+          Si querés, subí tu certificado médico, estudios u otros papeles que el estudio deba tener.
+        </p>
+        <DocumentosAlumna alumnaId={perfil.id} puedeEditar />
       </div>
     </div>
   )

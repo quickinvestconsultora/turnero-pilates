@@ -80,6 +80,9 @@ export async function actualizarMiPerfil(cambios: {
   lesiones: string
   contactoEmergenciaNombre: string
   contactoEmergenciaTelefono: string
+  fechaNacimiento: string
+  objetivo: string
+  experienciaPrevia: string
 }): Promise<void> {
   const { data: sesion } = await supabase.auth.getUser()
   if (!sesion.user) throw new Error('No hay sesión.')
@@ -88,8 +91,11 @@ export async function actualizarMiPerfil(cambios: {
     .from('perfiles')
     .update({
       nombre: cambios.nombre.trim(),
-      telefono: cambios.telefono.trim() || null,
+      telefono: cambios.telefono.trim(),
       nivel: cambios.nivel,
+      fecha_nacimiento: cambios.fechaNacimiento || null,
+      objetivo: cambios.objetivo.trim() || null,
+      experiencia_previa: cambios.experienciaPrevia.trim() || null,
       lesiones: cambios.lesiones.trim() || null,
       contacto_emergencia_nombre: cambios.contactoEmergenciaNombre.trim() || null,
       contacto_emergencia_telefono: cambios.contactoEmergenciaTelefono.trim() || null,
