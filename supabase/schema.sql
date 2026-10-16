@@ -1456,6 +1456,68 @@ begin
 end;
 $$;
 
+-- --- Mi cuenta (alumna) -----------------------------------------------------------
+-- Lo que la alumna puede ver de sí misma: sus clases ya dadas con la asistencia
+-- y sus pagos (sin las notas internas del estudio).
+create or replace function public.mi_historial()
+returns table (fecha date, hora time, instructor text, asistencia text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select t.fecha, t.hora, t.instructor, r.asistencia
+  from public.reservas r
+  join public.turnos t on t.id = r.turno_id
+  where r.alumno_id = auth.uid()
+    and r.estado = 'reservada'
+    and not t.cancelado
+    and (t.fecha + t.hora) < (now() at time zone 'America/Argentina/Buenos_Aires')
+  order by t.fecha desc, t.hora desc
+  limit 60;
+$$;
+
+create or replace function public.mis_pagos()
+returns table (fecha timestamptz, monto numeric, medio text, abono_hasta date)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p.creado_en, p.monto, p.medio, p.abono_hasta
+  from public.pagos_clientes p
+  where p.alumna_id = auth.uid()
+  order by p.creado_en desc
+  limit 24;
+$$;
+
+-- --- Copia de seguridad (staff) -----------------------------------------------------
+-- Todos los perfiles con su mail (que vive en auth.users y la app no puede leer
+-- directo), para descargarlos desde Administración.
+create or replace function public.respaldo_perfiles()
+returns json
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede descargar la copia de seguridad.';
+  end if;
+
+  return (
+    select coalesce(json_agg(row_to_json(x)), '[]'::json)
+    from (
+      select p.*, u.email
+      from public.perfiles p
+      left join auth.users u on u.id = p.id
+      order by p.creado_en
+    ) x
+  );
+end;
+$$;
+
 -- --- Informe por profesora (staff) ---------------------------------------------
 -- Por cada profesora (y los turnos sin asignar o con nombre escrito a mano) y
 -- dentro del período: clases ya dadas, anotadas, y cuántas asistieron o
@@ -1784,5 +1846,8 @@ grant execute on function public.informe_profesoras(date, date) to authenticated
 grant execute on function public.registrar_pago(uuid, numeric, text, text, date) to authenticated;
 grant execute on function public.marcar_promocion_vista(uuid) to authenticated;
 grant execute on function public.cambiar_recordatorios(boolean) to authenticated;
+grant execute on function public.mi_historial() to authenticated;
+grant execute on function public.mis_pagos() to authenticated;
+grant execute on function public.respaldo_perfiles() to authenticated;
 grant execute on function public.agregar_invitada_a_turno(uuid, text, text, text, text) to authenticated;
 grant execute on function public.clientes_para_instructora()   to authenticated;

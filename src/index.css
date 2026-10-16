@@ -1866,3 +1866,40 @@ label {
   font-size: 13px;
   padding: 6px 10px;
 }
+
+/* ---- Copia de seguridad y Mi cuenta ---- */
+.lista-respaldo {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lista-respaldo li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.lista-respaldo li div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mi-cuenta {
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.mi-cuenta h3 {
+  margin: 16px 0 8px;
+  font-size: 15px;
+}

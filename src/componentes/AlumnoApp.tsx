@@ -28,6 +28,7 @@ import AvisoPromocion from './AvisoPromocion'
 import EstadoAbono from './EstadoAbono'
 import InstalarApp from './InstalarApp'
 import AvisoPrimeraClase from './AvisoPrimeraClase'
+import MiCuenta from './MiCuenta'
 import ModalPago from './ModalPago'
 import ModalProfesora from './ModalProfesora'
 
@@ -46,6 +47,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   const [aviso, setAviso] = useState('')
   const [ocupadoId, setOcupadoId] = useState<string | null>(null)
   const [editandoPerfil, setEditandoPerfil] = useState(false)
+  const [mostrandoCuenta, setMostrandoCuenta] = useState(false)
   const [pagoRequerido, setPagoRequerido] = useState(false)
   const [avisoPrimeraClase, setAvisoPrimeraClase] = useState(false)
   const [profesoras, setProfesoras] = useState<Profesora[]>([])
@@ -204,6 +206,13 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
             >
               Mis datos
             </button>
+            <button
+              type="button"
+              className="link-secundario"
+              onClick={() => setMostrandoCuenta(true)}
+            >
+              Mi cuenta
+            </button>
             <button type="button" className="link-secundario" onClick={cerrarSesion}>
               Salir
             </button>
@@ -264,6 +273,8 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
           />
         )}
       </main>
+
+      {mostrandoCuenta && <MiCuenta perfil={perfil} onCerrar={() => setMostrandoCuenta(false)} />}
 
       {editandoPerfil && (
         <EditarPerfil

@@ -153,6 +153,10 @@ El staff pasa a una alumna a `Al día` desde **Clientes** cuando confirma que pa
 
 **Comprobantes de pago:** en el cartel de pago (y en el aviso de abono vencido) la alumna tiene "Ya pagué: subir comprobante": manda la foto o el PDF de su transferencia (las fotos se achican solas; máximo 5 MB, bucket privado `comprobantes`). En **Clientes** aparece arriba "Pagos para confirmar", con la cantidad también en la pestaña: el staff abre el comprobante, y **Aprobar** abre el panel de registrar pago (la deja al día y guarda el cobro en el historial) o **Rechazar**. La alumna ve "el estudio lo está revisando" mientras tenga uno pendiente. Tope de 5 pendientes por alumna.
 
+**Mi cuenta (alumna):** el botón "Mi cuenta" del encabezado muestra cómo está su abono (hasta cuándo cubre), cuántas clases asistió y faltó, sus últimas clases y sus pagos registrados (sin las notas internas del estudio). Sale de las funciones `mi_historial` y `mis_pagos`, que solo devuelven lo suyo.
+
+**Copia de seguridad:** en **Administración → Respaldo** el staff baja los datos a archivos para Excel (personas con su mail, turnos, reservas, anotadas sin registrar, pagos, observaciones y turnos fijos), uno por uno o todos juntos. Conviene hacerlo cada tanto y guardar los archivos fuera de la app. Los mails salen por `respaldo_perfiles`, que solo funciona para el staff.
+
 **Informe por profesora y Excel:** en la pestaña **Profesores**, "Informe del mes" muestra por profesora las clases ya dadas, anotadas, asistieron, faltaron y sin marcar (incluye a las "sin registrar"; no cuenta turnos cancelados ni los que no empezaron), con selector de mes y descarga para Excel. **Clientes** también tiene "Descargar para Excel" (respeta el filtro y la búsqueda). Los archivos son CSV con `;` y acentos correctos, que Excel en español abre directo.
 
 **Cartel de "versión de prueba":** una franja finita arriba de toda la app invita a dejar sugerencias. El botón abre WhatsApp si cargás el número en `src/config/feedback.ts` (`WHATSAPP_FEEDBACK`); mientras esté vacío, manda un mail a la dirección de administración. Se puede cerrar y vuelve en la próxima visita.
