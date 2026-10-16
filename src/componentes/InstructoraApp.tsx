@@ -10,8 +10,10 @@ import PlantillasStaff from './PlantillasStaff'
 import Clientes from './Clientes'
 import PerfilProfe from './PerfilProfe'
 import BienvenidaProfe from './BienvenidaProfe'
+import MisPagosProfe from './MisPagosProfe'
+import CartelAnuncios from './CartelAnuncios'
 
-type Vista = 'hoy' | 'agenda' | 'semana' | 'plantillas' | 'clientes' | 'perfil'
+type Vista = 'hoy' | 'agenda' | 'semana' | 'plantillas' | 'clientes' | 'pagos' | 'perfil'
 
 const PESTAÑAS: [Vista, string][] = [
   ['hoy', 'Hoy'],
@@ -19,6 +21,7 @@ const PESTAÑAS: [Vista, string][] = [
   ['semana', 'Semana'],
   ['plantillas', 'Turnos fijos'],
   ['clientes', 'Clientes'],
+  ['pagos', 'Mis pagos'],
   ['perfil', 'Mi perfil'],
 ]
 
@@ -80,6 +83,8 @@ export default function InstructoraApp({
         }
       />
 
+      <CartelAnuncios />
+
       <nav className="tabs tabs-scroll">
         {PESTAÑAS.map(([clave, etiqueta]) => (
           <button
@@ -99,6 +104,7 @@ export default function InstructoraApp({
         {vista === 'agenda' && <AgendaStaff instructoraId={perfil.id} />}
         {vista === 'plantillas' && <PlantillasStaff instructoraId={perfil.id} />}
         {vista === 'clientes' && <Clientes paraProfesora miId={perfil.id} />}
+        {vista === 'pagos' && <MisPagosProfe miId={perfil.id} />}
         {vista === 'perfil' && <PerfilProfe perfil={perfil} onGuardado={onPerfilActualizado} />}
       </main>
 

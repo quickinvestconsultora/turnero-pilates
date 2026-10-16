@@ -25,6 +25,8 @@ import CabeceraApp from './CabeceraApp'
 import EditarPerfil from './EditarPerfil'
 import AvisoPago from './AvisoPago'
 import AvisoPromocion from './AvisoPromocion'
+import CartelAnuncios from './CartelAnuncios'
+import UltimoPago from './UltimoPago'
 import EstadoAbono from './EstadoAbono'
 import InstalarApp from './InstalarApp'
 import AvisoPrimeraClase from './AvisoPrimeraClase'
@@ -220,6 +222,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
         }
       />
 
+      <CartelAnuncios />
       <AvisoPromocion turnos={promovidas} onEntendido={entenderPromociones} />
       <AvisoPago perfil={perfil} onComprobante={cargarComprobantes} />
       {comprobantePendiente && (
@@ -228,6 +231,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
         </p>
       )}
       <EstadoAbono perfil={perfil} />
+      <UltimoPago perfil={perfil} onVerTodos={() => setMostrandoCuenta(true)} />
       <InstalarApp />
 
       <nav className="tabs">

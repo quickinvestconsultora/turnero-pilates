@@ -13,9 +13,21 @@ import Profesores from './Profesores'
 import Respaldo from './Respaldo'
 import CobrosDelMes from './CobrosDelMes'
 import Reactivar from './Reactivar'
+import Resumen from './Resumen'
+import Egresos from './Egresos'
+import AnunciosStaff from './AnunciosStaff'
 
 type Vista = 'hoy' | 'agenda' | 'semana' | 'plantillas' | 'administracion'
-type Seccion = 'clientes' | 'reactivar' | 'profesores' | 'cobros' | 'estadisticas' | 'respaldo'
+type Seccion =
+  | 'resumen'
+  | 'clientes'
+  | 'reactivar'
+  | 'profesores'
+  | 'cobros'
+  | 'egresos'
+  | 'estadisticas'
+  | 'anuncios'
+  | 'respaldo'
 
 const PESTAÑAS: [Vista, string][] = [
   ['hoy', 'Hoy'],
@@ -26,17 +38,20 @@ const PESTAÑAS: [Vista, string][] = [
 ]
 
 const SECCIONES: [Seccion, string][] = [
+  ['resumen', 'Resumen'],
   ['clientes', 'Clientes'],
   ['reactivar', 'Para reactivar'],
   ['profesores', 'Profesores'],
   ['cobros', 'Cobros'],
+  ['egresos', 'Egresos'],
   ['estadisticas', 'Estadísticas'],
+  ['anuncios', 'Anuncios'],
   ['respaldo', 'Respaldo'],
 ]
 
 export default function AdminApp({ perfil }: { perfil: Perfil }) {
   const [vista, setVista] = useState<Vista>('hoy')
-  const [seccion, setSeccion] = useState<Seccion>('clientes')
+  const [seccion, setSeccion] = useState<Seccion>('resumen')
   const [pendientes, setPendientes] = useState(0)
 
   // Cantidad de comprobantes esperando confirmación. Se ve como número en
@@ -101,11 +116,14 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
         {vista === 'agenda' && <AgendaStaff />}
         {vista === 'semana' && <SemanaGrilla />}
         {vista === 'plantillas' && <PlantillasStaff />}
+        {vista === 'administracion' && seccion === 'resumen' && <Resumen onIr={setSeccion} />}
         {vista === 'administracion' && seccion === 'clientes' && <Clientes />}
         {vista === 'administracion' && seccion === 'reactivar' && <Reactivar />}
         {vista === 'administracion' && seccion === 'profesores' && <Profesores />}
         {vista === 'administracion' && seccion === 'cobros' && <CobrosDelMes />}
+        {vista === 'administracion' && seccion === 'egresos' && <Egresos />}
         {vista === 'administracion' && seccion === 'estadisticas' && <Estadisticas />}
+        {vista === 'administracion' && seccion === 'anuncios' && <AnunciosStaff />}
         {vista === 'administracion' && seccion === 'respaldo' && <Respaldo />}
       </main>
     </div>

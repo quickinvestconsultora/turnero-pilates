@@ -28,7 +28,7 @@ export default function BotonRecibo({ datos }: { datos: DatosRecibo }) {
         disabled={ocupado}
         onClick={() => correr(descargarRecibo)}
       >
-        {ocupado ? 'Generando...' : 'Recibo PDF'}
+        {ocupado ? 'Generando...' : 'Descargar recibo'}
       </button>
       {puedeCompartirArchivos() && (
         <button

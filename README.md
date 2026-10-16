@@ -256,9 +256,24 @@ Las funciones SQL son `avisos_vencimiento_pendientes`, `avisos_promocion_pendien
 
 **Recibo de pago:** cada pago del historial (ficha del cliente y "Mi cuenta" de la alumna) tiene **Recibo PDF**, y en el celular también **Compartir** (menú del teléfono: WhatsApp, mail…). Lleva el número correlativo (`pagos_clientes.numero`), fecha, nombre y DNI, concepto, medio, importe y hasta cuándo cubre. Es un comprobante interno: aclara que no es factura. Se genera en el navegador con jsPDF (`src/servicios/recibo.ts`).
 
+**Anuncios por mail:** los anuncios cargados con "mandarlo también por mail" salen por la misma función, de a 40 por corrida (`anuncios_mail_pendientes` y `marcar_anuncios_enviados`, solo clave de servicio; `anuncios_envios` evita repetirlos). Respetan el interruptor de pausa.
+
 Para ver qué pasó en las últimas corridas, en el SQL Editor: `select status, return_message, start_time from cron.job_run_details order by start_time desc limit 5;` y `select status_code, content, created from net._http_response order by created desc limit 5;`.
 
 Antes de activarlo en serio conviene arreglar el remitente: con un Gmail, Brevo puede reescribir el "De". Lo prolijo es una dirección del dominio (`turnos@fortevastudio.com.ar`) con sus registros DNS.
+
+## Gestión del administrador
+
+En **Administración** (subpestañas):
+
+- **Resumen:** tablero con lo cobrado, egresos y resultado del mes contra el mes pasado, alumnas activas (vinieron en los últimos 30 días), altas, ocupación de los últimos 30 días, cuentas al día/vencidas y las alertas (comprobantes sin confirmar, abonos que vencen esta semana, alumnas para reactivar). Sale de `resumen_estudio()` (solo staff).
+- **Egresos:** gastos del estudio por categoría (`gastos`, solo staff) y el balance del mes (`balance_mes`): cobrado a alumnas − gastos − pagos a profesoras = resultado.
+- **Profesores → Liquidación del mes:** valor por clase de cada profesora (`tarifas_profesoras`), clases ya dadas (sin las canceladas) y registro de pagos (`pagos_profesoras`, con mes liquidado, monto, medio, fecha y nota). El valor por clase es el actual: al registrar un pago se puede poner el monto que corresponda. `liquidacion_mes` y `liquidacion_de` hacen el cálculo.
+- **Anuncios:** carteles para alumnas, profesoras o todas, con fecha de inicio y fin opcionales, "importante" y envío opcional por mail. Las políticas de la tabla `anuncios` entregan a cada rol solo los vigentes que le corresponden; cada persona puede cerrar el cartel (se recuerda en su navegador).
+
+**Las profesoras ven lo suyo:** la pestaña **Mis pagos** de la profesora muestra sus clases del mes, lo que le corresponde, lo ya cobrado y todo su historial de pagos (`mi_liquidacion` y la política que deja leer solo sus propias filas). No ve lo de las demás ni los cobros de alumnas.
+
+**Recibo para la alumna:** en la pantalla principal aparece "Tu último pago" con **Descargar recibo** (y **Compartir** en el celular), y en **Mi cuenta** el de cada pago.
 
 ## Pendiente (fuera del MVP)
 

@@ -2032,3 +2032,147 @@ label {
   flex-wrap: wrap;
   gap: 2px 12px;
 }
+
+/* ---- Gestión: resumen, liquidación, anuncios ---- */
+.kpi-boton {
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kpi-valor--negativo {
+  color: var(--error);
+}
+
+.variacion {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.variacion--sube {
+  color: #2f7d4f;
+}
+
+.variacion--baja {
+  color: var(--error);
+}
+
+.resumen-alertas {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.resumen-alertas li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 9px 14px;
+  background: rgba(180, 71, 46, 0.08);
+  border: 1px solid rgba(180, 71, 46, 0.3);
+  border-radius: var(--radio);
+  font-size: 14px;
+}
+
+.lista-liquidacion {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.liquidacion-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 13px 15px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.liquidacion-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+}
+
+.liquidacion-numeros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+
+.liquidacion-numeros div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.anuncios {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.anuncio {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 14px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-left: 4px solid var(--borde);
+  border-radius: var(--radio);
+  font-size: 14px;
+}
+
+.anuncio--importante {
+  background: rgba(180, 71, 46, 0.08);
+  border-color: rgba(180, 71, 46, 0.35);
+  border-left-color: var(--error);
+}
+
+.anuncio-texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.anuncio-texto p {
+  margin: 2px 0 0;
+  white-space: pre-line;
+}
+
+.anuncio-cerrar {
+  flex: none;
+  padding: 0 6px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+}
+
+.ultimo-pago {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 0 0 12px;
+  padding: 9px 14px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  font-size: 13px;
+}

@@ -1,0 +1,264 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
+import {
+  agregarGasto,
+  borrarGasto,
+  ETIQUETA_CATEGORIA,
+  listarGastos,
+  obtenerBalance,
+} from '../servicios/gestion'
+import type { Balance, CategoriaGasto, Gasto } from '../servicios/gestion'
+import { descargarCsv } from '../csv'
+import { finDeMes, hoyIso, inicioDeMes, nombreMes } from '../fechas'
+
+const pesos = (n: number) =>
+  n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
+
+const fechaAr = (iso: string) => iso.split('-').reverse().join('/')
+
+// Egresos del estudio y resultado del mes: lo cobrado a las alumnas, menos los
+// gastos cargados acá y lo pagado a las profesoras (ver Profesores → Liquidación).
+export default function Egresos() {
+  const [mes, setMes] = useState(0)
+  const [balance, setBalance] = useState<Balance | null>(null)
+  const [gastos, setGastos] = useState<Gasto[]>([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState('')
+  const [agregando, setAgregando] = useState(false)
+
+  const referencia = useMemo(() => inicioDeMes(hoyIso(), mes), [mes])
+  const titulo = `${nombreMes(referencia)} ${referencia.slice(0, 4)}`
+
+  const cargar = useCallback(async () => {
+    setError('')
+    setCargando(true)
+    try {
+      const [b, g] = await Promise.all([
+        obtenerBalance(referencia),
+        listarGastos(referencia, finDeMes(referencia)),
+      ])
+      setBalance(b)
+      setGastos(g)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudieron cargar los egresos.')
+    } finally {
+      setCargando(false)
+    }
+  }, [referencia])
+
+  useEffect(() => {
+    cargar()
+  }, [cargar])
+
+  const quitar = async (g: Gasto) => {
+    if (!window.confirm(`¿Borrar el gasto "${g.concepto}" de ${pesos(g.monto)}?`)) return
+    setError('')
+    try {
+      await borrarGasto(g.id)
+      await cargar()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo borrar.')
+    }
+  }
+
+  const egresos = balance ? balance.gastos + balance.liquidaciones : 0
+  const resultado = balance ? balance.cobrado - egresos : 0
+
+  const porCategoria = (Object.keys(ETIQUETA_CATEGORIA) as CategoriaGasto[])
+    .map((c) => ({
+      categoria: c,
+      monto: gastos.filter((g) => g.categoria === c).reduce((n, g) => n + g.monto, 0),
+    }))
+    .filter((f) => f.monto > 0)
+
+  const descargar = () =>
+    descargarCsv(`egresos-${referencia.slice(0, 7)}.csv`, [
+      ['Fecha', 'Categoría', 'Concepto', 'Monto', 'Nota'],
+      ...gastos.map((g) => [fechaAr(g.fecha), ETIQUETA_CATEGORIA[g.categoria], g.concepto, g.monto, g.nota ?? '']),
+    ])
+
+  return (
+    <section>
+      <div className="fila-titulo">
+        <h2>Egresos</h2>
+        <div className="barra-acciones">
+          <button type="button" className="link-secundario" disabled={mes <= -12} onClick={() => setMes((m) => m - 1)}>
+            ← Anterior
+          </button>
+          {mes !== 0 && (
+            <button type="button" className="link-secundario" onClick={() => setMes(0)}>
+              Este mes
+            </button>
+          )}
+        </div>
+      </div>
+      <p className="ayuda hoy-fecha">{titulo}</p>
+
+      {error && <p className="mensaje-error">{error}</p>}
+
+      {balance && (
+        <div className="cobros-resumen">
+          <div>
+            <span className="ayuda">Cobrado a alumnas</span>
+            <strong>{pesos(balance.cobrado)}</strong>
+          </div>
+          <div>
+            <span className="ayuda">Gastos</span>
+            <strong>{pesos(balance.gastos)}</strong>
+          </div>
+          <div>
+            <span className="ayuda">Pagado a profesoras</span>
+            <strong>{pesos(balance.liquidaciones)}</strong>
+          </div>
+          <div>
+            <span className="ayuda">Resultado</span>
+            <strong className={resultado < 0 ? 'kpi-valor--negativo' : ''}>{pesos(resultado)}</strong>
+          </div>
+        </div>
+      )}
+
+      <div className="fila-titulo">
+        <h3>Gastos</h3>
+        <button type="button" className="link-secundario" onClick={() => setAgregando((v) => !v)}>
+          {agregando ? 'Cerrar' : '+ Cargar un gasto'}
+        </button>
+      </div>
+
+      {agregando && (
+        <FormGasto
+          onGuardado={() => {
+            setAgregando(false)
+            cargar()
+          }}
+          onCerrar={() => setAgregando(false)}
+        />
+      )}
+
+      {cargando ? (
+        <p className="vacio">Cargando...</p>
+      ) : gastos.length === 0 ? (
+        <p className="vacio">No hay gastos cargados en este mes.</p>
+      ) : (
+        <>
+          <ul className="ficha-historial">
+            {porCategoria.map((f) => (
+              <li key={f.categoria}>
+                <span>{ETIQUETA_CATEGORIA[f.categoria]}</span>
+                <strong>{pesos(f.monto)}</strong>
+              </li>
+            ))}
+          </ul>
+
+          <h3>Detalle</h3>
+          <ul className="ficha-historial">
+            {gastos.map((g) => (
+              <li key={g.id}>
+                <span>
+                  {fechaAr(g.fecha)} · {g.concepto}
+                  <span className="ayuda"> · {ETIQUETA_CATEGORIA[g.categoria]}</span>
+                  {g.nota && <span className="ayuda"> · {g.nota}</span>}
+                </span>
+                <span className="acciones-pago">
+                  <strong>{pesos(g.monto)}</strong>
+                  <button type="button" className="link-secundario" onClick={() => quitar(g)}>
+                    Borrar
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <button type="button" className="link-secundario" onClick={descargar}>
+            Descargar para Excel
+          </button>
+        </>
+      )}
+    </section>
+  )
+}
+
+function FormGasto({ onGuardado, onCerrar }: { onGuardado: () => void; onCerrar: () => void }) {
+  const hoy = hoyIso()
+  const [fecha, setFecha] = useState(hoy)
+  const [categoria, setCategoria] = useState<CategoriaGasto>('alquiler')
+  const [concepto, setConcepto] = useState('')
+  const [monto, setMonto] = useState('')
+  const [nota, setNota] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState('')
+
+  const guardar = async (e: FormEvent) => {
+    e.preventDefault()
+    setError('')
+    const montoNum = Number(monto.replace(',', '.'))
+    if (!Number.isFinite(montoNum) || montoNum <= 0) {
+      setError('Poné un monto mayor a cero.')
+      return
+    }
+    setEnviando(true)
+    try {
+      await agregarGasto({
+        fecha,
+        categoria,
+        concepto: concepto.trim() || ETIQUETA_CATEGORIA[categoria],
+        monto: montoNum,
+        nota,
+      })
+      onGuardado()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar el gasto.')
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <form className="form-caja" onSubmit={guardar}>
+      <div className="grilla-campos">
+        <div>
+          <label htmlFor="gasto-fecha">Fecha</label>
+          <input id="gasto-fecha" type="date" value={fecha} max={hoy} onChange={(e) => setFecha(e.target.value)} required />
+        </div>
+        <div>
+          <label htmlFor="gasto-cat">Categoría</label>
+          <select id="gasto-cat" value={categoria} onChange={(e) => setCategoria(e.target.value as CategoriaGasto)}>
+            {(Object.keys(ETIQUETA_CATEGORIA) as CategoriaGasto[]).map((c) => (
+              <option key={c} value={c}>
+                {ETIQUETA_CATEGORIA[c]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="gasto-concepto">Concepto</label>
+          <input
+            id="gasto-concepto"
+            value={concepto}
+            onChange={(e) => setConcepto(e.target.value)}
+            placeholder="Ej: alquiler de octubre"
+          />
+        </div>
+        <div>
+          <label htmlFor="gasto-monto">Monto</label>
+          <input
+            id="gasto-monto"
+            value={monto}
+            onChange={(e) => setMonto(e.target.value)}
+            inputMode="decimal"
+            placeholder="$"
+            required
+          />
+        </div>
+      </div>
+      <label htmlFor="gasto-nota">Nota (opcional)</label>
+      <input id="gasto-nota" value={nota} onChange={(e) => setNota(e.target.value)} />
+      {error && <p className="mensaje-error">{error}</p>}
+      <div className="barra-acciones">
+        <button type="submit" disabled={enviando}>
+          {enviando ? 'Guardando...' : 'Guardar gasto'}
+        </button>
+        <button type="button" className="link-secundario" onClick={onCerrar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  )
+}

@@ -8,6 +8,8 @@
 //   3. Subió de la lista de espera: se liberó un lugar y quedaste anotada.
 //   4. Deslinde firmado: PDF de cada alumna nueva, a la administradora.
 //   5. Cumpleaños: saludo el día que cumple años (desde las 9, hora argentina).
+//   6. Anuncios: los que el estudio carga con "mandar también por mail" (de a
+//      40 por corrida).
 //
 // Secretos (Supabase → Edge Functions → Secrets):
 //   BREVO_API_KEY   clave de la API de Brevo (no es la clave SMTP)
@@ -62,6 +64,15 @@ type Promocion = {
   profesora: string | null
 }
 type Cumple = { alumna_id: string; nombre: string; email: string }
+type AnuncioMail = {
+  anuncio_id: string
+  titulo: string
+  mensaje: string
+  importante: boolean
+  perfil_id: string
+  nombre: string
+  email: string
+}
 type Deslinde = {
   alumna_id: string
   nombre: string
@@ -225,6 +236,24 @@ function mailCumple(c: Cumple): Mail {
   }
 }
 
+function mailAnuncio(a: AnuncioMail): Mail {
+  const nombre = a.nombre.trim() || 'hola'
+  const titulo = a.titulo.trim() || (a.importante ? 'Aviso importante' : 'Novedades')
+  const lineas = a.mensaje.split('\n').map((l) => l.trim()).filter((l) => l.length > 0)
+
+  return {
+    para: { email: a.email, nombre: a.nombre },
+    asunto: titulo + ' - ' + NOMBRE_ESTUDIO,
+    texto: 'Hola ' + nombre + '!\n\n' + lineas.join('\n\n') + '\n\n' + APP_URL,
+    html: envolver(
+      titulo,
+      parrafo('Hola ' + escapar(nombre) + ',') +
+        lineas.map((l) => (a.importante ? destacado(escapar(l)) : parrafo(escapar(l)))).join(''),
+      { texto: 'Entrar al turnero', url: APP_URL },
+    ),
+  }
+}
+
 function mailDeslinde(d: Deslinde, adminEmail: string, pdfBase64: string): Mail {
   const nombre = (d.nombre + ' ' + d.apellido).trim()
   const filas: [string, string][] = [
@@ -323,6 +352,7 @@ Deno.serve(async (req) => {
   const promociones = await pedir<Promocion>('avisos_promocion_pendientes')
   const deslindes = await pedir<Deslinde>('deslindes_pendientes')
   const cumples = await pedir<Cumple>('avisos_cumple_pendientes')
+  const anuncios = await pedir<AnuncioMail>('anuncios_mail_pendientes')
 
   if (prueba) {
     return json({
@@ -332,12 +362,13 @@ Deno.serve(async (req) => {
       promociones: promociones.map((p) => ({ nombre: p.nombre, email: p.email, fecha: p.fecha, hora: p.hora })),
       deslindes: deslindes.map((d) => ({ nombre: d.nombre + ' ' + d.apellido, email: d.email })),
       cumples: cumples.map((c) => ({ nombre: c.nombre, email: c.email })),
+      anuncios: anuncios.map((a) => ({ titulo: a.titulo, nombre: a.nombre, email: a.email })),
       errores,
     })
   }
 
   const total = recordatorios.length + vencimientos.length + promociones.length + deslindes.length +
-    cumples.length
+    cumples.length + anuncios.length
   if (total === 0) return json({ pendientes: 0, enviados: 0, fallidos: [], errores })
 
   const apiKey = Deno.env.get('BREVO_API_KEY')
@@ -405,6 +436,18 @@ Deno.serve(async (req) => {
     }
   }
 
+  const anunciosEnviados: string[] = []
+  const perfilesAnuncio: string[] = []
+  for (const a of anuncios) {
+    try {
+      await enviarPorBrevo(mailAnuncio(a), apiKey, remitente)
+      anunciosEnviados.push(a.anuncio_id)
+      perfilesAnuncio.push(a.perfil_id)
+    } catch (e) {
+      fallidos.push({ email: a.email, error: motivo(e) })
+    }
+  }
+
   if (enviadasAlumnas.length > 0 || enviadasInvitadas.length > 0) {
     const { error } = await supabase.rpc('marcar_recordatorios', {
       p_reservas: enviadasAlumnas,
@@ -421,6 +464,14 @@ Deno.serve(async (req) => {
     if (error) errores.push('marcar_avisos: ' + error.message)
   }
 
+  if (anunciosEnviados.length > 0) {
+    const { error } = await supabase.rpc('marcar_anuncios_enviados', {
+      p_anuncios: anunciosEnviados,
+      p_perfiles: perfilesAnuncio,
+    })
+    if (error) errores.push('marcar_anuncios_enviados: ' + error.message)
+  }
+
   if (enviadosCumple.length > 0) {
     const { error } = await supabase.rpc('marcar_avisos_cumple', { p_alumnas: enviadosCumple })
     if (error) errores.push('marcar_avisos_cumple: ' + error.message)
@@ -430,13 +481,14 @@ Deno.serve(async (req) => {
     pendientes: total,
     enviados:
       enviadasAlumnas.length + enviadasInvitadas.length + enviadosVencimiento.length +
-      enviadosPromocion.length + enviadosDeslinde.length + enviadosCumple.length,
+      enviadosPromocion.length + enviadosDeslinde.length + enviadosCumple.length + anunciosEnviados.length,
     detalle: {
       recordatorios: enviadasAlumnas.length + enviadasInvitadas.length,
       vencimientos: enviadosVencimiento.length,
       promociones: enviadosPromocion.length,
       deslindes: enviadosDeslinde.length,
       cumples: enviadosCumple.length,
+      anuncios: anunciosEnviados.length,
     },
     fallidos,
     errores,

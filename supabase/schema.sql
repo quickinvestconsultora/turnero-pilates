@@ -2316,6 +2316,378 @@ begin
 end;
 $$;
 
+-- ============================================================================
+-- Gestión del estudio: egresos, liquidación de profesoras, anuncios y resumen
+-- ============================================================================
+
+-- --- Egresos --------------------------------------------------------------------
+-- Gastos del estudio (alquiler, insumos, etc.). Solo el staff. Junto con los
+-- cobros y los pagos a profesoras dan el resultado del mes.
+create table if not exists public.gastos (
+  id             uuid primary key default gen_random_uuid(),
+  fecha          date not null default (now() at time zone 'America/Argentina/Buenos_Aires')::date,
+  categoria      text not null default 'otro'
+                 check (categoria in ('alquiler', 'servicios', 'insumos', 'sueldos', 'impuestos', 'marketing', 'otro')),
+  concepto       text not null check (length(btrim(concepto)) > 0),
+  monto          numeric(12, 2) not null check (monto > 0),
+  nota           text,
+  registrado_por uuid references auth.users (id) on delete set null default auth.uid(),
+  creado_en      timestamptz not null default now()
+);
+
+create index if not exists gastos_fecha_idx on public.gastos (fecha desc);
+
+alter table public.gastos enable row level security;
+
+drop policy if exists gastos_staff on public.gastos;
+create policy gastos_staff on public.gastos
+  for all using (public.es_staff()) with check (public.es_staff());
+
+-- --- Liquidación de profesoras ----------------------------------------------------
+-- Cuánto se le paga a cada profesora por clase dada, y el registro de lo que se
+-- le fue pagando mes a mes. Cada profesora ve lo suyo; solo el staff lo carga.
+create table if not exists public.tarifas_profesoras (
+  profesora_id   uuid primary key references public.perfiles (id) on delete cascade,
+  valor_clase    numeric(12, 2) not null check (valor_clase >= 0),
+  actualizado_en timestamptz not null default now()
+);
+
+create table if not exists public.pagos_profesoras (
+  id             uuid primary key default gen_random_uuid(),
+  profesora_id   uuid not null references public.perfiles (id) on delete cascade,
+  periodo        date not null check (extract(day from periodo) = 1),
+  clases         int not null default 0,
+  valor_clase    numeric(12, 2),
+  monto          numeric(12, 2) not null check (monto > 0),
+  medio          text not null default 'transferencia'
+                 check (medio in ('transferencia', 'mercado_pago', 'efectivo', 'otro')),
+  fecha          date not null default (now() at time zone 'America/Argentina/Buenos_Aires')::date,
+  nota           text,
+  registrado_por uuid references auth.users (id) on delete set null default auth.uid(),
+  creado_en      timestamptz not null default now()
+);
+
+create index if not exists pagos_profesoras_idx
+  on public.pagos_profesoras (profesora_id, periodo desc);
+
+alter table public.tarifas_profesoras enable row level security;
+alter table public.pagos_profesoras enable row level security;
+
+drop policy if exists tarifas_staff on public.tarifas_profesoras;
+create policy tarifas_staff on public.tarifas_profesoras
+  for all using (public.es_staff()) with check (public.es_staff());
+
+drop policy if exists tarifas_propia on public.tarifas_profesoras;
+create policy tarifas_propia on public.tarifas_profesoras
+  for select using (profesora_id = auth.uid());
+
+drop policy if exists pagos_profesoras_staff on public.pagos_profesoras;
+create policy pagos_profesoras_staff on public.pagos_profesoras
+  for all using (public.es_staff()) with check (public.es_staff());
+
+drop policy if exists pagos_profesoras_propios on public.pagos_profesoras;
+create policy pagos_profesoras_propios on public.pagos_profesoras
+  for select using (profesora_id = auth.uid());
+
+-- Cálculo de un mes para una profesora: clases ya dadas (sin las canceladas),
+-- valor por clase actual, lo que le corresponde, lo ya pagado y el saldo. Si no
+-- tiene valor por clase cargado, "a pagar" y "saldo" quedan vacíos. Función interna.
+create or replace function public.liquidacion_de(p_prof uuid, p_mes date)
+returns table (
+  clases      bigint,
+  valor_clase numeric,
+  a_pagar     numeric,
+  pagado      numeric,
+  saldo       numeric
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with m as (
+    select date_trunc('month', p_mes)::date as ini
+  ),
+  c as (
+    select count(*) as n
+    from public.turnos t, m
+    where t.instructora_id = p_prof
+      and not t.cancelado
+      and t.fecha >= m.ini
+      and t.fecha < (m.ini + interval '1 month')::date
+      and (t.fecha + t.hora) < (now() at time zone 'America/Argentina/Buenos_Aires')
+  ),
+  v as (
+    select tp.valor_clase as valor from public.tarifas_profesoras tp where tp.profesora_id = p_prof
+  ),
+  g as (
+    select coalesce(sum(x.monto), 0) as total
+    from public.pagos_profesoras x, m
+    where x.profesora_id = p_prof and x.periodo = m.ini
+  )
+  select c.n, v.valor, c.n * v.valor, g.total, c.n * v.valor - g.total
+  from c cross join g left join v on true;
+$$;
+
+revoke execute on function public.liquidacion_de(uuid, date) from public, anon, authenticated;
+
+-- Todas las profesoras en un mes (staff).
+create or replace function public.liquidacion_mes(p_mes date)
+returns table (
+  profesora_id uuid,
+  nombre       text,
+  clases       bigint,
+  valor_clase  numeric,
+  a_pagar      numeric,
+  pagado       numeric,
+  saldo        numeric
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_ini date := date_trunc('month', p_mes)::date;
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede ver la liquidación.';
+  end if;
+
+  return query
+  select p.id,
+         coalesce(nullif(btrim(p.nombre || ' ' || p.apellido), ''), 'Sin nombre'),
+         l.clases, l.valor_clase, l.a_pagar, l.pagado, l.saldo
+  from public.perfiles p
+  cross join lateral public.liquidacion_de(p.id, v_ini) l
+  where p.rol = 'instructora' or l.clases > 0 or l.pagado > 0
+  order by 2;
+end;
+$$;
+
+-- Lo mío (profesora) en un mes.
+create or replace function public.mi_liquidacion(p_mes date)
+returns table (
+  clases      bigint,
+  valor_clase numeric,
+  a_pagar     numeric,
+  pagado      numeric,
+  saldo       numeric
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select * from public.liquidacion_de(auth.uid(), p_mes);
+$$;
+
+-- --- Balance del mes (staff) -------------------------------------------------------
+-- Cobrado a alumnas, gastos cargados y pagos a profesoras de un mes.
+create or replace function public.balance_mes(p_mes date)
+returns table (cobrado numeric, gastos numeric, liquidaciones numeric)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_ini date := date_trunc('month', p_mes)::date;
+  v_fin date := (date_trunc('month', p_mes) + interval '1 month')::date;
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede ver el balance.';
+  end if;
+
+  return query
+  select
+    coalesce((select sum(pc.monto) from public.pagos_clientes pc
+              where pc.creado_en >= (v_ini::timestamp at time zone 'America/Argentina/Buenos_Aires')
+                and pc.creado_en <  (v_fin::timestamp at time zone 'America/Argentina/Buenos_Aires')), 0),
+    coalesce((select sum(g.monto) from public.gastos g
+              where g.fecha >= v_ini and g.fecha < v_fin), 0),
+    coalesce((select sum(pp.monto) from public.pagos_profesoras pp
+              where pp.fecha >= v_ini and pp.fecha < v_fin), 0);
+end;
+$$;
+
+-- --- Anuncios ----------------------------------------------------------------------
+-- Cartel que ven todas al entrar a la app (feriados, cambios de horario,
+-- novedades). Se puede mandar también por mail. Los maneja el staff.
+create table if not exists public.anuncios (
+  id          uuid primary key default gen_random_uuid(),
+  titulo      text not null default '',
+  mensaje     text not null check (length(btrim(mensaje)) > 0),
+  para        text not null default 'alumnas' check (para in ('alumnas', 'profesoras', 'todas')),
+  importante  boolean not null default false,
+  desde       date not null default (now() at time zone 'America/Argentina/Buenos_Aires')::date,
+  hasta       date,
+  activo      boolean not null default true,
+  enviar_mail boolean not null default false,
+  creado_por  uuid references auth.users (id) on delete set null default auth.uid(),
+  creado_en   timestamptz not null default now()
+);
+
+-- A quién ya se le mandó el mail de cada anuncio (para no repetir).
+create table if not exists public.anuncios_envios (
+  anuncio_id uuid not null references public.anuncios (id) on delete cascade,
+  perfil_id  uuid not null references public.perfiles (id) on delete cascade,
+  enviado_en timestamptz not null default now(),
+  primary key (anuncio_id, perfil_id)
+);
+
+alter table public.anuncios enable row level security;
+alter table public.anuncios_envios enable row level security;
+
+drop policy if exists anuncios_staff on public.anuncios;
+create policy anuncios_staff on public.anuncios
+  for all using (public.es_staff()) with check (public.es_staff());
+
+-- Cada quien ve los anuncios vigentes dirigidos a su rol.
+drop policy if exists anuncios_vigentes on public.anuncios;
+create policy anuncios_vigentes on public.anuncios
+  for select to authenticated using (
+    activo
+    and desde <= (now() at time zone 'America/Argentina/Buenos_Aires')::date
+    and (hasta is null or hasta >= (now() at time zone 'America/Argentina/Buenos_Aires')::date)
+    and (
+      para = 'todas'
+      or (para = 'profesoras' and public.es_instructora())
+      or (para = 'alumnas' and not public.es_instructora() and not public.es_staff())
+    )
+  );
+
+-- Mails de anuncios pendientes (los manda la Edge Function): de a 40 por
+-- corrida para no pasarse de tiempo; el resto sale en las siguientes.
+create or replace function public.anuncios_mail_pendientes()
+returns table (
+  anuncio_id uuid,
+  titulo     text,
+  mensaje    text,
+  importante boolean,
+  perfil_id  uuid,
+  nombre     text,
+  email      text
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select a.id, a.titulo, a.mensaje, a.importante, p.id, p.nombre, u.email::text
+  from public.anuncios a
+  join public.perfiles p
+    on (a.para in ('alumnas', 'todas') and p.rol = 'alumno')
+    or (a.para in ('profesoras', 'todas') and p.rol = 'instructora')
+  join auth.users u on u.id = p.id
+  where public.recordatorios_activos()
+    and a.activo
+    and a.enviar_mail
+    and a.creado_en > now() - interval '3 days'
+    and a.desde <= (now() at time zone 'America/Argentina/Buenos_Aires')::date
+    and (a.hasta is null or a.hasta >= (now() at time zone 'America/Argentina/Buenos_Aires')::date)
+    and u.email is not null
+    and not exists (
+      select 1 from public.anuncios_envios e where e.anuncio_id = a.id and e.perfil_id = p.id
+    )
+  order by a.creado_en, p.id
+  limit 40;
+$$;
+
+create or replace function public.marcar_anuncios_enviados(p_anuncios uuid[], p_perfiles uuid[])
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  insert into public.anuncios_envios (anuncio_id, perfil_id)
+  select a, p from unnest(p_anuncios, p_perfiles) as t(a, p)
+  on conflict do nothing;
+$$;
+
+-- --- Resumen del estudio (staff) ----------------------------------------------------
+-- Los números clave para el tablero de Administración.
+create or replace function public.resumen_estudio()
+returns json
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_ahora timestamp := now() at time zone 'America/Argentina/Buenos_Aires';
+  v_hoy   date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
+  v_mes   date := date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires')::date;
+  v_ant   date := (date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires') - interval '1 month')::date;
+  v_b     record;
+  v_b_ant record;
+  v_reservas bigint;
+  v_cupo     bigint;
+  v_clases   bigint;
+  v_activas  bigint;
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede ver el resumen.';
+  end if;
+
+  select * into v_b from public.balance_mes(v_mes);
+  select * into v_b_ant from public.balance_mes(v_ant);
+
+  select count(*), coalesce(sum(t.cupo), 0),
+         coalesce(sum(
+           (select count(*) from public.reservas r where r.turno_id = t.id and r.estado = 'reservada')
+           + (select count(*) from public.reservas_invitadas i where i.turno_id = t.id)
+         ), 0)
+    into v_clases, v_cupo, v_reservas
+  from public.turnos t
+  where not t.cancelado
+    and (t.fecha + t.hora) < v_ahora
+    and (t.fecha + t.hora) >= v_ahora - interval '30 days';
+
+  select count(distinct r.alumno_id) into v_activas
+  from public.reservas r
+  join public.turnos t on t.id = r.turno_id
+  where r.estado = 'reservada' and not t.cancelado
+    and (t.fecha + t.hora) < v_ahora
+    and (t.fecha + t.hora) >= v_ahora - interval '30 days'
+    and r.asistencia is distinct from 'ausente';
+
+  return json_build_object(
+    'cobrado_mes', v_b.cobrado,
+    'cobrado_mes_anterior', v_b_ant.cobrado,
+    'egresos_mes', v_b.gastos + v_b.liquidaciones,
+    'egresos_mes_anterior', v_b_ant.gastos + v_b_ant.liquidaciones,
+    'alumnas_total', (select count(*) from public.perfiles where rol = 'alumno'),
+    'alumnas_activas', v_activas,
+    'altas_mes', (select count(*) from public.perfiles
+                  where rol = 'alumno'
+                    and (creado_en at time zone 'America/Argentina/Buenos_Aires')::date >= v_mes),
+    'altas_mes_anterior', (select count(*) from public.perfiles
+                           where rol = 'alumno'
+                             and (creado_en at time zone 'America/Argentina/Buenos_Aires')::date >= v_ant
+                             and (creado_en at time zone 'America/Argentina/Buenos_Aires')::date < v_mes),
+    'al_dia', (select count(*) from public.perfiles
+               where rol = 'alumno' and estado_cuenta = 'al_dia'
+                 and (al_dia_hasta is null or al_dia_hasta >= v_hoy)),
+    'vencen_semana', (select count(*) from public.perfiles
+                      where rol = 'alumno' and estado_cuenta = 'al_dia'
+                        and al_dia_hasta between v_hoy and v_hoy + 7),
+    'vencidas', (select count(*) from public.perfiles
+                 where rol = 'alumno' and estado_cuenta = 'al_dia' and al_dia_hasta < v_hoy),
+    'deben', (select count(*) from public.perfiles
+              where rol = 'alumno' and estado_cuenta = 'pendiente'),
+    'en_prueba', (select count(*) from public.perfiles
+                  where rol = 'alumno' and estado_cuenta = 'prueba'),
+    'comprobantes_pendientes', (select count(*) from public.comprobantes_pago where estado = 'pendiente'),
+    'para_reactivar', (select count(*) from public.alumnas_para_reactivar(21) x
+                       where x.avisada_en is null or x.avisada_en < now() - interval '30 days'),
+    'clases_30d', v_clases,
+    'reservas_30d', v_reservas,
+    'cupo_30d', v_cupo
+  );
+end;
+$$;
+
 -- Permisos de ejecución (authenticated ya puede ejecutar funciones public
 -- por defecto en Supabase, pero lo dejamos explícito).
 grant execute on function public.reservar_turno(uuid)          to authenticated;
@@ -2361,3 +2733,13 @@ grant execute on function public.marcar_reactivacion(uuid) to authenticated;
 grant execute on function public.respaldo_perfiles() to authenticated;
 grant execute on function public.agregar_invitada_a_turno(uuid, text, text, text, text) to authenticated;
 grant execute on function public.clientes_para_instructora()   to authenticated;
+grant execute on function public.liquidacion_mes(date) to authenticated;
+grant execute on function public.mi_liquidacion(date) to authenticated;
+grant execute on function public.balance_mes(date) to authenticated;
+grant execute on function public.resumen_estudio() to authenticated;
+
+-- Los mails de anuncios los maneja solo la función programada.
+revoke execute on function public.anuncios_mail_pendientes() from public, anon, authenticated;
+revoke execute on function public.marcar_anuncios_enviados(uuid[], uuid[]) from public, anon, authenticated;
+grant execute on function public.anuncios_mail_pendientes() to service_role;
+grant execute on function public.marcar_anuncios_enviados(uuid[], uuid[]) to service_role;
