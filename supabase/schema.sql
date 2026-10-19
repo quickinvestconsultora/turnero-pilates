@@ -3115,6 +3115,133 @@ grant execute on function public.informe_mensual_pendiente() to service_role;
 grant execute on function public.marcar_informe_enviado(date) to service_role;
 grant execute on function public.informe_mensual_datos(date) to service_role;
 
+-- --- Pagos online con Mercado Pago ---------------------------------------------------
+-- Cada intento de pago de una alumna es una fila de pagos_mp (la crea la función
+-- crear-pago-mp). Cuando Mercado Pago avisa que se aprobó, la función mp-webhook
+-- llama a registrar_pago_mp, que deja a la alumna al día y asienta el cobro.
+create table if not exists public.pagos_mp (
+  id            uuid primary key default gen_random_uuid(),
+  perfil_id     uuid not null references public.perfiles (id) on delete cascade,
+  plan          text not null check (plan in ('clase', 'mes-1', 'mes-2', 'mes-3')),
+  monto         numeric(12, 2) not null check (monto > 0),
+  estado        text not null default 'pendiente'
+                check (estado in ('pendiente', 'aprobado', 'rechazado')),
+  preference_id text,
+  payment_id    text unique,
+  creado_en     timestamptz not null default now(),
+  procesado_en  timestamptz
+);
+
+create index if not exists pagos_mp_perfil_idx on public.pagos_mp (perfil_id, creado_en desc);
+
+-- Registro de cada aviso que llega de Mercado Pago, para poder revisar qué pasó.
+create table if not exists public.mp_eventos (
+  id           uuid primary key default gen_random_uuid(),
+  payment_id   text,
+  tipo         text,
+  firma_valida boolean,
+  resultado    text,
+  detalle      text,
+  creado_en    timestamptz not null default now()
+);
+
+alter table public.pagos_mp enable row level security;
+alter table public.mp_eventos enable row level security;
+
+drop policy if exists pagos_mp_staff_ve on public.pagos_mp;
+create policy pagos_mp_staff_ve on public.pagos_mp
+  for select using (public.es_staff());
+
+drop policy if exists mp_eventos_staff_ve on public.mp_eventos;
+create policy mp_eventos_staff_ve on public.mp_eventos
+  for select using (public.es_staff());
+
+-- Asienta un pago aprobado: cobro en el historial y alumna al día. Es seguro
+-- llamarla más de una vez por el mismo pago (no duplica nada). Si en
+-- configuracion existe la clave 'mp_dia_corte' (por ejemplo 20), un abono mensual
+-- pagado después de ese día del mes cubre hasta el fin del mes siguiente.
+-- Solo la función programada (clave de servicio) la puede llamar.
+create or replace function public.registrar_pago_mp(
+  p_pago_mp_id uuid,
+  p_payment_id text,
+  p_monto      numeric
+)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_p       public.pagos_mp;
+  v_perfil  public.perfiles;
+  v_hoy     date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
+  v_corte   int := coalesce((select (c.valor #>> '{}')::int from public.configuracion c where c.clave = 'mp_dia_corte'), 0);
+  v_fin_mes date;
+  v_actual  date;
+  v_hasta   date;
+  v_concepto text;
+begin
+  select * into v_p from public.pagos_mp where id = p_pago_mp_id for update;
+  if not found then
+    return 'no_encontrado';
+  end if;
+  if v_p.estado = 'aprobado' then
+    return 'ya_registrado';
+  end if;
+  if abs(v_p.monto - p_monto) > 0.01 then
+    return 'monto_distinto';
+  end if;
+  if exists (select 1 from public.pagos_mp x where x.payment_id = p_payment_id and x.id <> v_p.id) then
+    return 'pago_repetido';
+  end if;
+
+  select * into v_perfil from public.perfiles where id = v_p.perfil_id;
+  if not found then
+    return 'sin_perfil';
+  end if;
+
+  v_actual := case
+    when v_perfil.estado_cuenta = 'al_dia' and v_perfil.al_dia_hasta is not null then v_perfil.al_dia_hasta
+    else null
+  end;
+
+  if v_p.plan = 'clase' then
+    v_concepto := 'clase';
+    v_hasta := greatest(v_hoy, coalesce(v_actual, v_hoy));
+  else
+    v_concepto := 'mes';
+    v_fin_mes := (date_trunc('month', v_hoy) + interval '1 month - 1 day')::date;
+    if v_corte > 0 and extract(day from v_hoy) > v_corte then
+      v_fin_mes := (date_trunc('month', v_hoy) + interval '2 months - 1 day')::date;
+    end if;
+    if v_actual is not null and v_actual >= v_fin_mes then
+      v_hasta := (date_trunc('month', v_actual) + interval '2 months - 1 day')::date;
+    else
+      v_hasta := v_fin_mes;
+    end if;
+  end if;
+
+  insert into public.pagos_clientes (alumna_id, monto, medio, concepto, nota, abono_hasta)
+  values (v_p.perfil_id, v_p.monto, 'mercado_pago', v_concepto,
+          'Pago online (Mercado Pago ' || p_payment_id || ')', v_hasta);
+
+  update public.perfiles
+    set estado_cuenta = 'al_dia',
+        al_dia_hasta = v_hasta,
+        pago_actualizado_en = now()
+  where id = v_p.perfil_id;
+
+  update public.pagos_mp
+    set estado = 'aprobado', payment_id = p_payment_id, procesado_en = now()
+  where id = v_p.id;
+
+  return 'registrado';
+end;
+$$;
+
+revoke execute on function public.registrar_pago_mp(uuid, text, numeric) from public, anon, authenticated;
+grant execute on function public.registrar_pago_mp(uuid, text, numeric) to service_role;
+
 -- Permisos de ejecución (authenticated ya puede ejecutar funciones public
 -- por defecto en Supabase, pero lo dejamos explícito).
 grant execute on function public.reservar_turno(uuid)          to authenticated;

@@ -2386,3 +2386,23 @@ label {
   text-transform: none;
   cursor: pointer;
 }
+
+/* ---- Pago online con Mercado Pago ---- */
+.pagar-online {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.pagar-online-titulo {
+  margin: 0;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.pagar-online-opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

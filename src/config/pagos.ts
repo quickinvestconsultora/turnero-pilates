@@ -15,3 +15,8 @@ export const WHATSAPP_NUMERO = ''
 export function linkWhatsApp(mensaje: string): string {
   return `https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(mensaje)}`
 }
+
+// Pago online con Mercado Pago (funciones crear-pago-mp y mp-webhook en Supabase).
+// Mientras esté en false, la app sigue ofreciendo el link y la transferencia de siempre.
+// Se pasa a true cuando las funciones estén publicadas y probadas.
+export const PAGO_ONLINE_ACTIVO: boolean = false

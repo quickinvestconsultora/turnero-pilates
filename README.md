@@ -303,6 +303,18 @@ En **Administración → Finanzas** (pestañas **Panorama, Cobros, Gastos, Otros
 
 **Informe mensual por mail:** el día 1 de cada mes (desde las 9, hora argentina) la función `enviar-recordatorios` manda el cierre del mes anterior, con la comparación contra el mes pasado y el detalle en Excel adjunto. Va a `MAIL_INFORME` (uno o varios mails separados por coma) o, si no está, a `MAIL_ADMIN`. Usa `informe_mensual_pendiente`, `informe_mensual_datos` y `marcar_informe_enviado` (solo clave de servicio) y respeta la pausa de Clientes. El mes ya enviado queda anotado en `configuracion` (`informe_mensual_enviado`), así no se repite.
 
+## Pago online con Mercado Pago
+
+La alumna elige qué paga (clase suelta o abono de 1, 2 o 3 veces por semana) y la app la lleva a Mercado Pago (Checkout Pro). Cuando se aprueba, su cuenta queda al día sola, el cobro aparece en la ficha y en Finanzas → Cobros (medio "Mercado Pago") y se genera el recibo.
+
+- **`crear-pago-mp`** (verifica el JWT): crea una fila en `pagos_mp` y la preferencia de pago. **Los precios se definen en esta función** (constante `PLANES`) y tienen que coincidir con `src/config/precios.ts`; si cambian, actualizá los dos.
+- **`mp-webhook`** (**sin** verificar JWT, porque Mercado Pago no manda token de Supabase): recibe el aviso, confirma el pago consultándolo a la API de Mercado Pago con el Access Token, compara el monto con lo esperado y llama a `registrar_pago_mp`, que no duplica nada si el aviso llega repetido. Cada aviso queda en `mp_eventos` (visible solo para el staff) con `firma_valida` y el resultado.
+- **Secretos:** `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` y, opcional, `MP_FIRMA_ESTRICTA=si` para rechazar avisos con firma que no coincide (activarlo cuando en `mp_eventos` los avisos reales lleguen con `firma_valida = true`), y `APP_URL`.
+- **Mercado Pago:** Tus integraciones → la aplicación → Webhooks → Configurar notificaciones → Modo productivo: `https://TU-PROYECTO.supabase.co/functions/v1/mp-webhook`, evento "Pagos".
+- **Cuándo cubre un abono mensual:** hasta fin de mes; si ya estaba al día, suma el mes siguiente. Para que un pago hecho después de cierto día cubra también el mes que viene, cargar en `configuracion` la clave `mp_dia_corte` (por ejemplo 20): `insert into public.configuracion (clave, valor) values ('mp_dia_corte', to_jsonb(20)) on conflict (clave) do update set valor = excluded.valor;`
+- **Encendido:** el botón "Pagar con Mercado Pago" aparece cuando `PAGO_ONLINE_ACTIVO` (en `src/config/pagos.ts`) está en `true`. Hasta entonces, la app sigue con el link y la transferencia de siempre.
+- **Pruebas:** primero con las credenciales de prueba y cuentas de prueba de Mercado Pago; recién después se cambia `MP_ACCESS_TOKEN` por el de producción.
+
 ## Pendiente (fuera del MVP)
 
 - Bonos / paquetes de clases con vencimiento (por ahora el estado de cuenta es binario: al día o debe, sin "cuántas clases le quedan").
