@@ -11,10 +11,10 @@ import Estadisticas from './Estadisticas'
 import Clientes from './Clientes'
 import Profesores from './Profesores'
 import Respaldo from './Respaldo'
-import CobrosDelMes from './CobrosDelMes'
 import Reactivar from './Reactivar'
 import Resumen from './Resumen'
-import Egresos from './Egresos'
+import Finanzas from './Finanzas'
+import type { PestañaFinanzas } from './Finanzas'
 import AnunciosStaff from './AnunciosStaff'
 
 type Vista = 'hoy' | 'agenda' | 'semana' | 'plantillas' | 'administracion'
@@ -23,8 +23,7 @@ type Seccion =
   | 'clientes'
   | 'reactivar'
   | 'profesores'
-  | 'cobros'
-  | 'egresos'
+  | 'finanzas'
   | 'estadisticas'
   | 'anuncios'
   | 'respaldo'
@@ -42,8 +41,7 @@ const SECCIONES: [Seccion, string][] = [
   ['clientes', 'Clientes'],
   ['reactivar', 'Para reactivar'],
   ['profesores', 'Profesores'],
-  ['cobros', 'Cobros'],
-  ['egresos', 'Egresos'],
+  ['finanzas', 'Finanzas'],
   ['estadisticas', 'Estadísticas'],
   ['anuncios', 'Anuncios'],
   ['respaldo', 'Respaldo'],
@@ -53,6 +51,17 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
   const [vista, setVista] = useState<Vista>('hoy')
   const [seccion, setSeccion] = useState<Seccion>('resumen')
   const [pendientes, setPendientes] = useState(0)
+  const [pestañaFinanzas, setPestañaFinanzas] = useState<PestañaFinanzas>('panorama')
+
+  // Los atajos del Resumen pueden llevar directo a una pestaña de Finanzas.
+  const irA = (destino: Seccion | 'cobros' | 'egresos') => {
+    if (destino === 'cobros' || destino === 'egresos') {
+      setPestañaFinanzas(destino === 'cobros' ? 'cobros' : 'gastos')
+      setSeccion('finanzas')
+      return
+    }
+    setSeccion(destino)
+  }
 
   // Cantidad de comprobantes esperando confirmación. Se ve como número en
   // "Administración" y en "Clientes". Se actualiza al cambiar de pantalla,
@@ -102,7 +111,10 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
               key={clave}
               type="button"
               className={seccion === clave ? 'tab activa' : 'tab'}
-              onClick={() => setSeccion(clave)}
+              onClick={() => {
+                if (clave === 'finanzas') setPestañaFinanzas('panorama')
+                setSeccion(clave)
+              }}
             >
               {etiqueta}
               {clave === 'clientes' && pendientes > 0 && <span className="pastilla">{pendientes}</span>}
@@ -116,12 +128,11 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
         {vista === 'agenda' && <AgendaStaff />}
         {vista === 'semana' && <SemanaGrilla />}
         {vista === 'plantillas' && <PlantillasStaff />}
-        {vista === 'administracion' && seccion === 'resumen' && <Resumen onIr={setSeccion} />}
+        {vista === 'administracion' && seccion === 'resumen' && <Resumen onIr={irA} />}
         {vista === 'administracion' && seccion === 'clientes' && <Clientes />}
         {vista === 'administracion' && seccion === 'reactivar' && <Reactivar />}
         {vista === 'administracion' && seccion === 'profesores' && <Profesores />}
-        {vista === 'administracion' && seccion === 'cobros' && <CobrosDelMes />}
-        {vista === 'administracion' && seccion === 'egresos' && <Egresos />}
+        {vista === 'administracion' && seccion === 'finanzas' && <Finanzas inicial={pestañaFinanzas} />}
         {vista === 'administracion' && seccion === 'estadisticas' && <Estadisticas />}
         {vista === 'administracion' && seccion === 'anuncios' && <AnunciosStaff />}
         {vista === 'administracion' && seccion === 'respaldo' && <Respaldo />}

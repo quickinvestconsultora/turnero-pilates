@@ -2405,6 +2405,83 @@ drop policy if exists gastos_staff on public.gastos;
 create policy gastos_staff on public.gastos
   for all using (public.es_staff()) with check (public.es_staff());
 
+-- --- Gastos fijos (plantillas que se cargan con un clic cada mes) ----------------
+create table if not exists public.gastos_fijos (
+  id        uuid primary key default gen_random_uuid(),
+  concepto  text not null check (length(btrim(concepto)) > 0),
+  categoria text not null default 'alquiler'
+            check (categoria in ('alquiler', 'servicios', 'insumos', 'sueldos', 'impuestos', 'marketing', 'otro')),
+  monto     numeric(12, 2) not null check (monto > 0),
+  dia       int not null default 1 check (dia between 1 and 28),
+  activo    boolean not null default true,
+  creado_en timestamptz not null default now()
+);
+
+alter table public.gastos_fijos enable row level security;
+
+drop policy if exists gastos_fijos_staff on public.gastos_fijos;
+create policy gastos_fijos_staff on public.gastos_fijos
+  for all using (public.es_staff()) with check (public.es_staff());
+
+-- De qué gasto fijo salió cada gasto (así no se carga dos veces en el mismo mes).
+alter table public.gastos
+  add column if not exists fijo_id uuid references public.gastos_fijos (id) on delete set null;
+
+-- Carga en el mes indicado los gastos fijos activos que todavía no se cargaron.
+-- Devuelve cuántos cargó.
+create or replace function public.cargar_gastos_fijos(p_mes date)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ini date := date_trunc('month', p_mes)::date;
+  v_fin date := (date_trunc('month', p_mes) + interval '1 month')::date;
+  v_n   integer;
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede cargar gastos.';
+  end if;
+
+  insert into public.gastos (fecha, categoria, concepto, monto, fijo_id)
+  select v_ini + (f.dia - 1), f.categoria, f.concepto, f.monto, f.id
+  from public.gastos_fijos f
+  where f.activo
+    and not exists (
+      select 1 from public.gastos g
+      where g.fijo_id = f.id and g.fecha >= v_ini and g.fecha < v_fin
+    );
+
+  get diagnostics v_n = row_count;
+  return v_n;
+end;
+$$;
+
+-- --- Otros ingresos (que no son cobros a alumnas) -----------------------------------
+-- Alquiler de la sala, venta de productos, eventos, etc. Solo el staff.
+create table if not exists public.ingresos_extra (
+  id             uuid primary key default gen_random_uuid(),
+  fecha          date not null default (now() at time zone 'America/Argentina/Buenos_Aires')::date,
+  categoria      text not null default 'otro'
+                 check (categoria in ('alquiler_sala', 'productos', 'eventos', 'otro')),
+  concepto       text not null check (length(btrim(concepto)) > 0),
+  monto          numeric(12, 2) not null check (monto > 0),
+  medio          text not null default 'efectivo'
+                 check (medio in ('transferencia', 'mercado_pago', 'efectivo', 'otro')),
+  nota           text,
+  registrado_por uuid references auth.users (id) on delete set null default auth.uid(),
+  creado_en      timestamptz not null default now()
+);
+
+create index if not exists ingresos_extra_fecha_idx on public.ingresos_extra (fecha desc);
+
+alter table public.ingresos_extra enable row level security;
+
+drop policy if exists ingresos_extra_staff on public.ingresos_extra;
+create policy ingresos_extra_staff on public.ingresos_extra
+  for all using (public.es_staff()) with check (public.es_staff());
+
 -- --- Liquidación de profesoras ----------------------------------------------------
 -- Cuánto se le paga a cada profesora por clase dada, y el registro de lo que se
 -- le fue pagando mes a mes. Cada profesora ve lo suyo; solo el staff lo carga.
@@ -2545,9 +2622,10 @@ as $$
 $$;
 
 -- --- Balance del mes (staff) -------------------------------------------------------
--- Cobrado a alumnas, gastos cargados y pagos a profesoras de un mes.
-create or replace function public.balance_mes(p_mes date)
-returns table (cobrado numeric, gastos numeric, liquidaciones numeric)
+-- Cobrado a alumnas, otros ingresos, gastos cargados y pagos a profesoras de un mes.
+drop function if exists public.balance_mes(date);
+create function public.balance_mes(p_mes date)
+returns table (cobrado numeric, otros_ingresos numeric, gastos numeric, liquidaciones numeric)
 language plpgsql
 stable
 security definer
@@ -2566,6 +2644,8 @@ begin
     coalesce((select sum(pc.monto) from public.pagos_clientes pc
               where pc.creado_en >= (v_ini::timestamp at time zone 'America/Argentina/Buenos_Aires')
                 and pc.creado_en <  (v_fin::timestamp at time zone 'America/Argentina/Buenos_Aires')), 0),
+    coalesce((select sum(ie.monto) from public.ingresos_extra ie
+              where ie.fecha >= v_ini and ie.fecha < v_fin), 0),
     coalesce((select sum(g.monto) from public.gastos g
               where g.fecha >= v_ini and g.fecha < v_fin), 0),
     coalesce((select sum(pp.monto) from public.pagos_profesoras pp
@@ -2715,8 +2795,8 @@ begin
     and r.asistencia is distinct from 'ausente';
 
   return json_build_object(
-    'cobrado_mes', v_b.cobrado,
-    'cobrado_mes_anterior', v_b_ant.cobrado,
+    'cobrado_mes', v_b.cobrado + v_b.otros_ingresos,
+    'cobrado_mes_anterior', v_b_ant.cobrado + v_b_ant.otros_ingresos,
     'egresos_mes', v_b.gastos + v_b.liquidaciones,
     'egresos_mes_anterior', v_b_ant.gastos + v_b_ant.liquidaciones,
     'alumnas_total', (select count(*) from public.perfiles where rol = 'alumno'),
@@ -2747,6 +2827,124 @@ begin
     'reservas_30d', v_reservas,
     'cupo_30d', v_cupo
   );
+end;
+$$;
+
+-- --- Finanzas: detalle de un mes y evolución (staff) --------------------------------
+-- Desglose del mes para el panorama financiero: ingresos por concepto y por medio
+-- de pago (la "caja"), egresos por categoría, y los números para calcular costo
+-- por clase y punto de equilibrio.
+create or replace function public.detalle_financiero(p_mes date)
+returns json
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_ini   date := date_trunc('month', p_mes)::date;
+  v_fin   date := (date_trunc('month', p_mes) + interval '1 month')::date;
+  v_ahora timestamp := now() at time zone 'America/Argentina/Buenos_Aires';
+  v_ini_ts timestamptz := (date_trunc('month', p_mes)::date::timestamp at time zone 'America/Argentina/Buenos_Aires');
+  v_fin_ts timestamptz := ((date_trunc('month', p_mes) + interval '1 month')::date::timestamp at time zone 'America/Argentina/Buenos_Aires');
+  v_clases   bigint;
+  v_lugares  bigint;
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede ver las finanzas.';
+  end if;
+
+  select count(*),
+         coalesce(sum(
+           (select count(*) from public.reservas r where r.turno_id = t.id and r.estado = 'reservada')
+           + (select count(*) from public.reservas_invitadas i where i.turno_id = t.id)
+         ), 0)
+    into v_clases, v_lugares
+  from public.turnos t
+  where not t.cancelado
+    and t.fecha >= v_ini and t.fecha < v_fin
+    and (t.fecha + t.hora) < v_ahora;
+
+  return json_build_object(
+    'cobros_por_concepto', (
+      select coalesce(json_agg(json_build_object('clave', x.concepto, 'monto', x.total, 'cantidad', x.n) order by x.total desc), '[]'::json)
+      from (select pc.concepto, coalesce(sum(pc.monto), 0) as total, count(*) as n
+            from public.pagos_clientes pc
+            where pc.creado_en >= v_ini_ts and pc.creado_en < v_fin_ts
+            group by pc.concepto) x
+    ),
+    'otros_por_categoria', (
+      select coalesce(json_agg(json_build_object('clave', x.categoria, 'monto', x.total, 'cantidad', x.n) order by x.total desc), '[]'::json)
+      from (select ie.categoria, sum(ie.monto) as total, count(*) as n
+            from public.ingresos_extra ie
+            where ie.fecha >= v_ini and ie.fecha < v_fin
+            group by ie.categoria) x
+    ),
+    'ingresos_por_medio', (
+      select coalesce(json_agg(json_build_object('clave', x.medio, 'monto', x.total) order by x.total desc), '[]'::json)
+      from (select u.medio, sum(u.monto) as total
+            from (
+              select pc.medio, pc.monto from public.pagos_clientes pc
+              where pc.creado_en >= v_ini_ts and pc.creado_en < v_fin_ts and pc.monto is not null
+              union all
+              select ie.medio, ie.monto from public.ingresos_extra ie
+              where ie.fecha >= v_ini and ie.fecha < v_fin
+            ) u
+            group by u.medio) x
+    ),
+    'gastos_por_categoria', (
+      select coalesce(json_agg(json_build_object('clave', x.categoria, 'monto', x.total, 'cantidad', x.n) order by x.total desc), '[]'::json)
+      from (select g.categoria, sum(g.monto) as total, count(*) as n
+            from public.gastos g
+            where g.fecha >= v_ini and g.fecha < v_fin
+            group by g.categoria) x
+    ),
+    'cobros_sin_monto', (
+      select count(*) from public.pagos_clientes pc
+      where pc.creado_en >= v_ini_ts and pc.creado_en < v_fin_ts and pc.monto is null
+    ),
+    'pagos', (
+      select count(*) from public.pagos_clientes pc
+      where pc.creado_en >= v_ini_ts and pc.creado_en < v_fin_ts
+    ),
+    'alumnas_pagaron', (
+      select count(distinct pc.alumna_id) from public.pagos_clientes pc
+      where pc.creado_en >= v_ini_ts and pc.creado_en < v_fin_ts
+    ),
+    'clases_dadas', v_clases,
+    'lugares_usados', v_lugares
+  );
+end;
+$$;
+
+-- Evolución mes a mes de los últimos p_meses meses (incluye el actual).
+create or replace function public.panorama_financiero(p_meses int default 12)
+returns table (
+  mes           date,
+  cobros        numeric,
+  otros         numeric,
+  gastos        numeric,
+  liquidaciones numeric
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede ver las finanzas.';
+  end if;
+
+  return query
+  select m::date, b.cobrado, b.otros_ingresos, b.gastos, b.liquidaciones
+  from generate_series(
+         date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires') - make_interval(months => greatest(p_meses, 1) - 1),
+         date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires'),
+         interval '1 month'
+       ) m
+  cross join lateral public.balance_mes(m::date) b
+  order by 1;
 end;
 $$;
 
@@ -2801,6 +2999,9 @@ grant execute on function public.liquidacion_mes(date) to authenticated;
 grant execute on function public.mi_liquidacion(date) to authenticated;
 grant execute on function public.balance_mes(date) to authenticated;
 grant execute on function public.resumen_estudio() to authenticated;
+grant execute on function public.detalle_financiero(date) to authenticated;
+grant execute on function public.panorama_financiero(int) to authenticated;
+grant execute on function public.cargar_gastos_fijos(date) to authenticated;
 
 -- Los mails de anuncios los maneja solo la función programada.
 revoke execute on function public.anuncios_mail_pendientes() from public, anon, authenticated;

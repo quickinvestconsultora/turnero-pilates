@@ -39,13 +39,18 @@ export async function obtenerResumen(): Promise<Resumen> {
 
 // ---- Balance y egresos ------------------------------------------------------
 
-export type Balance = { cobrado: number; gastos: number; liquidaciones: number }
+export type Balance = { cobrado: number; otros: number; gastos: number; liquidaciones: number }
 
 export async function obtenerBalance(mes: string): Promise<Balance> {
   const { data, error } = await supabase.rpc('balance_mes', { p_mes: mes })
   if (error) throw new Error(error.message)
   const f = ((data ?? []) as Record<string, unknown>[])[0] ?? {}
-  return { cobrado: num(f.cobrado), gastos: num(f.gastos), liquidaciones: num(f.liquidaciones) }
+  return {
+    cobrado: num(f.cobrado),
+    otros: num(f.otros_ingresos),
+    gastos: num(f.gastos),
+    liquidaciones: num(f.liquidaciones),
+  }
 }
 
 export type CategoriaGasto =
@@ -299,5 +304,177 @@ export async function cambiarAnuncioActivo(id: string, activo: boolean): Promise
 
 export async function borrarAnuncio(id: string): Promise<void> {
   const { error } = await supabase.from('anuncios').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// ---- Finanzas: panorama, gastos fijos y otros ingresos -----------------------
+
+export type LineaDetalle = { clave: string; monto: number; cantidad: number }
+
+export type DetalleFinanciero = {
+  cobros_por_concepto: LineaDetalle[]
+  otros_por_categoria: LineaDetalle[]
+  ingresos_por_medio: LineaDetalle[]
+  gastos_por_categoria: LineaDetalle[]
+  cobros_sin_monto: number
+  pagos: number
+  alumnas_pagaron: number
+  clases_dadas: number
+  lugares_usados: number
+}
+
+function lineas(v: unknown): LineaDetalle[] {
+  return ((v ?? []) as Record<string, unknown>[]).map((l) => ({
+    clave: String(l.clave),
+    monto: num(l.monto),
+    cantidad: num(l.cantidad),
+  }))
+}
+
+export async function obtenerDetalleFinanciero(mes: string): Promise<DetalleFinanciero> {
+  const { data, error } = await supabase.rpc('detalle_financiero', { p_mes: mes })
+  if (error) throw new Error(error.message)
+  const d = (data ?? {}) as Record<string, unknown>
+  return {
+    cobros_por_concepto: lineas(d.cobros_por_concepto),
+    otros_por_categoria: lineas(d.otros_por_categoria),
+    ingresos_por_medio: lineas(d.ingresos_por_medio),
+    gastos_por_categoria: lineas(d.gastos_por_categoria),
+    cobros_sin_monto: num(d.cobros_sin_monto),
+    pagos: num(d.pagos),
+    alumnas_pagaron: num(d.alumnas_pagaron),
+    clases_dadas: num(d.clases_dadas),
+    lugares_usados: num(d.lugares_usados),
+  }
+}
+
+export type MesFinanciero = {
+  mes: string
+  cobros: number
+  otros: number
+  gastos: number
+  liquidaciones: number
+}
+
+export async function obtenerPanorama(meses = 12): Promise<MesFinanciero[]> {
+  const { data, error } = await supabase.rpc('panorama_financiero', { p_meses: meses })
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as Record<string, unknown>[]).map((f) => ({
+    mes: String(f.mes),
+    cobros: num(f.cobros),
+    otros: num(f.otros),
+    gastos: num(f.gastos),
+    liquidaciones: num(f.liquidaciones),
+  }))
+}
+
+export type GastoFijo = {
+  id: string
+  concepto: string
+  categoria: CategoriaGasto
+  monto: number
+  dia: number
+  activo: boolean
+}
+
+export async function listarGastosFijos(): Promise<GastoFijo[]> {
+  const { data, error } = await supabase
+    .from('gastos_fijos')
+    .select('id, concepto, categoria, monto, dia, activo')
+    .order('activo', { ascending: false })
+    .order('concepto', { ascending: true })
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as unknown as (Omit<GastoFijo, 'monto'> & { monto: string })[]).map((g) => ({
+    ...g,
+    monto: Number(g.monto),
+  }))
+}
+
+export async function guardarGastoFijo(g: {
+  id?: string
+  concepto: string
+  categoria: CategoriaGasto
+  monto: number
+  dia: number
+}): Promise<void> {
+  const fila = { concepto: g.concepto.trim(), categoria: g.categoria, monto: g.monto, dia: g.dia }
+  const { error } = g.id
+    ? await supabase.from('gastos_fijos').update(fila).eq('id', g.id)
+    : await supabase.from('gastos_fijos').insert(fila)
+  if (error) throw new Error(error.message)
+}
+
+export async function cambiarGastoFijoActivo(id: string, activo: boolean): Promise<void> {
+  const { error } = await supabase.from('gastos_fijos').update({ activo }).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function borrarGastoFijo(id: string): Promise<void> {
+  const { error } = await supabase.from('gastos_fijos').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// Carga en el mes los gastos fijos activos que todavía no están. Devuelve cuántos cargó.
+export async function cargarGastosFijos(mes: string): Promise<number> {
+  const { data, error } = await supabase.rpc('cargar_gastos_fijos', { p_mes: mes })
+  if (error) throw new Error(error.message)
+  return num(data)
+}
+
+export type CategoriaIngreso = 'alquiler_sala' | 'productos' | 'eventos' | 'otro'
+
+export const ETIQUETA_INGRESO: Record<CategoriaIngreso, string> = {
+  alquiler_sala: 'Alquiler de la sala',
+  productos: 'Venta de productos',
+  eventos: 'Eventos y talleres',
+  otro: 'Otro',
+}
+
+export type IngresoExtra = {
+  id: string
+  fecha: string
+  categoria: CategoriaIngreso
+  concepto: string
+  monto: number
+  medio: MedioPago
+  nota: string | null
+}
+
+export async function listarIngresosExtra(desde: string, hasta: string): Promise<IngresoExtra[]> {
+  const { data, error } = await supabase
+    .from('ingresos_extra')
+    .select('id, fecha, categoria, concepto, monto, medio, nota')
+    .gte('fecha', desde)
+    .lte('fecha', hasta)
+    .order('fecha', { ascending: false })
+    .order('creado_en', { ascending: false })
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as unknown as (Omit<IngresoExtra, 'monto'> & { monto: string })[]).map((i) => ({
+    ...i,
+    monto: Number(i.monto),
+  }))
+}
+
+export async function agregarIngresoExtra(i: {
+  fecha: string
+  categoria: CategoriaIngreso
+  concepto: string
+  monto: number
+  medio: MedioPago
+  nota: string
+}): Promise<void> {
+  const { error } = await supabase.from('ingresos_extra').insert({
+    fecha: i.fecha,
+    categoria: i.categoria,
+    concepto: i.concepto.trim(),
+    monto: i.monto,
+    medio: i.medio,
+    nota: i.nota.trim() || null,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function borrarIngresoExtra(id: string): Promise<void> {
+  const { error } = await supabase.from('ingresos_extra').delete().eq('id', id)
   if (error) throw new Error(error.message)
 }

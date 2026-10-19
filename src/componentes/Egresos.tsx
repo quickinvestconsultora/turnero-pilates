@@ -61,8 +61,9 @@ export default function Egresos() {
     }
   }
 
+  const ingresos = balance ? balance.cobrado + balance.otros : 0
   const egresos = balance ? balance.gastos + balance.liquidaciones : 0
-  const resultado = balance ? balance.cobrado - egresos : 0
+  const resultado = balance ? ingresos - egresos : 0
 
   const porCategoria = (Object.keys(ETIQUETA_CATEGORIA) as CategoriaGasto[])
     .map((c) => ({
@@ -80,7 +81,7 @@ export default function Egresos() {
   return (
     <section>
       <div className="fila-titulo">
-        <h2>Egresos</h2>
+        <h3>Gastos</h3>
         <div className="barra-acciones">
           <button type="button" className="link-secundario" disabled={mes <= -12} onClick={() => setMes((m) => m - 1)}>
             ← Anterior
@@ -103,6 +104,10 @@ export default function Egresos() {
             <strong>{pesos(balance.cobrado)}</strong>
           </div>
           <div>
+            <span className="ayuda">Otros ingresos</span>
+            <strong>{pesos(balance.otros)}</strong>
+          </div>
+          <div>
             <span className="ayuda">Gastos</span>
             <strong>{pesos(balance.gastos)}</strong>
           </div>
@@ -118,7 +123,7 @@ export default function Egresos() {
       )}
 
       <div className="fila-titulo">
-        <h3>Gastos</h3>
+        <h3>Detalle de gastos</h3>
         <button type="button" className="link-secundario" onClick={() => setAgregando((v) => !v)}>
           {agregando ? 'Cerrar' : '+ Cargar un gasto'}
         </button>

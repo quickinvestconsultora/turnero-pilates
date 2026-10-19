@@ -2275,3 +2275,71 @@ label {
   align-items: center;
   gap: 2px;
 }
+
+/* ---- Finanzas ---- */
+.panorama-columnas {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 18px;
+}
+
+@media (min-width: 600px) {
+  .panorama-columnas {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.panorama-bloque h3 {
+  margin-top: 18px;
+}
+
+.grafico-finanzas {
+  width: 100%;
+  height: auto;
+  display: block;
+  margin: 8px 0 4px;
+}
+
+.grafico-eje {
+  stroke: var(--borde);
+  stroke-width: 1;
+}
+
+.grafico-ingresos {
+  fill: var(--primario);
+}
+
+.grafico-egresos {
+  fill: var(--acento);
+}
+
+.grafico-mes {
+  fill: var(--texto-suave);
+  font-size: 11px;
+}
+
+.grafico-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--texto-suave);
+}
+
+.leyenda-punto {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  border-radius: 2px;
+}
+
+.leyenda-punto--ingresos {
+  background: var(--primario);
+}
+
+.leyenda-punto--egresos {
+  background: var(--acento);
+}
