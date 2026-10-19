@@ -8,6 +8,7 @@ import GastosFijos from './GastosFijos'
 import OtrosIngresos from './OtrosIngresos'
 import PagoManual from './PagoManual'
 import PanoramaFinanciero from './PanoramaFinanciero'
+import Solapas from './Solapas'
 
 export type PestañaFinanzas = 'panorama' | 'cobros' | 'gastos' | 'ingresos' | 'fijos'
 
@@ -31,18 +32,13 @@ export default function Finanzas({ inicial = 'panorama' }: { inicial?: PestañaF
   return (
     <div>
       <h2>Finanzas</h2>
-      <nav className="tabs subtabs" aria-label="Secciones de finanzas">
-        {PESTAÑAS.map(([clave, etiqueta]) => (
-          <button
-            key={clave}
-            type="button"
-            className={pestaña === clave ? 'tab activa' : 'tab'}
-            onClick={() => setPestaña(clave)}
-          >
-            {etiqueta}
-          </button>
-        ))}
-      </nav>
+      <Solapas
+        interna
+        etiqueta="Secciones de finanzas"
+        activa={pestaña}
+        onElegir={setPestaña}
+        items={PESTAÑAS.map(([clave, etiqueta]) => ({ clave, etiqueta }))}
+      />
 
       {pestaña === 'panorama' && <PanoramaFinanciero />}
       {pestaña === 'cobros' && <CobrosConCarga />}

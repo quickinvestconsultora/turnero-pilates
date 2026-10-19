@@ -1857,14 +1857,27 @@ label {
 }
 
 /* ---- Segunda fila de solapas (dentro de Administración) ---- */
+/* Las solapas secundarias se reparten en columnas parejas y bajan de fila si no entran. */
 .subtabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
   margin: -8px 0 18px;
   background: var(--superficie-2);
+  border-radius: 22px;
+}
+
+.subtabs--interna {
+  margin: 0 0 16px;
 }
 
 .subtabs .tab {
+  flex: none;
+  min-width: 0;
   font-size: 13px;
-  padding: 6px 10px;
+  padding: 7px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---- Copia de seguridad y Mi cuenta ---- */
@@ -2034,10 +2047,20 @@ label {
 }
 
 /* ---- Gestión: resumen, liquidación, anuncios ---- */
+/* Las tarjetas que son botones heredaban el texto claro del botón: sin esto el monto
+   casi no se ve sobre el fondo claro de la tarjeta. */
 .kpi-boton {
   font: inherit;
+  font-weight: 400;
+  letter-spacing: normal;
   text-align: left;
   cursor: pointer;
+  color: var(--texto);
+  align-items: flex-start;
+}
+
+.kpi-boton:hover {
+  border-color: var(--acento);
 }
 
 .kpi-valor--negativo {

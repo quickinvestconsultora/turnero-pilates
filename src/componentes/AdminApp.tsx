@@ -16,17 +16,15 @@ import Resumen from './Resumen'
 import Finanzas from './Finanzas'
 import type { PestañaFinanzas } from './Finanzas'
 import AnunciosStaff from './AnunciosStaff'
+import Solapas from './Solapas'
 
 type Vista = 'hoy' | 'agenda' | 'semana' | 'plantillas' | 'administracion'
-type Seccion =
-  | 'resumen'
-  | 'clientes'
-  | 'reactivar'
-  | 'profesores'
-  | 'finanzas'
-  | 'estadisticas'
-  | 'anuncios'
-  | 'respaldo'
+type Seccion = 'resumen' | 'clientes' | 'profesores' | 'finanzas' | 'mas'
+type SubClientes = 'lista' | 'reactivar'
+type SubMas = 'estadisticas' | 'anuncios' | 'respaldo'
+
+// A dónde pueden llevar los atajos del Resumen.
+type Destino = 'clientes' | 'reactivar' | 'cobros' | 'egresos' | 'estadisticas'
 
 const PESTAÑAS: [Vista, string][] = [
   ['hoy', 'Hoy'],
@@ -36,31 +34,26 @@ const PESTAÑAS: [Vista, string][] = [
   ['administracion', 'Administración'],
 ]
 
-const SECCIONES: [Seccion, string][] = [
-  ['resumen', 'Resumen'],
-  ['clientes', 'Clientes'],
-  ['reactivar', 'Para reactivar'],
-  ['profesores', 'Profesores'],
-  ['finanzas', 'Finanzas'],
-  ['estadisticas', 'Estadísticas'],
-  ['anuncios', 'Anuncios'],
-  ['respaldo', 'Respaldo'],
-]
-
 export default function AdminApp({ perfil }: { perfil: Perfil }) {
   const [vista, setVista] = useState<Vista>('hoy')
   const [seccion, setSeccion] = useState<Seccion>('resumen')
+  const [subClientes, setSubClientes] = useState<SubClientes>('lista')
+  const [subMas, setSubMas] = useState<SubMas>('estadisticas')
   const [pendientes, setPendientes] = useState(0)
   const [pestañaFinanzas, setPestañaFinanzas] = useState<PestañaFinanzas>('panorama')
 
-  // Los atajos del Resumen pueden llevar directo a una pestaña de Finanzas.
-  const irA = (destino: Seccion | 'cobros' | 'egresos') => {
+  // Los atajos del Resumen llevan directo a la pantalla que corresponde.
+  const irA = (destino: Destino) => {
     if (destino === 'cobros' || destino === 'egresos') {
       setPestañaFinanzas(destino === 'cobros' ? 'cobros' : 'gastos')
       setSeccion('finanzas')
-      return
+    } else if (destino === 'clientes' || destino === 'reactivar') {
+      setSubClientes(destino === 'reactivar' ? 'reactivar' : 'lista')
+      setSeccion('clientes')
+    } else {
+      setSubMas('estadisticas')
+      setSeccion('mas')
     }
-    setSeccion(destino)
   }
 
   // Cantidad de comprobantes esperando confirmación. Se ve como número en
@@ -105,22 +98,21 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
       </nav>
 
       {vista === 'administracion' && (
-        <nav className="tabs subtabs" aria-label="Secciones de administración">
-          {SECCIONES.map(([clave, etiqueta]) => (
-            <button
-              key={clave}
-              type="button"
-              className={seccion === clave ? 'tab activa' : 'tab'}
-              onClick={() => {
-                if (clave === 'finanzas') setPestañaFinanzas('panorama')
-                setSeccion(clave)
-              }}
-            >
-              {etiqueta}
-              {clave === 'clientes' && pendientes > 0 && <span className="pastilla">{pendientes}</span>}
-            </button>
-          ))}
-        </nav>
+        <Solapas
+          etiqueta="Secciones de administración"
+          activa={seccion}
+          onElegir={(clave) => {
+            if (clave === 'finanzas') setPestañaFinanzas('panorama')
+            setSeccion(clave)
+          }}
+          items={[
+            { clave: 'resumen', etiqueta: 'Resumen' },
+            { clave: 'clientes', etiqueta: 'Clientes', pastilla: pendientes },
+            { clave: 'profesores', etiqueta: 'Profesores' },
+            { clave: 'finanzas', etiqueta: 'Finanzas' },
+            { clave: 'mas', etiqueta: 'Más' },
+          ]}
+        />
       )}
 
       <main className="contenido">
@@ -129,13 +121,41 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
         {vista === 'semana' && <SemanaGrilla />}
         {vista === 'plantillas' && <PlantillasStaff />}
         {vista === 'administracion' && seccion === 'resumen' && <Resumen onIr={irA} />}
-        {vista === 'administracion' && seccion === 'clientes' && <Clientes />}
-        {vista === 'administracion' && seccion === 'reactivar' && <Reactivar />}
+        {vista === 'administracion' && seccion === 'clientes' && (
+          <>
+            <Solapas
+              interna
+              etiqueta="Clientes"
+              activa={subClientes}
+              onElegir={setSubClientes}
+              items={[
+                { clave: 'lista', etiqueta: 'Todas las alumnas' },
+                { clave: 'reactivar', etiqueta: 'Para reactivar' },
+              ]}
+            />
+            {subClientes === 'lista' ? <Clientes /> : <Reactivar />}
+          </>
+        )}
         {vista === 'administracion' && seccion === 'profesores' && <Profesores />}
         {vista === 'administracion' && seccion === 'finanzas' && <Finanzas inicial={pestañaFinanzas} />}
-        {vista === 'administracion' && seccion === 'estadisticas' && <Estadisticas />}
-        {vista === 'administracion' && seccion === 'anuncios' && <AnunciosStaff />}
-        {vista === 'administracion' && seccion === 'respaldo' && <Respaldo />}
+        {vista === 'administracion' && seccion === 'mas' && (
+          <>
+            <Solapas
+              interna
+              etiqueta="Más opciones"
+              activa={subMas}
+              onElegir={setSubMas}
+              items={[
+                { clave: 'estadisticas', etiqueta: 'Estadísticas' },
+                { clave: 'anuncios', etiqueta: 'Anuncios' },
+                { clave: 'respaldo', etiqueta: 'Respaldo' },
+              ]}
+            />
+            {subMas === 'estadisticas' && <Estadisticas />}
+            {subMas === 'anuncios' && <AnunciosStaff />}
+            {subMas === 'respaldo' && <Respaldo />}
+          </>
+        )}
       </main>
     </div>
   )
