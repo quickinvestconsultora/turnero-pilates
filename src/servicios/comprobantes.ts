@@ -22,7 +22,7 @@ const TIPOS_IMAGEN = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_PDF = 5 * 1024 * 1024
 
 // Las fotos de celular pesan varios MB: se achican a 1400 px de lado mayor.
-async function achicar(archivo: File): Promise<Blob> {
+export async function achicar(archivo: File): Promise<Blob> {
   const bitmap = await createImageBitmap(archivo)
   const escala = Math.min(1, 1400 / Math.max(bitmap.width, bitmap.height))
   const lienzo = document.createElement('canvas')

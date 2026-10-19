@@ -10,11 +10,15 @@
 //   5. Cumpleaños: saludo el día que cumple años (desde las 9, hora argentina).
 //   6. Anuncios: los que el estudio carga con "mandar también por mail" (de a
 //      40 por corrida).
+//   7. Informe mensual: el día 1 de cada mes (desde las 9), el cierre del mes
+//      anterior a la administradora, con el detalle en Excel adjunto.
 // Después de cada mail se manda, si la persona lo activó, la misma novedad como
 // notificación al celular, a través de la función enviar-push (si esa falla, los
 // mails salen igual).
 //
 // Secretos (Supabase → Edge Functions → Secrets):
+//   MAIL_INFORME    (opcional) a dónde va el informe mensual; uno o varios mails
+//                   separados por coma. Por defecto, el mismo de MAIL_ADMIN
 //   BREVO_API_KEY   clave de la API de Brevo (no es la clave SMTP)
 //   CRON_SECRET     texto largo inventado por vos; la tarea programada lo manda
 //                   en el encabezado x-cron-secret para que nadie más la dispare
@@ -87,6 +91,8 @@ type Deslinde = {
   email: string
   aceptado_en: string | null
 }
+
+type Informe = Record<string, unknown>
 
 type AvisoPush = { perfil_id: string; titulo: string; cuerpo: string; url?: string }
 
@@ -300,6 +306,97 @@ function aBase64(bytes: Uint8Array): string {
   return btoa(texto)
 }
 
+const MEDIOS: Record<string, string> = {
+  transferencia: 'Transferencia',
+  mercado_pago: 'Mercado Pago',
+  efectivo: 'Efectivo',
+  otro: 'Otro',
+}
+
+function pesosAr(n: number): string {
+  const entero = Math.round(Math.abs(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return (n < 0 ? '-$' : '$') + entero
+}
+
+function nombreMesAr(ym: string): string {
+  const partes = ym.split('-').map(Number)
+  return MESES[partes[1] - 1] + ' ' + partes[0]
+}
+
+// Escapa una celda para CSV con separador punto y coma (Excel en espanol).
+function celdaCsv(valor: unknown): string {
+  let texto = valor === null || valor === undefined ? '' : String(valor)
+  if (typeof valor === 'string' && /^[=+\-@]/.test(texto)) texto = "'" + texto
+  return /[";\n\r]/.test(texto) ? '"' + texto.replace(/"/g, '""') + '"' : texto
+}
+
+function comparar(actual: number, anterior: number): string {
+  const dif = actual - anterior
+  if (dif === 0) return 'igual que el mes pasado'
+  return pesosAr(Math.abs(dif)) + (dif > 0 ? ' mas' : ' menos') + ' que el mes pasado'
+}
+
+function mailInforme(d: Informe, destinatario: string): Mail {
+  const n = (clave: string) => Number(d[clave] || 0)
+  const mes = String(d.mes)
+  const ingresos = n('cobrado') + n('otros')
+  const ingresosAnt = n('cobrado_ant') + n('otros_ant')
+  const egresos = n('gastos') + n('liquidaciones')
+  const egresosAnt = n('gastos_ant') + n('liquidaciones_ant')
+  const resultado = ingresos - egresos
+  const resultadoAnt = ingresosAnt - egresosAnt
+  const margen = ingresos > 0 ? Math.round((resultado / ingresos) * 100) + '%' : '-'
+  const meta = n('meta_ingresos')
+
+  const filas: [string, string, string][] = [
+    ['Ingresos', pesosAr(ingresos), comparar(ingresos, ingresosAnt)],
+    ['   Cobros a alumnas', pesosAr(n('cobrado')), ''],
+    ['   Otros ingresos', pesosAr(n('otros')), ''],
+    ['Egresos', pesosAr(egresos), comparar(egresos, egresosAnt)],
+    ['   Gastos', pesosAr(n('gastos')), ''],
+    ['   Pagos a profesoras', pesosAr(n('liquidaciones')), ''],
+    [resultado < 0 ? 'Perdida' : 'Ganancia', pesosAr(resultado), 'margen ' + margen + '; ' + comparar(resultado, resultadoAnt)],
+    ['Alumnas que vinieron', String(n('alumnas_activas')), ''],
+    ['Altas nuevas', String(n('altas')), 'el mes pasado: ' + n('altas_ant')],
+  ]
+  if (meta > 0) {
+    filas.push(['Meta de ingresos', pesosAr(meta), ingresos >= meta ? 'cumplida' : 'se llego al ' + Math.round((ingresos / meta) * 100) + '%'])
+  }
+
+  const tabla =
+    '<table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 14px;">' +
+    filas.map((fila) =>
+      '<tr><td style="padding:6px 0;color:#6d6455;">' + escapar(fila[0]).replace(/ /g, '&nbsp;') + '</td>' +
+      '<td style="padding:6px 8px;text-align:right;"><strong>' + escapar(fila[1]) + '</strong></td>' +
+      '<td style="padding:6px 0;font-size:12px;color:#948077;">' + escapar(fila[2]) + '</td></tr>').join('') +
+    '</table>'
+
+  const texto =
+    'Resumen de ' + nombreMesAr(mes) + '\n\n' + filas.map((fila) => fila[0].trim() + ': ' + fila[1] + (fila[2] ? ' (' + fila[2] + ')' : '')).join('\n') +
+    '\n\nEl detalle completo va adjunto en un archivo para Excel.'
+
+  // Detalle para Excel: un renglon por movimiento, ingresos y egresos juntos.
+  const lineas: unknown[][] = [['Tipo', 'Fecha', 'Detalle', 'Categoria o medio', 'Monto']]
+  const lista = (clave: string) => (Array.isArray(d[clave]) ? (d[clave] as Record<string, unknown>[]) : [])
+  for (const c of lista('cobros')) lineas.push(['Cobro a alumna', c.fecha, c.alumna, (MEDIOS[String(c.medio)] || c.medio) + ' / ' + c.concepto, c.monto])
+  for (const i of lista('ingresos_extra')) lineas.push(['Otro ingreso', i.fecha, i.concepto, i.categoria, i.monto])
+  for (const g of lista('gastos_detalle')) lineas.push(['Gasto', g.fecha, g.concepto, g.categoria, g.monto === null ? '' : -Number(g.monto)])
+  for (const l of lista('liquidaciones_detalle')) lineas.push(['Pago a profesora', l.fecha, l.profesora, MEDIOS[String(l.medio)] || l.medio, -Number(l.monto)])
+  const csv = '\ufeff' + lineas.map((fila) => fila.map(celdaCsv).join(';')).join('\r\n')
+
+  return {
+    para: { email: destinatario },
+    asunto: 'Cierre de ' + nombreMesAr(mes) + ' - ' + NOMBRE_ESTUDIO,
+    texto: texto,
+    html: envolver(
+      'Cierre de ' + nombreMesAr(mes),
+      parrafo('Este es el resumen del mes que termino en ' + escapar(NOMBRE_ESTUDIO) + ':') + tabla +
+        parrafo('El detalle de cada cobro, gasto y pago va adjunto en un archivo para Excel.'),
+    ),
+    adjuntos: [{ name: 'detalle-' + mes + '.csv', content: aBase64(new TextEncoder().encode(csv)) }],
+  }
+}
+
 async function enviarPorBrevo(mail: Mail, apiKey: string, remitente: string): Promise<void> {
   const cuerpo: Record<string, unknown> = {
     sender: { name: NOMBRE_ESTUDIO, email: remitente },
@@ -360,6 +457,12 @@ Deno.serve(async (req) => {
   const deslindes = await pedir<Deslinde>('deslindes_pendientes')
   const cumples = await pedir<Cumple>('avisos_cumple_pendientes')
   const anuncios = await pedir<AnuncioMail>('anuncios_mail_pendientes')
+  let mesInforme: string | null = null
+  {
+    const { data, error } = await supabase.rpc('informe_mensual_pendiente')
+    if (error) errores.push('informe_mensual_pendiente: ' + error.message)
+    else if (data) mesInforme = String(data)
+  }
 
   if (prueba) {
     return json({
@@ -370,12 +473,13 @@ Deno.serve(async (req) => {
       deslindes: deslindes.map((d) => ({ nombre: d.nombre + ' ' + d.apellido, email: d.email })),
       cumples: cumples.map((c) => ({ nombre: c.nombre, email: c.email })),
       anuncios: anuncios.map((a) => ({ titulo: a.titulo, nombre: a.nombre, email: a.email })),
+      informe_mensual: mesInforme,
       errores,
     })
   }
 
   const total = recordatorios.length + vencimientos.length + promociones.length + deslindes.length +
-    cumples.length + anuncios.length
+    cumples.length + anuncios.length + (mesInforme ? 1 : 0)
   if (total === 0) return json({ pendientes: 0, enviados: 0, fallidos: [], errores })
 
   const apiKey = Deno.env.get('BREVO_API_KEY')
@@ -470,6 +574,28 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Informe mensual: se manda a cada destinatario; se marca como enviado si salio al menos uno.
+  let informeEnviado = false
+  if (mesInforme) {
+    const { data: datos, error: errorInforme } = await supabase.rpc('informe_mensual_datos', { p_mes: mesInforme })
+    if (errorInforme || !datos) {
+      errores.push('informe_mensual_datos: ' + (errorInforme ? errorInforme.message : 'vacio'))
+    } else {
+      const destinatarios = (Deno.env.get('MAIL_INFORME') ?? adminEmail)
+        .split(',')
+        .map((x) => x.trim())
+        .filter((x) => x.length > 0)
+      for (const destino of destinatarios) {
+        try {
+          await enviarPorBrevo(mailInforme(datos as Informe, destino), apiKey, remitente)
+          informeEnviado = true
+        } catch (e) {
+          fallidos.push({ email: destino, error: motivo(e) })
+        }
+      }
+    }
+  }
+
   const anunciosEnviados: string[] = []
   const perfilesAnuncio: string[] = []
   for (const a of anuncios) {
@@ -501,6 +627,11 @@ Deno.serve(async (req) => {
       p_deslinde: enviadosDeslinde,
     })
     if (error) errores.push('marcar_avisos: ' + error.message)
+  }
+
+  if (informeEnviado && mesInforme) {
+    const { error } = await supabase.rpc('marcar_informe_enviado', { p_mes: mesInforme })
+    if (error) errores.push('marcar_informe_enviado: ' + error.message)
   }
 
   if (anunciosEnviados.length > 0) {
@@ -554,6 +685,7 @@ Deno.serve(async (req) => {
       cumples: enviadosCumple.length,
       anuncios: anunciosEnviados.length,
       notificaciones: push,
+      informe: informeEnviado ? 1 : 0,
     },
     fallidos,
     errores,

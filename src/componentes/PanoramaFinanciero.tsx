@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
 import {
   ETIQUETA_CATEGORIA,
   ETIQUETA_INGRESO,
+  guardarPresupuesto,
+  leerPresupuesto,
   obtenerDetalleFinanciero,
   obtenerPanorama,
   obtenerResumen,
@@ -12,6 +15,7 @@ import type {
   DetalleFinanciero,
   LineaDetalle,
   MesFinanciero,
+  Presupuesto,
   Resumen,
 } from '../servicios/gestion'
 import { ETIQUETA_CONCEPTO, ETIQUETA_MEDIO } from '../servicios/clientes'
@@ -31,11 +35,13 @@ function Lineas({
   filas,
   etiqueta,
   vacio,
+  tope,
 }: {
   titulo: string
   filas: LineaDetalle[]
   etiqueta: (clave: string) => string
   vacio: string
+  tope?: (clave: string) => number | undefined
 }) {
   const total = filas.reduce((n, f) => n + f.monto, 0)
   return (
@@ -56,6 +62,13 @@ function Lineas({
                   </span>
                 )}
                 {total > 0 && <span className="ayuda"> · {porcentaje((f.monto / total) * 100)}</span>}
+                {tope && tope(f.clave) !== undefined && (
+                  <span className={f.monto > (tope(f.clave) ?? 0) ? 'hoy-alerta' : 'ayuda'}>
+                    {' '}
+                    · tope {pesos(tope(f.clave) ?? 0)}
+                    {f.monto > (tope(f.clave) ?? 0) && ' (te pasaste)'}
+                  </span>
+                )}
               </span>
               <strong>{pesos(f.monto)}</strong>
             </li>
@@ -120,6 +133,8 @@ export default function PanoramaFinanciero() {
   const [meses, setMeses] = useState<MesFinanciero[] | null>(null)
   const [detalle, setDetalle] = useState<DetalleFinanciero | null>(null)
   const [resumen, setResumen] = useState<Resumen | null>(null)
+  const [presupuesto, setPresupuesto] = useState<Presupuesto>({ metaIngresos: 0, topes: {} })
+  const [editandoMetas, setEditandoMetas] = useState(false)
   const [error, setError] = useState('')
 
   const referencia = useMemo(() => inicioDeMes(hoyIso(), mes), [mes])
@@ -131,6 +146,9 @@ export default function PanoramaFinanciero() {
     obtenerResumen()
       .then(setResumen)
       .catch(() => setResumen(null))
+    leerPresupuesto()
+      .then(setPresupuesto)
+      .catch(() => undefined)
   }, [])
 
   useEffect(() => {
@@ -220,6 +238,41 @@ export default function PanoramaFinanciero() {
         </div>
       </div>
 
+      {presupuesto.metaIngresos > 0 && (
+        <div className="meta-barra">
+          <div className="meta-barra-texto">
+            <span>
+              Meta de ingresos: <strong>{pesos(presupuesto.metaIngresos)}</strong>
+            </span>
+            <span className={ingresos >= presupuesto.metaIngresos ? 'mensaje-ok' : 'ayuda'}>
+              {ingresos >= presupuesto.metaIngresos
+                ? '¡Meta cumplida!'
+                : `${porcentaje((ingresos / presupuesto.metaIngresos) * 100)} · faltan ${pesos(presupuesto.metaIngresos - ingresos)}`}
+            </span>
+          </div>
+          <div className="meta-barra-fondo" role="progressbar" aria-valuenow={Math.min(100, Math.round((ingresos / presupuesto.metaIngresos) * 100))} aria-valuemin={0} aria-valuemax={100}>
+            <div
+              className={ingresos >= presupuesto.metaIngresos ? 'meta-barra-relleno meta-barra-relleno--ok' : 'meta-barra-relleno'}
+              style={{ width: `${Math.min(100, (ingresos / presupuesto.metaIngresos) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      <button type="button" className="link-secundario" onClick={() => setEditandoMetas((v) => !v)}>
+        {editandoMetas ? 'Cerrar' : 'Metas y topes de gasto'}
+      </button>
+      {editandoMetas && (
+        <FormMetas
+          actual={presupuesto}
+          onGuardado={(p) => {
+            setPresupuesto(p)
+            setEditandoMetas(false)
+          }}
+          onCerrar={() => setEditandoMetas(false)}
+        />
+      )}
+
       {detalle.cobros_sin_monto > 0 && (
         <p className="ayuda">
           {detalle.cobros_sin_monto} cobro{detalle.cobros_sin_monto === 1 ? '' : 's'} sin monto cargado: no suma
@@ -246,6 +299,7 @@ export default function PanoramaFinanciero() {
             c === '__profesoras' ? 'Pagos a profesoras' : ETIQUETA_CATEGORIA[c as CategoriaGasto] ?? c
           }
           vacio="Todavía no hay gastos en este mes."
+          tope={(c) => (presupuesto.topes[c as CategoriaGasto] ? presupuesto.topes[c as CategoriaGasto] : undefined)}
         />
       </div>
 
@@ -347,5 +401,86 @@ export default function PanoramaFinanciero() {
         Descargar para Excel
       </button>
     </div>
+  )
+}
+
+// Meta de ingresos y topes de gasto por categoría. Valen para todos los meses;
+// dejar un campo vacío (o en cero) quita esa meta o ese tope.
+function FormMetas({
+  actual,
+  onGuardado,
+  onCerrar,
+}: {
+  actual: Presupuesto
+  onGuardado: (p: Presupuesto) => void
+  onCerrar: () => void
+}) {
+  const texto = (n: number | undefined) => (n && n > 0 ? String(n) : '')
+  const [meta, setMeta] = useState(texto(actual.metaIngresos))
+  const [topes, setTopes] = useState<Record<string, string>>(
+    Object.fromEntries(
+      (Object.keys(ETIQUETA_CATEGORIA) as CategoriaGasto[]).map((c) => [c, texto(actual.topes[c])]),
+    ),
+  )
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState('')
+
+  const aNumero = (t: string): number | null => {
+    if (t.trim() === '') return null
+    const n = Number(t.replace(',', '.'))
+    if (!Number.isFinite(n) || n < 0) throw new Error('Los montos tienen que ser números.')
+    return n
+  }
+
+  const guardar = async (e: FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setEnviando(true)
+    try {
+      const nuevo: Presupuesto = { metaIngresos: 0, topes: {} }
+      const metaNum = aNumero(meta)
+      await guardarPresupuesto('meta_ingresos', metaNum)
+      nuevo.metaIngresos = metaNum ?? 0
+      for (const c of Object.keys(ETIQUETA_CATEGORIA) as CategoriaGasto[]) {
+        const n = aNumero(topes[c] ?? '')
+        await guardarPresupuesto('tope_' + c, n)
+        if (n && n > 0) nuevo.topes[c] = n
+      }
+      onGuardado(nuevo)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar.')
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <form className="form-caja" onSubmit={guardar}>
+      <label htmlFor="meta-ingresos">Meta de ingresos por mes</label>
+      <input id="meta-ingresos" value={meta} onChange={(e) => setMeta(e.target.value)} inputMode="decimal" placeholder="$ (vacío = sin meta)" />
+      <p className="ayuda">Tope de gasto por mes en cada categoría (vacío = sin tope):</p>
+      <div className="grilla-campos">
+        {(Object.keys(ETIQUETA_CATEGORIA) as CategoriaGasto[]).map((c) => (
+          <div key={c}>
+            <label htmlFor={'tope-' + c}>{ETIQUETA_CATEGORIA[c]}</label>
+            <input
+              id={'tope-' + c}
+              value={topes[c] ?? ''}
+              onChange={(e) => setTopes((t) => ({ ...t, [c]: e.target.value }))}
+              inputMode="decimal"
+              placeholder="$"
+            />
+          </div>
+        ))}
+      </div>
+      {error && <p className="mensaje-error">{error}</p>}
+      <div className="barra-acciones">
+        <button type="submit" disabled={enviando}>
+          {enviando ? 'Guardando...' : 'Guardar'}
+        </button>
+        <button type="button" className="link-secundario" onClick={onCerrar}>
+          Cancelar
+        </button>
+      </div>
+    </form>
   )
 }

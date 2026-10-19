@@ -2482,6 +2482,51 @@ drop policy if exists ingresos_extra_staff on public.ingresos_extra;
 create policy ingresos_extra_staff on public.ingresos_extra
   for all using (public.es_staff()) with check (public.es_staff());
 
+-- --- Comprobantes de gastos (factura o ticket adjunto) ----------------------------
+-- Cada gasto puede tener un archivo (foto o PDF) en el bucket privado "gastos".
+-- Solo el staff lo ve, lo sube y lo borra.
+alter table public.gastos add column if not exists comprobante_ruta text;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'gastos', 'gastos', false, 5242880,
+  array['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+)
+on conflict (id) do update
+  set file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists gastos_bucket_visible on storage.buckets;
+create policy gastos_bucket_visible on storage.buckets
+  for select using (id = 'gastos' and public.es_staff());
+
+drop policy if exists gastos_objeto_sube on storage.objects;
+create policy gastos_objeto_sube on storage.objects
+  for insert with check (bucket_id = 'gastos' and public.es_staff());
+
+drop policy if exists gastos_objeto_ve on storage.objects;
+create policy gastos_objeto_ve on storage.objects
+  for select using (bucket_id = 'gastos' and public.es_staff());
+
+drop policy if exists gastos_objeto_borra on storage.objects;
+create policy gastos_objeto_borra on storage.objects
+  for delete using (bucket_id = 'gastos' and public.es_staff());
+
+-- --- Metas y topes ---------------------------------------------------------------------
+-- 'meta_ingresos': cuánto se quiere ingresar por mes. 'tope_<categoría>': cuánto
+-- como máximo se quiere gastar por mes en esa categoría. Valen para todos los meses.
+create table if not exists public.presupuesto (
+  clave          text primary key,
+  monto          numeric(12, 2) not null check (monto >= 0),
+  actualizado_en timestamptz not null default now()
+);
+
+alter table public.presupuesto enable row level security;
+
+drop policy if exists presupuesto_staff on public.presupuesto;
+create policy presupuesto_staff on public.presupuesto
+  for all using (public.es_staff()) with check (public.es_staff());
+
 -- --- Liquidación de profesoras ----------------------------------------------------
 -- Cuánto se le paga a cada profesora por clase dada, y el registro de lo que se
 -- le fue pagando mes a mes. Cada profesora ve lo suyo; solo el staff lo carga.
@@ -2823,6 +2868,16 @@ begin
     'comprobantes_pendientes', (select count(*) from public.comprobantes_pago where estado = 'pendiente'),
     'para_reactivar', (select count(*) from public.alumnas_para_reactivar(21) x
                        where x.avisada_en is null or x.avisada_en < now() - interval '30 days'),
+    'meta_ingresos', coalesce((select pr.monto from public.presupuesto pr where pr.clave = 'meta_ingresos'), 0),
+    'topes_superados', (
+      select count(*)
+      from public.presupuesto pr
+      join (select g.categoria, sum(g.monto) as total
+            from public.gastos g
+            where g.fecha >= v_mes and g.fecha < (v_mes + interval '1 month')::date
+            group by g.categoria) gg on ('tope_' || gg.categoria) = pr.clave
+      where pr.monto > 0 and gg.total > pr.monto
+    ),
     'clases_30d', v_clases,
     'reservas_30d', v_reservas,
     'cupo_30d', v_cupo
@@ -2947,6 +3002,118 @@ begin
   order by 1;
 end;
 $$;
+
+-- --- Informe mensual por mail ---------------------------------------------------------
+-- Lo usa la Edge Function (clave de servicio). Devuelve el mes anterior cuando ya
+-- es de mañana (9 h o más, hora argentina) del primer día del mes en adelante y
+-- todavía no se mandó el informe de ese mes. Respeta el interruptor de pausa.
+create or replace function public.informe_mensual_pendiente()
+returns date
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select (date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires') - interval '1 month')::date
+  where public.recordatorios_activos()
+    and extract(hour from now() at time zone 'America/Argentina/Buenos_Aires') >= 9
+    and coalesce((select c.valor #>> '{}' from public.configuracion c where c.clave = 'informe_mensual_enviado'), '')
+        <> to_char(date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires') - interval '1 month', 'YYYY-MM');
+$$;
+
+create or replace function public.marcar_informe_enviado(p_mes date)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  insert into public.configuracion (clave, valor)
+  values ('informe_mensual_enviado', to_jsonb(to_char(p_mes, 'YYYY-MM')))
+  on conflict (clave) do update set valor = excluded.valor, actualizado_en = now();
+$$;
+
+-- Todos los números y el detalle de un mes, para armar el mail y el Excel adjunto.
+create or replace function public.informe_mensual_datos(p_mes date)
+returns json
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_ini date := date_trunc('month', p_mes)::date;
+  v_fin date := (date_trunc('month', p_mes) + interval '1 month')::date;
+  v_ant date := (date_trunc('month', p_mes) - interval '1 month')::date;
+  v_ini_ts  timestamptz := (v_ini::timestamp at time zone 'America/Argentina/Buenos_Aires');
+  v_fin_ts  timestamptz := (v_fin::timestamp at time zone 'America/Argentina/Buenos_Aires');
+  v_ant_ts  timestamptz := (v_ant::timestamp at time zone 'America/Argentina/Buenos_Aires');
+begin
+  return json_build_object(
+    'mes', to_char(v_ini, 'YYYY-MM'),
+    'cobrado', coalesce((select sum(pc.monto) from public.pagos_clientes pc
+                         where pc.creado_en >= v_ini_ts and pc.creado_en < v_fin_ts), 0),
+    'otros', coalesce((select sum(ie.monto) from public.ingresos_extra ie
+                       where ie.fecha >= v_ini and ie.fecha < v_fin), 0),
+    'gastos', coalesce((select sum(g.monto) from public.gastos g
+                        where g.fecha >= v_ini and g.fecha < v_fin), 0),
+    'liquidaciones', coalesce((select sum(pp.monto) from public.pagos_profesoras pp
+                               where pp.fecha >= v_ini and pp.fecha < v_fin), 0),
+    'cobrado_ant', coalesce((select sum(pc.monto) from public.pagos_clientes pc
+                             where pc.creado_en >= v_ant_ts and pc.creado_en < v_ini_ts), 0),
+    'otros_ant', coalesce((select sum(ie.monto) from public.ingresos_extra ie
+                           where ie.fecha >= v_ant and ie.fecha < v_ini), 0),
+    'gastos_ant', coalesce((select sum(g.monto) from public.gastos g
+                            where g.fecha >= v_ant and g.fecha < v_ini), 0),
+    'liquidaciones_ant', coalesce((select sum(pp.monto) from public.pagos_profesoras pp
+                                   where pp.fecha >= v_ant and pp.fecha < v_ini), 0),
+    'altas', (select count(*) from public.perfiles p
+              where p.rol = 'alumno'
+                and p.creado_en >= v_ini_ts and p.creado_en < v_fin_ts),
+    'altas_ant', (select count(*) from public.perfiles p
+                  where p.rol = 'alumno'
+                    and p.creado_en >= v_ant_ts and p.creado_en < v_ini_ts),
+    'alumnas_activas', (select count(distinct r.alumno_id)
+                        from public.reservas r
+                        join public.turnos t on t.id = r.turno_id
+                        where r.estado = 'reservada' and not t.cancelado
+                          and t.fecha >= v_ini and t.fecha < v_fin
+                          and (t.fecha + t.hora) < (now() at time zone 'America/Argentina/Buenos_Aires')
+                          and r.asistencia is distinct from 'ausente'),
+    'meta_ingresos', coalesce((select pr.monto from public.presupuesto pr where pr.clave = 'meta_ingresos'), 0),
+    'cobros', (select coalesce(json_agg(json_build_object(
+                  'fecha', (pc.creado_en at time zone 'America/Argentina/Buenos_Aires')::date,
+                  'alumna', btrim(coalesce(p.nombre, '') || ' ' || coalesce(p.apellido, '')),
+                  'concepto', pc.concepto, 'medio', pc.medio, 'monto', pc.monto)
+                  order by pc.creado_en), '[]'::json)
+               from public.pagos_clientes pc
+               left join public.perfiles p on p.id = pc.alumna_id
+               where pc.creado_en >= v_ini_ts and pc.creado_en < v_fin_ts),
+    'ingresos_extra', (select coalesce(json_agg(json_build_object(
+                  'fecha', ie.fecha, 'categoria', ie.categoria, 'concepto', ie.concepto,
+                  'medio', ie.medio, 'monto', ie.monto) order by ie.fecha), '[]'::json)
+               from public.ingresos_extra ie
+               where ie.fecha >= v_ini and ie.fecha < v_fin),
+    'gastos_detalle', (select coalesce(json_agg(json_build_object(
+                  'fecha', g.fecha, 'categoria', g.categoria, 'concepto', g.concepto,
+                  'monto', g.monto) order by g.fecha), '[]'::json)
+               from public.gastos g
+               where g.fecha >= v_ini and g.fecha < v_fin),
+    'liquidaciones_detalle', (select coalesce(json_agg(json_build_object(
+                  'fecha', pp.fecha, 'profesora', btrim(coalesce(p.nombre, '') || ' ' || coalesce(p.apellido, '')),
+                  'medio', pp.medio, 'monto', pp.monto) order by pp.fecha), '[]'::json)
+               from public.pagos_profesoras pp
+               left join public.perfiles p on p.id = pp.profesora_id
+               where pp.fecha >= v_ini and pp.fecha < v_fin)
+  );
+end;
+$$;
+
+revoke execute on function public.informe_mensual_pendiente() from public, anon, authenticated;
+revoke execute on function public.marcar_informe_enviado(date) from public, anon, authenticated;
+revoke execute on function public.informe_mensual_datos(date) from public, anon, authenticated;
+grant execute on function public.informe_mensual_pendiente() to service_role;
+grant execute on function public.marcar_informe_enviado(date) to service_role;
+grant execute on function public.informe_mensual_datos(date) to service_role;
 
 -- Permisos de ejecución (authenticated ya puede ejecutar funciones public
 -- por defecto en Supabase, pero lo dejamos explícito).

@@ -2343,3 +2343,46 @@ label {
 .leyenda-punto--egresos {
   background: var(--acento);
 }
+
+/* ---- Metas, topes y adjuntos de gastos ---- */
+.meta-barra {
+  margin: 4px 0 12px;
+}
+
+.meta-barra-texto {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.meta-barra-fondo {
+  height: 10px;
+  background: var(--borde);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.meta-barra-relleno {
+  height: 100%;
+  background: var(--acento);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.meta-barra-relleno--ok {
+  background: var(--ok);
+}
+
+.boton-archivo-chico {
+  display: inline-block;
+  margin: 0;
+  padding: 6px 10px;
+  font-size: inherit;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  cursor: pointer;
+}

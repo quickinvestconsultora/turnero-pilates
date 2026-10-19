@@ -8,6 +8,8 @@ const numONull = (v: unknown): number | null => (v === null || v === undefined ?
 // ---- Resumen del estudio ----------------------------------------------------
 
 export type Resumen = {
+  meta_ingresos: number
+  topes_superados: number
   cobrado_mes: number
   cobrado_mes_anterior: number
   egresos_mes: number
@@ -79,12 +81,13 @@ export type Gasto = {
   concepto: string
   monto: number
   nota: string | null
+  comprobante_ruta: string | null
 }
 
 export async function listarGastos(desde: string, hasta: string): Promise<Gasto[]> {
   const { data, error } = await supabase
     .from('gastos')
-    .select('id, fecha, categoria, concepto, monto, nota')
+    .select('id, fecha, categoria, concepto, monto, nota, comprobante_ruta')
     .gte('fecha', desde)
     .lte('fecha', hasta)
     .order('fecha', { ascending: false })
@@ -102,20 +105,26 @@ export async function agregarGasto(g: {
   concepto: string
   monto: number
   nota: string
-}): Promise<void> {
-  const { error } = await supabase.from('gastos').insert({
-    fecha: g.fecha,
-    categoria: g.categoria,
-    concepto: g.concepto.trim(),
-    monto: g.monto,
-    nota: g.nota.trim() || null,
-  })
+}): Promise<string> {
+  const { data, error } = await supabase
+    .from('gastos')
+    .insert({
+      fecha: g.fecha,
+      categoria: g.categoria,
+      concepto: g.concepto.trim(),
+      monto: g.monto,
+      nota: g.nota.trim() || null,
+    })
+    .select('id')
+    .single()
   if (error) throw new Error(error.message)
+  return String((data as { id: string }).id)
 }
 
-export async function borrarGasto(id: string): Promise<void> {
+export async function borrarGasto(id: string, rutaComprobante?: string | null): Promise<void> {
   const { error } = await supabase.from('gastos').delete().eq('id', id)
   if (error) throw new Error(error.message)
+  if (rutaComprobante) await supabase.storage.from('gastos').remove([rutaComprobante])
 }
 
 // ---- Liquidación de profesoras ---------------------------------------------
@@ -476,5 +485,84 @@ export async function agregarIngresoExtra(i: {
 
 export async function borrarIngresoExtra(id: string): Promise<void> {
   const { error } = await supabase.from('ingresos_extra').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// ---- Comprobantes de gastos (factura o ticket adjunto) -----------------------
+
+const MAX_PDF_GASTO = 5 * 1024 * 1024
+
+// Sube la foto o el PDF y lo deja ligado al gasto. Reemplaza el anterior, si había.
+export async function adjuntarComprobanteGasto(
+  gastoId: string,
+  archivo: File,
+  rutaAnterior?: string | null,
+): Promise<string> {
+  const esPdf = archivo.type === 'application/pdf'
+  if (!esPdf && !archivo.type.startsWith('image/')) {
+    throw new Error('Subí una foto o un PDF del comprobante.')
+  }
+  if (esPdf && archivo.size > MAX_PDF_GASTO) throw new Error('El PDF pesa más de 5 MB.')
+
+  const { achicar } = await import('./comprobantes')
+  const contenido: Blob = esPdf ? archivo : await achicar(archivo)
+  const ruta = gastoId + '/' + crypto.randomUUID() + (esPdf ? '.pdf' : '.jpg')
+
+  const { error } = await supabase.storage
+    .from('gastos')
+    .upload(ruta, contenido, { contentType: esPdf ? 'application/pdf' : 'image/jpeg' })
+  if (error) throw new Error(error.message)
+
+  const { error: errorFila } = await supabase.from('gastos').update({ comprobante_ruta: ruta }).eq('id', gastoId)
+  if (errorFila) {
+    await supabase.storage.from('gastos').remove([ruta])
+    throw new Error(errorFila.message)
+  }
+  if (rutaAnterior) await supabase.storage.from('gastos').remove([rutaAnterior])
+  return ruta
+}
+
+export async function quitarComprobanteGasto(gastoId: string, ruta: string): Promise<void> {
+  const { error } = await supabase.from('gastos').update({ comprobante_ruta: null }).eq('id', gastoId)
+  if (error) throw new Error(error.message)
+  await supabase.storage.from('gastos').remove([ruta])
+}
+
+// Link temporal para abrir el comprobante (el bucket es privado).
+export async function urlComprobanteGasto(ruta: string): Promise<string> {
+  const { data, error } = await supabase.storage.from('gastos').createSignedUrl(ruta, 120)
+  if (error) throw new Error(error.message)
+  return data.signedUrl
+}
+
+// ---- Metas y topes ----------------------------------------------------------
+
+export type Presupuesto = {
+  metaIngresos: number // 0 = sin meta
+  topes: Partial<Record<CategoriaGasto, number>>
+}
+
+export async function leerPresupuesto(): Promise<Presupuesto> {
+  const { data, error } = await supabase.from('presupuesto').select('clave, monto')
+  if (error) throw new Error(error.message)
+  const p: Presupuesto = { metaIngresos: 0, topes: {} }
+  for (const f of (data ?? []) as { clave: string; monto: string | number }[]) {
+    const monto = Number(f.monto)
+    if (f.clave === 'meta_ingresos') p.metaIngresos = monto
+    else if (f.clave.startsWith('tope_')) p.topes[f.clave.slice(5) as CategoriaGasto] = monto
+  }
+  return p
+}
+
+// monto vacío o cero: se quita la meta o el tope.
+export async function guardarPresupuesto(clave: string, monto: number | null): Promise<void> {
+  if (monto === null || monto <= 0) {
+    const { error } = await supabase.from('presupuesto').delete().eq('clave', clave)
+    if (error) throw new Error(error.message)
+    return
+  }
+  const { error } = await supabase
+    .from('presupuesto')
+    .upsert({ clave, monto, actualizado_en: new Date().toISOString() })
   if (error) throw new Error(error.message)
 }

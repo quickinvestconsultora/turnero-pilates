@@ -38,7 +38,7 @@ export default function Resumen({ onIr }: { onIr: (seccion: 'clientes' | 'reacti
   const ocupacion = r.cupo_30d > 0 ? Math.round((r.reservas_30d / r.cupo_30d) * 100) : null
   const mes = nombreMes(hoyIso())
 
-  const alertas: { texto: string; ir: 'clientes' | 'reactivar' }[] = []
+  const alertas: { texto: string; ir: 'clientes' | 'reactivar' | 'egresos' }[] = []
   if (r.comprobantes_pendientes > 0) {
     alertas.push({
       texto: `${r.comprobantes_pendientes} comprobante${r.comprobantes_pendientes === 1 ? '' : 's'} esperando que lo${r.comprobantes_pendientes === 1 ? '' : 's'} confirmes`,
@@ -55,6 +55,12 @@ export default function Resumen({ onIr }: { onIr: (seccion: 'clientes' | 'reacti
     alertas.push({
       texto: `${r.vencidas + r.deben} alumna${r.vencidas + r.deben === 1 ? '' : 's'} con abono vencido o pago pendiente`,
       ir: 'clientes',
+    })
+  }
+  if (r.topes_superados > 0) {
+    alertas.push({
+      texto: `${r.topes_superados} categoría${r.topes_superados === 1 ? '' : 's'} de gasto pasó el tope de este mes`,
+      ir: 'egresos',
     })
   }
   if (r.para_reactivar > 0) {
@@ -101,6 +107,27 @@ export default function Resumen({ onIr }: { onIr: (seccion: 'clientes' | 'reacti
           <Comparacion actual={resultado} anterior={resultadoAnterior} plata />
         </button>
       </div>
+
+      {r.meta_ingresos > 0 && (
+        <div className="meta-barra">
+          <div className="meta-barra-texto">
+            <span>
+              Meta del mes: <strong>{pesos(r.meta_ingresos)}</strong>
+            </span>
+            <span className={r.cobrado_mes >= r.meta_ingresos ? 'mensaje-ok' : 'ayuda'}>
+              {r.cobrado_mes >= r.meta_ingresos
+                ? '¡Meta cumplida!'
+                : `${Math.round((r.cobrado_mes / r.meta_ingresos) * 100)}% · faltan ${pesos(r.meta_ingresos - r.cobrado_mes)}`}
+            </span>
+          </div>
+          <div className="meta-barra-fondo">
+            <div
+              className={r.cobrado_mes >= r.meta_ingresos ? 'meta-barra-relleno meta-barra-relleno--ok' : 'meta-barra-relleno'}
+              style={{ width: `${Math.min(100, (r.cobrado_mes / r.meta_ingresos) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       <h3>Alumnas</h3>
       <div className="kpi-grid">

@@ -6,12 +6,16 @@ type Celda = string | number | null | undefined
 function escapar(valor: Celda): string {
   let texto = valor === null || valor === undefined ? '' : String(valor)
   // Evita que Excel interprete como fórmula un texto que empieza con = + - @.
-  if (/^[=+\-@]/.test(texto)) texto = `'${texto}`
+  if (typeof valor === 'string' && /^[=+\-@]/.test(texto)) texto = `'${texto}`
   return /[";\n\r]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto
 }
 
+export function textoCsv(filas: Celda[][]): string {
+  return filas.map((fila) => fila.map(escapar).join(';')).join('\r\n')
+}
+
 export function descargarCsv(nombreArchivo: string, filas: Celda[][]): void {
-  const contenido = filas.map((fila) => fila.map(escapar).join(';')).join('\r\n')
+  const contenido = textoCsv(filas)
   const blob = new Blob(['﻿', contenido], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const enlace = document.createElement('a')

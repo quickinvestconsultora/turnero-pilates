@@ -290,6 +290,19 @@ Puesta en marcha (una sola vez):
 
 **Progreso de la alumna.** En **Mi cuenta**: clases del mes, semanas seguidas con al menos una clase y total de clases, sin contar las que faltó (`src/progreso.ts`; `mi_historial` devuelve hasta 400 clases).
 
+## Finanzas del negocio
+
+En **Administración → Finanzas** (pestañas **Panorama, Cobros, Gastos, Otros ingresos y Gastos fijos**):
+
+- **Panorama:** ingresos, egresos y ganancia del mes (con margen), de dónde viene la plata, en qué se va, la caja por medio de pago, ticket promedio, ingreso y costo por clase dada, punto de equilibrio, lo estimado por cobrar y la evolución de 12 meses (gráfico, tabla y Excel). Sale de `detalle_financiero` y `panorama_financiero` (solo staff).
+- **Cobros:** el resumen del mes y **+ Cargar un cobro** para anotar uno "por fuera" sin entrar a la ficha (el mismo formulario de la ficha, `registrar_pago_manual`).
+- **Gastos:** detalle por categoría. Cada gasto puede llevar su **factura o ticket adjunto** (bucket privado `gastos`, solo staff). **Paquete para el contador:** un ZIP del mes con el resumen, cobros, gastos, otros ingresos y pagos a profesoras en CSV, más la carpeta de comprobantes.
+- **Otros ingresos:** plata que no es de alumnas (alquiler de la sala, productos, talleres), tabla `ingresos_extra`.
+- **Gastos fijos:** plantillas mensuales (`gastos_fijos`) que se cargan con un clic con `cargar_gastos_fijos`, sin duplicarse en el mismo mes.
+- **Metas y topes:** en el Panorama, una meta de ingresos por mes y un tope de gasto por categoría (tabla `presupuesto`, claves `meta_ingresos` y `tope_<categoría>`). El Resumen muestra la barra de la meta y avisa cuando una categoría se pasó.
+
+**Informe mensual por mail:** el día 1 de cada mes (desde las 9, hora argentina) la función `enviar-recordatorios` manda el cierre del mes anterior, con la comparación contra el mes pasado y el detalle en Excel adjunto. Va a `MAIL_INFORME` (uno o varios mails separados por coma) o, si no está, a `MAIL_ADMIN`. Usa `informe_mensual_pendiente`, `informe_mensual_datos` y `marcar_informe_enviado` (solo clave de servicio) y respeta la pausa de Clientes. El mes ya enviado queda anotado en `configuracion` (`informe_mensual_enviado`), así no se repite.
+
 ## Pendiente (fuera del MVP)
 
 - Bonos / paquetes de clases con vencimiento (por ahora el estado de cuenta es binario: al día o debe, sin "cuántas clases le quedan").
