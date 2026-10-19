@@ -95,6 +95,20 @@ export function faltanMenosDe(fechaIso: string, hora: string, horas: number): bo
   return new Date(y, m - 1, d, hh, mm).getTime() - horas * 3600_000 < Date.now()
 }
 
+// '2026-10-19' -> 'Lunes 19 oct' (para encabezados compactos)
+export function fechaMedia(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const fecha = new Date(y, m - 1, d)
+  return `${DIAS[fecha.getDay()]} ${d} ${MESES[m - 1].slice(0, 3)}`
+}
+
+// Igual que encabezadoDia, pero con la fecha corta.
+export function encabezadoDiaCorto(iso: string): string {
+  if (iso === hoyIso()) return 'Hoy'
+  if (iso === sumarDias(hoyIso(), 1)) return 'Mañana'
+  return fechaMedia(iso)
+}
+
 // Etiqueta relativa amigable para encabezar la lista: "Hoy", "Mañana" o el día.
 export function encabezadoDia(iso: string): string {
   if (iso === hoyIso()) return 'Hoy'

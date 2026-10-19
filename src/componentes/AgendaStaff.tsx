@@ -12,7 +12,7 @@ import {
   quitarInvitada,
   quitarReserva,
 } from '../servicios/agenda'
-import { encabezadoDia, horaCorta, hoyIso, sumarDias, yaPaso } from '../fechas'
+import { encabezadoDia, encabezadoDiaCorto, horaCorta, hoyIso, sumarDias, yaPaso } from '../fechas'
 import { nombreCompleto } from '../personas'
 import AgregarAlumna from './AgregarAlumna'
 import EditarTurno from './EditarTurno'
@@ -201,11 +201,11 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
           No hay turnos en la agenda. Creá un turno suelto o generá desde un turno fijo.
         </p>
       ) : (
-        <div className="grupos-dia">
+        <div className="grupos-dia grupos-dia--agenda">
           {[...porDia.entries()].map(([fecha, delDia]) => (
             <section key={fecha} className="grupo-dia">
               <div className="fila-dia">
-                <h2>{encabezadoDia(fecha)}</h2>
+                <h2>{encabezadoDiaCorto(fecha)}</h2>
                 {!instructoraId && delDia.some((t) => !t.cancelado && !yaPaso(t.fecha, t.hora)) && (
                   <button
                     type="button"

@@ -2176,3 +2176,95 @@ label {
   border-radius: var(--radio);
   font-size: 13px;
 }
+
+/* ---- Turnos en tamaño compacto ----
+   Alumna: dos columnas, cada turno a la mitad, para ver el mes de un vistazo.
+   Agenda del estudio: dos columnas desde que hay lugar. */
+.grupos-dia--compacto {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 10px;
+  align-items: start;
+}
+
+.grupos-dia--compacto .grupo-dia h2 {
+  font-size: 14px;
+  margin: 0 0 6px;
+}
+
+.grupos-dia--compacto .lista-turnos {
+  gap: 6px;
+}
+
+.grupos-dia--compacto .turno {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 9px 10px;
+}
+
+.grupos-dia--compacto .turno-info {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+
+.grupos-dia--compacto .turno-hora {
+  font-size: 18px;
+}
+
+.grupos-dia--compacto .turno-detalle {
+  font-size: 12px;
+}
+
+.grupos-dia--compacto .turno-profesora,
+.grupos-dia--compacto .turno-nota {
+  flex-basis: 100%;
+  font-size: 11px;
+  text-align: left;
+}
+
+.grupos-dia--compacto .turno-acciones {
+  align-items: stretch;
+  gap: 2px;
+}
+
+.grupos-dia--compacto .turno button {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.grupos-dia--compacto .turno .link-secundario {
+  padding: 2px 0;
+  font-size: 11px;
+  text-align: center;
+}
+
+.grupos-dia--compacto .turno > .ayuda {
+  font-size: 11px;
+  text-align: center;
+}
+
+.grupos-dia--agenda .grupo-dia h2 {
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+
+.grupos-dia--agenda .turno-staff {
+  padding: 9px 11px;
+  margin-bottom: 6px;
+}
+
+.grupos-dia--agenda .turno-hora {
+  font-size: 18px;
+}
+
+@media (min-width: 600px) {
+  .grupos-dia--agenda {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 12px;
+    align-items: start;
+  }
+}

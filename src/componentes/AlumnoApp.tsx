@@ -14,7 +14,7 @@ import {
 } from '../servicios/turnos'
 import {
   diaSemanaPlural,
-  encabezadoDia,
+  encabezadoDiaCorto,
   faltanMenosDe,
   horaCorta,
   nombreMes,
@@ -344,10 +344,10 @@ function ListaTurnos({
   }
 
   return (
-    <div className="grupos-dia">
+    <div className="grupos-dia grupos-dia--compacto">
       {[...porDia.entries()].map(([fecha, delDia]) => (
         <section key={fecha} className="grupo-dia">
-          <h2>{encabezadoDia(fecha)}</h2>
+          <h2>{encabezadoDiaCorto(fecha)}</h2>
           <ul className="lista-turnos">
             {delDia.map((t) => {
               const libres = Math.max(0, t.cupo - Number(t.ocupados))
