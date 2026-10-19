@@ -2352,7 +2352,7 @@ returns void
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 begin
   if auth.uid() is null then
     raise exception 'Tenés que iniciar sesión.';
@@ -2366,17 +2366,17 @@ begin
         auth = excluded.auth,
         agente = excluded.agente;
 end;
-$;
+$$;
 
 create or replace function public.quitar_suscripcion_push(p_endpoint text)
 returns void
 language sql
 security definer
 set search_path = public
-as $
+as $$
   delete from public.suscripciones_push
   where endpoint = p_endpoint and perfil_id = auth.uid();
-$;
+$$;
 
 -- ============================================================================
 -- Gestión del estudio: egresos, liquidación de profesoras, anuncios y resumen
