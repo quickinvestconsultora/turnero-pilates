@@ -312,7 +312,8 @@ La alumna elige qué paga (clase suelta o abono de 1, 2 o 3 veces por semana) y 
 - **Secretos:** `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` y, opcional, `MP_FIRMA_ESTRICTA=si` para rechazar avisos con firma que no coincide (activarlo cuando en `mp_eventos` los avisos reales lleguen con `firma_valida = true`), y `APP_URL`.
 - **Mercado Pago:** Tus integraciones → la aplicación → Webhooks → Configurar notificaciones → Modo productivo: `https://TU-PROYECTO.supabase.co/functions/v1/mp-webhook`, evento "Pagos".
 - **Cuándo cubre un abono mensual:** hasta fin de mes; si ya estaba al día, suma el mes siguiente. Para que un pago hecho después de cierto día cubra también el mes que viene, cargar en `configuracion` la clave `mp_dia_corte` (por ejemplo 20): `insert into public.configuracion (clave, valor) values ('mp_dia_corte', to_jsonb(20)) on conflict (clave) do update set valor = excluded.valor;`
-- **Encendido:** el botón "Pagar con Mercado Pago" aparece cuando `PAGO_ONLINE_ACTIVO` (en `src/config/pagos.ts`) está en `true`. Hasta entonces, la app sigue con el link y la transferencia de siempre.
+- **Encendido:** `PAGO_ONLINE` en `src/config/pagos.ts` tiene tres estados. `'apagado'`: la app sigue con el link y la transferencia de siempre. `'prueba'`: el botón "Pagar con Mercado Pago" lo ve solo quien entró una vez a `/app/?mp=prueba` desde ese navegador (`?mp=no` lo saca); sirve para probar con las credenciales de prueba sin exponerlo. `'activo'`: lo ven todas.
+- **Revisar avisos:** en el SQL Editor, `select creado_en, payment_id, tipo, firma_valida, resultado, detalle from public.mp_eventos order by creado_en desc limit 20;`
 - **Pruebas:** primero con las credenciales de prueba y cuentas de prueba de Mercado Pago; recién después se cambia `MP_ACCESS_TOKEN` por el de producción.
 
 ## Pendiente (fuera del MVP)

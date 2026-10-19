@@ -17,6 +17,24 @@ export function linkWhatsApp(mensaje: string): string {
 }
 
 // Pago online con Mercado Pago (funciones crear-pago-mp y mp-webhook en Supabase).
-// Mientras esté en false, la app sigue ofreciendo el link y la transferencia de siempre.
-// Se pasa a true cuando las funciones estén publicadas y probadas.
-export const PAGO_ONLINE_ACTIVO: boolean = false
+//   'apagado': la app sigue ofreciendo el link y la transferencia de siempre.
+//   'prueba':  el botón solo lo ve quien entró una vez a /app/?mp=prueba desde ese
+//              navegador (para probar con las credenciales de prueba sin exponerlo).
+//   'activo':  el botón lo ven todas las alumnas.
+export const PAGO_ONLINE: 'apagado' | 'prueba' | 'activo' = 'prueba'
+
+const CLAVE_PRUEBA_MP = 'forteva-mp-prueba'
+
+// Si la dirección trae ?mp=prueba (o ?mp=no para sacarlo), se recuerda en este navegador.
+export function pagoOnlineVisible(): boolean {
+  if (PAGO_ONLINE === 'activo') return true
+  if (PAGO_ONLINE === 'apagado') return false
+  try {
+    const param = new URLSearchParams(window.location.search).get('mp')
+    if (param === 'prueba') localStorage.setItem(CLAVE_PRUEBA_MP, '1')
+    if (param === 'no') localStorage.removeItem(CLAVE_PRUEBA_MP)
+    return localStorage.getItem(CLAVE_PRUEBA_MP) === '1'
+  } catch {
+    return false
+  }
+}

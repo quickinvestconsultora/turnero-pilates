@@ -3,9 +3,9 @@ import {
   LINK_MERCADO_PAGO,
   TRANSFERENCIA_ALIAS,
   TRANSFERENCIA_TITULAR,
-  PAGO_ONLINE_ACTIVO,
   WHATSAPP_NUMERO,
   linkWhatsApp,
+  pagoOnlineVisible,
 } from '../config/pagos'
 import PagarOnline from './PagarOnline'
 import { nombreCompleto } from '../personas'
@@ -15,15 +15,16 @@ import { nombreCompleto } from '../personas'
 // estudio cargó ese dato en src/config/pagos.ts — nada de links inventados.
 export default function OpcionesPago({ perfil }: { perfil: Perfil }) {
   const mensaje = `Hola! Soy ${nombreCompleto(perfil)}, te aviso que ya hice el pago de mi reserva en FORTEVA Studio.`
+  const pagoOnline = pagoOnlineVisible()
   const hayAlgunaOpcion = Boolean(
-    PAGO_ONLINE_ACTIVO || LINK_MERCADO_PAGO || TRANSFERENCIA_ALIAS || WHATSAPP_NUMERO,
+    pagoOnline || LINK_MERCADO_PAGO || TRANSFERENCIA_ALIAS || WHATSAPP_NUMERO,
   )
 
   return (
     <div className="aviso-pago-opciones">
-      {PAGO_ONLINE_ACTIVO && <PagarOnline />}
+      {pagoOnline && <PagarOnline />}
 
-      {!PAGO_ONLINE_ACTIVO && LINK_MERCADO_PAGO && (
+      {!pagoOnline && LINK_MERCADO_PAGO && (
         <a className="btn-fantasma" href={LINK_MERCADO_PAGO} target="_blank" rel="noopener noreferrer">
           Pagar con Mercado Pago
         </a>
