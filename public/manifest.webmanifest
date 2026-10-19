@@ -1,17 +1,27 @@
 {
+  "id": "/app/",
   "name": "FORTEVA Studio",
   "short_name": "FORTEVA",
   "description": "Reservá tu clase de Pilates & Strength en FORTEVA Studio",
+  "lang": "es-AR",
   "start_url": "/app/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#f5f1e8",
   "theme_color": "#f5f1e8",
   "icons": [
     {
       "src": "/icon-512.png",
-      "sizes": "512x512",
+      "sizes": "192x192 512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
