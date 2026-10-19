@@ -10,6 +10,9 @@
 //   5. Cumpleaños: saludo el día que cumple años (desde las 9, hora argentina).
 //   6. Anuncios: los que el estudio carga con "mandar también por mail" (de a
 //      40 por corrida).
+// Después de cada mail se manda, si la persona lo activó, la misma novedad como
+// notificación al celular, a través de la función enviar-push (si esa falla, los
+// mails salen igual).
 //
 // Secretos (Supabase → Edge Functions → Secrets):
 //   BREVO_API_KEY   clave de la API de Brevo (no es la clave SMTP)
@@ -53,9 +56,11 @@ type Recordatorio = {
   hora: string
   profesora: string | null
   horas: number | null // cuántas horas antes se avisa (1, 2 o 3)
+  perfil_id: string | null // para la notificación al celular (null si es invitada)
 }
 type Vencimiento = { alumna_id: string; nombre: string; email: string; al_dia_hasta: string }
 type Promocion = {
+  perfil_id: string | null
   reserva_id: string
   nombre: string
   email: string
@@ -82,6 +87,8 @@ type Deslinde = {
   email: string
   aceptado_en: string | null
 }
+
+type AvisoPush = { perfil_id: string; titulo: string; cuerpo: string; url?: string }
 
 type Mail = {
   para: { email: string; nombre?: string }
@@ -379,11 +386,21 @@ Deno.serve(async (req) => {
   const fallidos: { email: string; error: string }[] = []
   const motivo = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
+  // Avisos para el celular: se arman después de cada mail enviado con éxito.
+  const avisosPush: AvisoPush[] = []
+
   const enviadasAlumnas: string[] = []
   const enviadasInvitadas: string[] = []
   for (const p of recordatorios) {
     try {
       await enviarPorBrevo(mailRecordatorio(p), apiKey, remitente)
+      if (p.perfil_id) {
+        avisosPush.push({
+          perfil_id: p.perfil_id,
+          titulo: 'Tu clase es en ' + (p.horas === 1 ? '1 hora' : (p.horas || 2) + ' horas'),
+          cuerpo: 'Hoy a las ' + p.hora.slice(0, 5) + (p.profesora ? ' con ' + p.profesora : '') + '. ¡Te esperamos!',
+        })
+      }
       if (p.tipo === 'alumna') enviadasAlumnas.push(p.reserva_id)
       else enviadasInvitadas.push(p.reserva_id)
     } catch (e) {
@@ -395,6 +412,11 @@ Deno.serve(async (req) => {
   for (const v of vencimientos) {
     try {
       await enviarPorBrevo(mailVencimiento(v), apiKey, remitente)
+      avisosPush.push({
+        perfil_id: v.alumna_id,
+        titulo: 'Tu abono está por vencer',
+        cuerpo: 'Cubre turnos hasta el ' + fechaLarga(v.al_dia_hasta) + '. Renovalo para seguir reservando.',
+      })
       enviadosVencimiento.push(v.alumna_id)
     } catch (e) {
       fallidos.push({ email: v.email, error: motivo(e) })
@@ -405,6 +427,13 @@ Deno.serve(async (req) => {
   for (const p of promociones) {
     try {
       await enviarPorBrevo(mailPromocion(p), apiKey, remitente)
+      if (p.perfil_id) {
+        avisosPush.push({
+          perfil_id: p.perfil_id,
+          titulo: '¡Se liberó un lugar!',
+          cuerpo: 'Quedaste anotada el ' + fechaLarga(p.fecha) + ' a las ' + p.hora.slice(0, 5) + '.',
+        })
+      }
       enviadosPromocion.push(p.reserva_id)
     } catch (e) {
       fallidos.push({ email: p.email, error: motivo(e) })
@@ -430,6 +459,11 @@ Deno.serve(async (req) => {
   for (const c of cumples) {
     try {
       await enviarPorBrevo(mailCumple(c), apiKey, remitente)
+      avisosPush.push({
+        perfil_id: c.alumna_id,
+        titulo: '¡Feliz cumpleaños, ' + (c.nombre.trim() || 'hola') + '!',
+        cuerpo: 'Un abrazo enorme de todo el equipo de ' + NOMBRE_ESTUDIO + '.',
+      })
       enviadosCumple.push(c.alumna_id)
     } catch (e) {
       fallidos.push({ email: c.email, error: motivo(e) })
@@ -441,6 +475,11 @@ Deno.serve(async (req) => {
   for (const a of anuncios) {
     try {
       await enviarPorBrevo(mailAnuncio(a), apiKey, remitente)
+      avisosPush.push({
+        perfil_id: a.perfil_id,
+        titulo: a.titulo.trim() || (a.importante ? 'Aviso importante' : 'Novedades de ' + NOMBRE_ESTUDIO),
+        cuerpo: a.mensaje.length > 160 ? a.mensaje.slice(0, 157) + '...' : a.mensaje,
+      })
       anunciosEnviados.push(a.anuncio_id)
       perfilesAnuncio.push(a.perfil_id)
     } catch (e) {
@@ -477,6 +516,31 @@ Deno.serve(async (req) => {
     if (error) errores.push('marcar_avisos_cumple: ' + error.message)
   }
 
+  // Notificaciones al celular: función aparte, así un problema ahí no frena los mails.
+  let push = 0
+  if (avisosPush.length > 0) {
+    try {
+      const respuesta = await fetch(Deno.env.get('SUPABASE_URL')! + '/functions/v1/enviar-push', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-cron-secret': secreto,
+          Authorization: 'Bearer ' + Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+        },
+        body: JSON.stringify({ avisos: avisosPush }),
+        signal: AbortSignal.timeout(25000),
+      })
+      if (respuesta.ok) {
+        const r = await respuesta.json().catch(() => ({}))
+        push = Number(r.enviados) || 0
+      } else if (respuesta.status !== 404) {
+        errores.push('enviar-push: ' + respuesta.status)
+      }
+    } catch (e) {
+      errores.push('enviar-push: ' + motivo(e))
+    }
+  }
+
   return json({
     pendientes: total,
     enviados:
@@ -489,6 +553,7 @@ Deno.serve(async (req) => {
       deslindes: enviadosDeslinde.length,
       cumples: enviadosCumple.length,
       anuncios: anunciosEnviados.length,
+      notificaciones: push,
     },
     fallidos,
     errores,

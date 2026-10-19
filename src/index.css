@@ -2268,3 +2268,10 @@ label {
     align-items: start;
   }
 }
+
+.opciones-calendario {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}

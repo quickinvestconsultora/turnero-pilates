@@ -12,6 +12,7 @@ import PerfilProfe from './PerfilProfe'
 import BienvenidaProfe from './BienvenidaProfe'
 import MisPagosProfe from './MisPagosProfe'
 import CartelAnuncios from './CartelAnuncios'
+import { TarjetaNotificaciones } from './Notificaciones'
 
 type Vista = 'hoy' | 'agenda' | 'semana' | 'plantillas' | 'clientes' | 'pagos' | 'perfil'
 
@@ -84,6 +85,7 @@ export default function InstructoraApp({
       />
 
       <CartelAnuncios />
+      <TarjetaNotificaciones />
 
       <nav className="tabs tabs-scroll">
         {PESTAÑAS.map(([clave, etiqueta]) => (

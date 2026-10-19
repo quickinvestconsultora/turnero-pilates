@@ -1626,7 +1626,7 @@ as $$
     and not t.cancelado
     and (t.fecha + t.hora) < (now() at time zone 'America/Argentina/Buenos_Aires')
   order by t.fecha desc, t.hora desc
-  limit 60;
+  limit 400;
 $$;
 
 drop function if exists public.mis_pagos();
@@ -1898,7 +1898,8 @@ returns table (
   fecha      date,
   hora       time,
   profesora  text,
-  horas      int
+  horas      int,
+  perfil_id  uuid
 )
 language sql
 stable
@@ -1906,7 +1907,7 @@ security definer
 set search_path = public
 as $$
   with h as (select public.recordatorio_horas() as n)
-  select 'alumna'::text, r.id, p.nombre, u.email::text, t.fecha, t.hora, t.instructor, h.n
+  select 'alumna'::text, r.id, p.nombre, u.email::text, t.fecha, t.hora, t.instructor, h.n, r.alumno_id
   from h
   cross join public.reservas r
   join public.turnos t on t.id = r.turno_id
@@ -1921,7 +1922,7 @@ as $$
     and ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') <= now() + make_interval(hours => h.n)
     and r.creado_en <= ((t.fecha + t.hora) at time zone 'America/Argentina/Buenos_Aires') - make_interval(hours => h.n)
   union all
-  select 'invitada'::text, i.id, i.nombre, i.email, t.fecha, t.hora, t.instructor, h.n
+  select 'invitada'::text, i.id, i.nombre, i.email, t.fecha, t.hora, t.instructor, h.n, null::uuid
   from h
   cross join public.reservas_invitadas i
   join public.turnos t on t.id = i.turno_id
@@ -1977,14 +1978,15 @@ $$;
 
 -- Subió de la lista de espera: alumnas promovidas en las últimas 24 horas a un
 -- turno que todavía no pasó, a las que no se les mandó el mail.
-create or replace function public.avisos_promocion_pendientes()
-returns table (reserva_id uuid, nombre text, email text, fecha date, hora time, profesora text)
+drop function if exists public.avisos_promocion_pendientes();
+create function public.avisos_promocion_pendientes()
+returns table (reserva_id uuid, nombre text, email text, fecha date, hora time, profesora text, perfil_id uuid)
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select r.id, p.nombre, u.email::text, t.fecha, t.hora, t.instructor
+  select r.id, p.nombre, u.email::text, t.fecha, t.hora, t.instructor, r.alumno_id
   from public.reservas r
   join public.turnos t on t.id = r.turno_id
   join public.perfiles p on p.id = r.alumno_id
@@ -2315,6 +2317,66 @@ begin
   return resultado;
 end;
 $$;
+
+-- ============================================================================
+-- Notificaciones en el celular (Web Push)
+-- ============================================================================
+-- Un dispositivo suscripto por fila. La app guarda y quita sus suscripciones por
+-- funciones (así, si dos personas usan el mismo celular, la suscripción pasa a la
+-- que inició sesión); la Edge Function (clave de servicio) las lee para mandar.
+create table if not exists public.suscripciones_push (
+  id        uuid primary key default gen_random_uuid(),
+  perfil_id uuid not null references public.perfiles (id) on delete cascade,
+  endpoint  text not null unique,
+  p256dh    text not null,
+  auth      text not null,
+  agente    text,
+  creado_en timestamptz not null default now()
+);
+
+create index if not exists suscripciones_push_perfil_idx on public.suscripciones_push (perfil_id);
+
+alter table public.suscripciones_push enable row level security;
+
+drop policy if exists suscripciones_push_propias on public.suscripciones_push;
+create policy suscripciones_push_propias on public.suscripciones_push
+  for select using (perfil_id = auth.uid());
+
+create or replace function public.guardar_suscripcion_push(
+  p_endpoint text,
+  p_p256dh   text,
+  p_auth     text,
+  p_agente   text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $
+begin
+  if auth.uid() is null then
+    raise exception 'Tenés que iniciar sesión.';
+  end if;
+
+  insert into public.suscripciones_push (perfil_id, endpoint, p256dh, auth, agente)
+  values (auth.uid(), p_endpoint, p_p256dh, p_auth, left(p_agente, 300))
+  on conflict (endpoint) do update
+    set perfil_id = auth.uid(),
+        p256dh = excluded.p256dh,
+        auth = excluded.auth,
+        agente = excluded.agente;
+end;
+$;
+
+create or replace function public.quitar_suscripcion_push(p_endpoint text)
+returns void
+language sql
+security definer
+set search_path = public
+as $
+  delete from public.suscripciones_push
+  where endpoint = p_endpoint and perfil_id = auth.uid();
+$;
 
 -- ============================================================================
 -- Gestión del estudio: egresos, liquidación de profesoras, anuncios y resumen
@@ -2733,6 +2795,8 @@ grant execute on function public.marcar_reactivacion(uuid) to authenticated;
 grant execute on function public.respaldo_perfiles() to authenticated;
 grant execute on function public.agregar_invitada_a_turno(uuid, text, text, text, text) to authenticated;
 grant execute on function public.clientes_para_instructora()   to authenticated;
+grant execute on function public.guardar_suscripcion_push(text, text, text, text) to authenticated;
+grant execute on function public.quitar_suscripcion_push(text) to authenticated;
 grant execute on function public.liquidacion_mes(date) to authenticated;
 grant execute on function public.mi_liquidacion(date) to authenticated;
 grant execute on function public.balance_mes(date) to authenticated;

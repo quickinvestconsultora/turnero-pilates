@@ -29,6 +29,9 @@ import CartelAnuncios from './CartelAnuncios'
 import UltimoPago from './UltimoPago'
 import EstadoAbono from './EstadoAbono'
 import InstalarApp from './InstalarApp'
+import { TarjetaNotificaciones } from './Notificaciones'
+import AgregarAlCalendario from './AgregarAlCalendario'
+import { descargarIcs } from '../calendario'
 import AvisoPrimeraClase from './AvisoPrimeraClase'
 import MiCuenta from './MiCuenta'
 import ModalPago from './ModalPago'
@@ -233,6 +236,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       <EstadoAbono perfil={perfil} />
       <UltimoPago perfil={perfil} onVerTodos={() => setMostrandoCuenta(true)} />
       <InstalarApp />
+      <TarjetaNotificaciones />
 
       <nav className="tabs">
         <button
@@ -254,6 +258,15 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       <main className="contenido">
         {error && <p className="mensaje-error">{error}</p>}
         {aviso && <p className="mensaje-ok">{aviso}</p>}
+        {vista === 'mios' && mios.some((t) => t.mi_estado === 'reservada') && (
+          <button
+            type="button"
+            className="link-secundario"
+            onClick={() => descargarIcs(mios.filter((t) => t.mi_estado === 'reservada'), 'mis-turnos-forteva')}
+          >
+            Agregar todos mis turnos al calendario
+          </button>
+        )}
 
         {cargando ? (
           <p className="vacio">Cargando turnos...</p>
@@ -386,20 +399,26 @@ function ListaTurnos({
 
                   {t.mi_estado === 'reservada' &&
                   faltanMenosDe(t.fecha, t.hora, HORAS_LIMITE_CANCELAR) ? (
-                    <span className="ayuda">
-                      No se puede cancelar
-                      <br />
-                      (faltan menos de {HORAS_LIMITE_CANCELAR} h)
-                    </span>
+                    <div className="turno-acciones">
+                      <span className="ayuda">
+                        No se puede cancelar
+                        <br />
+                        (faltan menos de {HORAS_LIMITE_CANCELAR} h)
+                      </span>
+                      <AgregarAlCalendario turno={t} />
+                    </div>
                   ) : t.mi_estado ? (
-                    <button
-                      type="button"
-                      className="btn-fantasma"
-                      disabled={ocupado}
-                      onClick={() => onCancelar(t)}
-                    >
-                      {ocupado ? '...' : 'Cancelar'}
-                    </button>
+                    <div className="turno-acciones">
+                      <button
+                        type="button"
+                        className="btn-fantasma"
+                        disabled={ocupado}
+                        onClick={() => onCancelar(t)}
+                      >
+                        {ocupado ? '...' : 'Cancelar'}
+                      </button>
+                      {t.mi_estado === 'reservada' && <AgregarAlCalendario turno={t} />}
+                    </div>
                   ) : (
                     <div className="turno-acciones">
                       <button type="button" disabled={ocupado} onClick={() => onReservar(t)}>

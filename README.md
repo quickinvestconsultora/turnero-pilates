@@ -275,6 +275,21 @@ En **Administración** (subpestañas):
 
 **Recibo para la alumna:** en la pantalla principal aparece "Tu último pago" con **Descargar recibo** (y **Compartir** en el celular), y en **Mi cuenta** el de cada pago.
 
+## Notificaciones en el celular, calendario y progreso
+
+**Notificaciones push (Web Push).** La alumna (o profesora) las activa desde el cartel "¿Te avisamos en el celular?" o desde **Mi cuenta → Avisos en el celular**. En iPhone hace falta tener la app agregada al inicio. Cada dispositivo suscripto es una fila de `suscripciones_push` (se maneja con `guardar_suscripcion_push` y `quitar_suscripcion_push`; la tabla solo deja leer lo propio). Las manda la Edge Function `enviar-push`, que llama `enviar-recordatorios` justo después de cada mail enviado con éxito (recordatorio de clase, abono por vencer, lugar liberado, cumpleaños y anuncios con mail), así que valen las mismas reglas y la misma pausa de Clientes. Si `enviar-push` falla o no está publicada, los mails salen igual.
+
+Puesta en marcha (una sola vez):
+1. En una terminal: `npx web-push generate-vapid-keys`. Da una clave pública y una privada.
+2. Supabase → Edge Functions → Secrets: `VAPID_PUBLIC_KEY` (la pública) y `VAPID_PRIVATE_KEY` (la privada; no va en el código ni se comparte). Opcional: `VAPID_SUBJECT` (por defecto `mailto:fortevastudio@gmail.com`).
+3. La clave **pública** también va en `src/config/push.ts` (`VAPID_PUBLIC_KEY`); mientras esté vacía la app no ofrece activar nada.
+4. Publicar la función `enviar-push` (`supabase/functions/enviar-push/index.ts`) y volver a publicar `enviar-recordatorios`.
+5. Probar: con `{"prueba": true}` (y el encabezado `x-cron-secret`) `enviar-push` manda una notificación a todos los dispositivos suscriptos.
+
+**Agregar al calendario.** Cada turno reservado tiene "Agregar al calendario" (Google Calendar o archivo .ics para Apple y otras agendas, con aviso 1 hora antes), y en **Mis turnos** hay un botón que agrega todos juntos (`src/calendario.ts`).
+
+**Progreso de la alumna.** En **Mi cuenta**: clases del mes, semanas seguidas con al menos una clase y total de clases, sin contar las que faltó (`src/progreso.ts`; `mi_historial` devuelve hasta 400 clases).
+
 ## Pendiente (fuera del MVP)
 
 - Bonos / paquetes de clases con vencimiento (por ahora el estado de cuenta es binario: al día o debe, sin "cuántas clases le quedan").

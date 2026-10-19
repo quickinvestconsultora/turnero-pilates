@@ -5,6 +5,8 @@ import type { ClaseMia, PagoMio } from '../servicios/miCuenta'
 import { ETIQUETA_MEDIO } from '../servicios/clientes'
 import type { ConceptoPago, MedioPago } from '../servicios/clientes'
 import BotonRecibo from './BotonRecibo'
+import { SeccionNotificaciones } from './Notificaciones'
+import { calcularProgreso, mensajeProgreso } from '../progreso'
 import { abonoVencido, diaMes } from '../cuenta'
 import { fechaCorta, horaCorta } from '../fechas'
 
@@ -27,6 +29,7 @@ export default function MiCuenta({ perfil, onCerrar }: { perfil: Perfil; onCerra
       .catch((e) => setError(e instanceof Error ? e.message : 'No se pudo cargar tu cuenta.'))
   }, [])
 
+  const progreso = calcularProgreso(clases ?? [])
   const asistio = clases?.filter((c) => c.asistencia === 'asistio').length ?? 0
   const falto = clases?.filter((c) => c.asistencia === 'ausente').length ?? 0
 
@@ -52,6 +55,26 @@ export default function MiCuenta({ perfil, onCerrar }: { perfil: Perfil; onCerra
         <p className={estadoAbono.ok ? 'mensaje-ok' : 'mensaje-error'}>{estadoAbono.texto}</p>
 
         {error && <p className="mensaje-error">{error}</p>}
+
+        {clases !== null && (
+          <>
+            <div className="kpi-grid">
+              <div className="kpi">
+                <span className="kpi-valor">{progreso.esteMes}</span>
+                <span className="kpi-etiqueta">Clases este mes</span>
+              </div>
+              <div className="kpi">
+                <span className="kpi-valor">{progreso.semanasSeguidas}</span>
+                <span className="kpi-etiqueta">Semanas seguidas</span>
+              </div>
+              <div className="kpi">
+                <span className="kpi-valor">{progreso.total}</span>
+                <span className="kpi-etiqueta">Clases en total</span>
+              </div>
+            </div>
+            <p className="ayuda">{mensajeProgreso(progreso)}</p>
+          </>
+        )}
 
         <h3>Mis clases</h3>
         {clases === null ? (
@@ -112,6 +135,8 @@ export default function MiCuenta({ perfil, onCerrar }: { perfil: Perfil; onCerra
             ))}
           </ul>
         )}
+
+        <SeccionNotificaciones />
 
         <div className="modal-botones">
           <button type="button" className="link-secundario" onClick={onCerrar}>
