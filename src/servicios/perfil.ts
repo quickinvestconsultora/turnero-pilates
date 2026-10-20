@@ -9,6 +9,7 @@ export async function registrarse(datos: {
   dni: string
   telefono: string
   aceptaDeslinde: boolean
+  referido?: string
 }): Promise<void> {
   if (!datos.aceptaDeslinde) {
     throw new Error('Tenés que leer y aceptar el deslinde de responsabilidad para registrarte.')
@@ -27,6 +28,7 @@ export async function registrarse(datos: {
         dni: datos.dni.trim(),
         telefono: datos.telefono.trim(),
         acepta_deslinde: 'true',
+        referido: (datos.referido ?? '').trim().toUpperCase(),
       },
     },
   })

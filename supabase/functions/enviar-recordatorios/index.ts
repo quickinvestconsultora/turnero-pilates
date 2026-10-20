@@ -10,6 +10,8 @@
 //   5. Cumpleaños: saludo el día que cumple años (desde las 9, hora argentina).
 //   6. Anuncios: los que el estudio carga con "mandar también por mail" (de a
 //      40 por corrida).
+//   8. Opinión baja: cuando una alumna responde la encuesta con 3 estrellas o menos,
+//      le llega un aviso (con su comentario) a la administradora.
 //   7. Informe mensual: el día 1 de cada mes (desde las 9), el cierre del mes
 //      anterior a la administradora, con el detalle en Excel adjunto.
 // Después de cada mail se manda, si la persona lo activó, la misma novedad como
@@ -93,6 +95,15 @@ type Deslinde = {
 }
 
 type Informe = Record<string, unknown>
+type OpinionBaja = {
+  opinion_id: string
+  nombre: string
+  apellido: string
+  telefono: string
+  estrellas: number
+  comentario: string | null
+  creada_en: string
+}
 
 type AvisoPush = { perfil_id: string; titulo: string; cuerpo: string; url?: string }
 
@@ -263,6 +274,36 @@ function mailAnuncio(a: AnuncioMail): Mail {
       parrafo('Hola ' + escapar(nombre) + ',') +
         lineas.map((l) => (a.importante ? destacado(escapar(l)) : parrafo(escapar(l)))).join(''),
       { texto: 'Entrar al turnero', url: APP_URL },
+    ),
+  }
+}
+
+function mailOpinionBaja(o: OpinionBaja, adminEmail: string): Mail {
+  const nombre = (o.nombre + ' ' + o.apellido).trim() || 'Una alumna'
+  const estrellas = o.estrellas + ' de 5'
+  const comentario = (o.comentario || '').trim() || '(sin comentario)'
+  const filas: [string, string][] = [
+    ['Alumna', nombre],
+    ['Celular', o.telefono || '-'],
+    ['Puntuación', estrellas],
+    ['Comentario', comentario],
+  ]
+  const tabla =
+    '<table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 14px;">' +
+    filas.map((fila) =>
+      '<tr><td style="padding:6px 0;color:#6d6455;width:34%;vertical-align:top;">' + escapar(fila[0]) + '</td><td style="padding:6px 0;"><strong>' +
+      escapar(fila[1]) + '</strong></td></tr>').join('') +
+    '</table>'
+  return {
+    para: { email: adminEmail },
+    asunto: 'Opinión de ' + nombre + ': ' + estrellas + ' estrellas',
+    texto:
+      'Una alumna dejó una opinión baja en la encuesta.' + String.fromCharCode(10) + String.fromCharCode(10) +
+      filas.map((fila) => fila[0] + ': ' + fila[1]).join(String.fromCharCode(10)) +
+      String.fromCharCode(10) + String.fromCharCode(10) + 'Conviene escribirle para entender qué pasó.',
+    html: envolver(
+      'Opinión para atender',
+      parrafo('Una alumna respondió la encuesta con una puntuación baja. Conviene escribirle y entender qué pasó:') + tabla,
     ),
   }
 }
@@ -457,6 +498,7 @@ Deno.serve(async (req) => {
   const deslindes = await pedir<Deslinde>('deslindes_pendientes')
   const cumples = await pedir<Cumple>('avisos_cumple_pendientes')
   const anuncios = await pedir<AnuncioMail>('anuncios_mail_pendientes')
+  const opiniones = await pedir<OpinionBaja>('opiniones_bajas_pendientes')
   let mesInforme: string | null = null
   {
     const { data, error } = await supabase.rpc('informe_mensual_pendiente')
@@ -474,12 +516,13 @@ Deno.serve(async (req) => {
       cumples: cumples.map((c) => ({ nombre: c.nombre, email: c.email })),
       anuncios: anuncios.map((a) => ({ titulo: a.titulo, nombre: a.nombre, email: a.email })),
       informe_mensual: mesInforme,
+      opiniones_bajas: opiniones.map((o) => ({ alumna: (o.nombre + ' ' + o.apellido).trim(), estrellas: o.estrellas })),
       errores,
     })
   }
 
   const total = recordatorios.length + vencimientos.length + promociones.length + deslindes.length +
-    cumples.length + anuncios.length + (mesInforme ? 1 : 0)
+    cumples.length + anuncios.length + opiniones.length + (mesInforme ? 1 : 0)
   if (total === 0) return json({ pendientes: 0, enviados: 0, fallidos: [], errores })
 
   const apiKey = Deno.env.get('BREVO_API_KEY')
@@ -596,6 +639,16 @@ Deno.serve(async (req) => {
     }
   }
 
+  const opinionesAvisadas: string[] = []
+  for (const o of opiniones) {
+    try {
+      await enviarPorBrevo(mailOpinionBaja(o, adminEmail), apiKey, remitente)
+      opinionesAvisadas.push(o.opinion_id)
+    } catch (e) {
+      fallidos.push({ email: adminEmail, error: motivo(e) })
+    }
+  }
+
   const anunciosEnviados: string[] = []
   const perfilesAnuncio: string[] = []
   for (const a of anuncios) {
@@ -627,6 +680,11 @@ Deno.serve(async (req) => {
       p_deslinde: enviadosDeslinde,
     })
     if (error) errores.push('marcar_avisos: ' + error.message)
+  }
+
+  if (opinionesAvisadas.length > 0) {
+    const { error } = await supabase.rpc('marcar_opiniones_avisadas', { p_ids: opinionesAvisadas })
+    if (error) errores.push('marcar_opiniones_avisadas: ' + error.message)
   }
 
   if (informeEnviado && mesInforme) {
@@ -686,6 +744,7 @@ Deno.serve(async (req) => {
       anuncios: anunciosEnviados.length,
       notificaciones: push,
       informe: informeEnviado ? 1 : 0,
+      opiniones: opinionesAvisadas.length,
     },
     fallidos,
     errores,

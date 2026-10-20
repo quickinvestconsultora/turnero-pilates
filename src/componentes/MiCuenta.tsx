@@ -6,6 +6,7 @@ import { ETIQUETA_MEDIO } from '../servicios/clientes'
 import type { ConceptoPago, MedioPago } from '../servicios/clientes'
 import BotonRecibo from './BotonRecibo'
 import { SeccionNotificaciones } from './Notificaciones'
+import InvitarAmiga from './InvitarAmiga'
 import { calcularProgreso, mensajeProgreso } from '../progreso'
 import { abonoVencido, diaMes } from '../cuenta'
 import { fechaCorta, horaCorta } from '../fechas'
@@ -135,6 +136,8 @@ export default function MiCuenta({ perfil, onCerrar }: { perfil: Perfil; onCerra
             ))}
           </ul>
         )}
+
+        <InvitarAmiga />
 
         <SeccionNotificaciones />
 

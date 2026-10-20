@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { iniciarSesion, pedirRecuperacion, registrarse } from '../servicios/perfil'
 import logo from '../assets/forteva-logo.png'
 import CampoPassword from './CampoPassword'
 import AceptarDeslinde from './AceptarDeslinde'
+import { olvidarCodigoGuardado, recordarCodigoDelLink, referidosActivos } from '../servicios/referidos'
 
 // Nombre del estudio: cambialo acá y aparece en el login y en los correos que
 // configures en Supabase.
@@ -12,7 +13,10 @@ const NOMBRE_ESTUDIO = 'FORTEVA Studio'
 type Modo = 'login' | 'registro'
 
 export default function Auth() {
-  const [modo, setModo] = useState<Modo>('login')
+  // Si la persona llega por el link de una amiga (?ref=CODIGO), abre directo el registro.
+  const [referido, setReferido] = useState(recordarCodigoDelLink)
+  const [modo, setModo] = useState<Modo>(() => (recordarCodigoDelLink() ? 'registro' : 'login'))
+  const [referidosOn, setReferidosOn] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [nombre, setNombre] = useState('')
@@ -23,6 +27,12 @@ export default function Auth() {
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [enviando, setEnviando] = useState(false)
+
+  useEffect(() => {
+    referidosActivos()
+      .then(setReferidosOn)
+      .catch(() => setReferidosOn(false))
+  }, [])
 
   const enviar = async (e: FormEvent) => {
     e.preventDefault()
@@ -35,7 +45,8 @@ export default function Auth() {
         await iniciarSesion(email, password)
         // onAuthStateChange en App se encarga del resto.
       } else {
-        await registrarse({ email, password, nombre, apellido, dni, telefono, aceptaDeslinde })
+        await registrarse({ email, password, nombre, apellido, dni, telefono, aceptaDeslinde, referido })
+        olvidarCodigoGuardado()
         setAviso(
           '¡Cuenta creada! Si te llegó un correo para confirmarla, abrilo primero ' +
             '(revisá también spam). Después ingresá con tu correo y contraseña.',
@@ -99,6 +110,20 @@ export default function Auth() {
                 placeholder="Con código de área, sin 0 ni 15"
                 required
               />
+
+              {(referidosOn || referido) && (
+                <>
+                  <label htmlFor="referido">Código de una amiga (opcional)</label>
+                  <input
+                    id="referido"
+                    value={referido}
+                    onChange={(e) => setReferido(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                    maxLength={12}
+                    autoComplete="off"
+                    placeholder="Si una amiga te invitó"
+                  />
+                </>
+              )}
             </>
           )}
 

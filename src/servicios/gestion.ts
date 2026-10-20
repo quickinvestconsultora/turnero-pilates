@@ -8,6 +8,7 @@ const numONull = (v: unknown): number | null => (v === null || v === undefined ?
 // ---- Resumen del estudio ----------------------------------------------------
 
 export type Resumen = {
+  opiniones_bajas: number
   meta_ingresos: number
   topes_superados: number
   cobrado_mes: number

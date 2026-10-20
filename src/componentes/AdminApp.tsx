@@ -17,14 +17,16 @@ import Finanzas from './Finanzas'
 import type { PestañaFinanzas } from './Finanzas'
 import AnunciosStaff from './AnunciosStaff'
 import Solapas from './Solapas'
+import Referidos from './Referidos'
+import Opiniones from './Opiniones'
 
 type Vista = 'hoy' | 'agenda' | 'semana' | 'plantillas' | 'administracion'
 type Seccion = 'resumen' | 'clientes' | 'profesores' | 'finanzas' | 'mas'
-type SubClientes = 'lista' | 'reactivar'
-type SubMas = 'estadisticas' | 'anuncios' | 'respaldo'
+type SubClientes = 'lista' | 'reactivar' | 'referidos'
+type SubMas = 'estadisticas' | 'opiniones' | 'anuncios' | 'respaldo'
 
 // A dónde pueden llevar los atajos del Resumen.
-type Destino = 'clientes' | 'reactivar' | 'cobros' | 'egresos' | 'estadisticas'
+type Destino = 'clientes' | 'reactivar' | 'cobros' | 'egresos' | 'estadisticas' | 'opiniones'
 
 const PESTAÑAS: [Vista, string][] = [
   ['hoy', 'Hoy'],
@@ -51,7 +53,7 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
       setSubClientes(destino === 'reactivar' ? 'reactivar' : 'lista')
       setSeccion('clientes')
     } else {
-      setSubMas('estadisticas')
+      setSubMas(destino === 'opiniones' ? 'opiniones' : 'estadisticas')
       setSeccion('mas')
     }
   }
@@ -131,9 +133,12 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
               items={[
                 { clave: 'lista', etiqueta: 'Todas las alumnas' },
                 { clave: 'reactivar', etiqueta: 'Para reactivar' },
+                { clave: 'referidos', etiqueta: 'Referidos' },
               ]}
             />
-            {subClientes === 'lista' ? <Clientes /> : <Reactivar />}
+            {subClientes === 'lista' && <Clientes />}
+            {subClientes === 'reactivar' && <Reactivar />}
+            {subClientes === 'referidos' && <Referidos />}
           </>
         )}
         {vista === 'administracion' && seccion === 'profesores' && <Profesores />}
@@ -147,11 +152,13 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
               onElegir={setSubMas}
               items={[
                 { clave: 'estadisticas', etiqueta: 'Estadísticas' },
+                { clave: 'opiniones', etiqueta: 'Opiniones' },
                 { clave: 'anuncios', etiqueta: 'Anuncios' },
                 { clave: 'respaldo', etiqueta: 'Respaldo' },
               ]}
             />
             {subMas === 'estadisticas' && <Estadisticas />}
+            {subMas === 'opiniones' && <Opiniones />}
             {subMas === 'anuncios' && <AnunciosStaff />}
             {subMas === 'respaldo' && <Respaldo />}
           </>

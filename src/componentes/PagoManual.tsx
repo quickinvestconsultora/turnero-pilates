@@ -14,21 +14,24 @@ const aNumero = (texto: string) => Number(texto.replace(/\D/g, ''))
 // "al día" hasta esa fecha o solo guardarlo en el historial.
 export default function PagoManual({
   alumna,
+  inicial,
   onRegistrado,
   onCerrar,
 }: {
   alumna: { id: string; nombre: string }
+  // Valores con los que arranca el formulario (por ejemplo, regalar una clase).
+  inicial?: { monto?: string; concepto?: ConceptoPago; nota?: string }
   onRegistrado: () => void
   onCerrar: () => void
 }) {
   const hoy = hoyIso()
   const [fecha, setFecha] = useState(hoy)
-  const [concepto, setConcepto] = useState<ConceptoPago>('mes')
-  const [monto, setMonto] = useState('')
+  const [concepto, setConcepto] = useState<ConceptoPago>(inicial?.concepto ?? 'mes')
+  const [monto, setMonto] = useState(inicial?.monto ?? '')
   const [medio, setMedio] = useState<MedioPago>('transferencia')
-  const [hasta, setHasta] = useState(finDeMes(hoy))
+  const [hasta, setHasta] = useState(inicial?.concepto && inicial.concepto !== 'mes' ? hoy : finDeMes(hoy))
   const [dejarAlDia, setDejarAlDia] = useState(true)
-  const [nota, setNota] = useState('')
+  const [nota, setNota] = useState(inicial?.nota ?? '')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
 

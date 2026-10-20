@@ -60,6 +60,41 @@ alter table public.perfiles
   add column if not exists reactivacion_avisada_en timestamptz,
   add column if not exists aviso_cumple_anio int;
 
+-- Referidos ("traé una amiga"): cada perfil tiene un código corto; quien se registra
+-- con el código de otra queda anotada como referida por ella. El beneficio lo
+-- entrega el estudio a mano (ver Clientes → Referidos).
+create or replace function public.nuevo_codigo_referido()
+returns text
+language plpgsql
+volatile
+set search_path = public
+as $$
+declare
+  v_chars text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  v_cod   text;
+begin
+  loop
+    v_cod := '';
+    for i in 1..6 loop
+      v_cod := v_cod || substr(v_chars, 1 + floor(random() * length(v_chars))::int, 1);
+    end loop;
+    exit when not exists (select 1 from public.perfiles where codigo_referido = v_cod);
+  end loop;
+  return v_cod;
+end;
+$$;
+
+alter table public.perfiles
+  add column if not exists codigo_referido text,
+  add column if not exists referida_por uuid references public.perfiles (id) on delete set null,
+  add column if not exists referido_beneficio_en timestamptz;
+
+create unique index if not exists perfiles_codigo_referido_idx on public.perfiles (codigo_referido);
+
+alter table public.perfiles alter column codigo_referido set default public.nuevo_codigo_referido();
+
+update public.perfiles set codigo_referido = public.nuevo_codigo_referido() where codigo_referido is null;
+
 update public.perfiles
 set al_dia_hasta = (
   date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires')
@@ -124,14 +159,18 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.perfiles (id, nombre, apellido, dni, telefono, deslinde_aceptado_en)
+  insert into public.perfiles (id, nombre, apellido, dni, telefono, deslinde_aceptado_en, referida_por)
   values (
     new.id,
     coalesce(new.raw_user_meta_data ->> 'nombre', ''),
     coalesce(new.raw_user_meta_data ->> 'apellido', ''),
     nullif(new.raw_user_meta_data ->> 'dni', ''),
     coalesce(new.raw_user_meta_data ->> 'telefono', ''),
-    case when new.raw_user_meta_data ->> 'acepta_deslinde' = 'true' then now() end
+    case when new.raw_user_meta_data ->> 'acepta_deslinde' = 'true' then now() end,
+    (select p.id from public.perfiles p
+      where p.codigo_referido = upper(btrim(coalesce(new.raw_user_meta_data ->> 'referido', '')))
+        and p.rol = 'alumno'
+      limit 1)
   )
   on conflict (id) do nothing;
 
@@ -672,6 +711,9 @@ begin
     if new.al_dia_hasta is distinct from old.al_dia_hasta then
       new.al_dia_hasta := old.al_dia_hasta;
     end if;
+    new.codigo_referido := old.codigo_referido;
+    new.referida_por := old.referida_por;
+    new.referido_beneficio_en := old.referido_beneficio_en;
   end if;
   return new;
 end;
@@ -2868,6 +2910,8 @@ begin
     'comprobantes_pendientes', (select count(*) from public.comprobantes_pago where estado = 'pendiente'),
     'para_reactivar', (select count(*) from public.alumnas_para_reactivar(21) x
                        where x.avisada_en is null or x.avisada_en < now() - interval '30 days'),
+    'opiniones_bajas', (select count(*) from public.encuestas e
+                        where e.estado = 'respondida' and e.estrellas <= 3 and not e.revisada),
     'meta_ingresos', coalesce((select pr.monto from public.presupuesto pr where pr.clave = 'meta_ingresos'), 0),
     'topes_superados', (
       select count(*)
@@ -3241,6 +3285,277 @@ $$;
 
 revoke execute on function public.registrar_pago_mp(uuid, text, numeric) from public, anon, authenticated;
 grant execute on function public.registrar_pago_mp(uuid, text, numeric) to service_role;
+
+-- --- Encuestas de satisfacción -------------------------------------------------------
+-- A la alumna que ya hizo 3 clases y sigue viniendo se le pregunta cómo viene
+-- (1 a 5 estrellas y un comentario opcional). El comentario lo ve solo el staff.
+create table if not exists public.encuestas (
+  id         uuid primary key default gen_random_uuid(),
+  alumna_id  uuid not null references public.perfiles (id) on delete cascade default auth.uid(),
+  estado     text not null default 'respondida' check (estado in ('respondida', 'omitida')),
+  estrellas  int check (estrellas between 1 and 5),
+  comentario text,
+  revisada   boolean not null default false,
+  avisada_en timestamptz,
+  creado_en  timestamptz not null default now(),
+  check ((estado = 'respondida') = (estrellas is not null))
+);
+
+create index if not exists encuestas_alumna_idx on public.encuestas (alumna_id, creado_en desc);
+
+alter table public.encuestas enable row level security;
+
+drop policy if exists encuestas_ver on public.encuestas;
+create policy encuestas_ver on public.encuestas
+  for select using (alumna_id = auth.uid() or public.es_staff());
+
+drop policy if exists encuestas_crea on public.encuestas;
+create policy encuestas_crea on public.encuestas
+  for insert with check (alumna_id = auth.uid() and not revisada and avisada_en is null);
+
+drop policy if exists encuestas_staff_actualiza on public.encuestas;
+create policy encuestas_staff_actualiza on public.encuestas
+  for update using (public.es_staff()) with check (public.es_staff());
+
+drop policy if exists encuestas_staff_borra on public.encuestas;
+create policy encuestas_staff_borra on public.encuestas
+  for delete using (public.es_staff());
+
+-- Una respuesta por día por alumna, para evitar el spam.
+create or replace function public.limitar_encuestas()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if exists (
+    select 1 from public.encuestas e
+    where e.alumna_id = new.alumna_id and e.creado_en > now() - interval '12 hours'
+  ) then
+    raise exception 'Ya respondiste hace un rato. Gracias!';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists limitar_encuestas on public.encuestas;
+create trigger limitar_encuestas
+  before insert on public.encuestas
+  for each row execute function public.limitar_encuestas();
+
+-- ¿Hay que preguntarle a esta alumna? Hizo al menos 3 clases (sin contar las que
+-- faltó), vino en los últimos 30 días y no respondió hace menos de 60 días (o
+-- no quiso responder hace menos de 14).
+create or replace function public.encuesta_pendiente()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with clases as (
+    select t.fecha
+    from public.reservas r
+    join public.turnos t on t.id = r.turno_id
+    where r.alumno_id = auth.uid()
+      and r.estado = 'reservada'
+      and not t.cancelado
+      and (t.fecha + t.hora) < (now() at time zone 'America/Argentina/Buenos_Aires')
+      and r.asistencia is distinct from 'ausente'
+  )
+  select auth.uid() is not null
+    and exists (select 1 from public.perfiles p where p.id = auth.uid() and p.rol = 'alumno')
+    and (select count(*) from clases) >= 3
+    and exists (
+      select 1 from clases
+      where fecha >= (now() at time zone 'America/Argentina/Buenos_Aires')::date - 30
+    )
+    and not exists (
+      select 1 from public.encuestas e
+      where e.alumna_id = auth.uid()
+        and ((e.estado = 'respondida' and e.creado_en > now() - interval '60 days')
+          or (e.estado = 'omitida' and e.creado_en > now() - interval '14 days'))
+    );
+$$;
+
+-- Opiniones bajas (3 estrellas o menos) para avisarle a la administradora por mail.
+-- Las usa la Edge Function (clave de servicio).
+create or replace function public.opiniones_bajas_pendientes()
+returns table (
+  opinion_id uuid,
+  nombre     text,
+  apellido   text,
+  telefono   text,
+  estrellas  int,
+  comentario text,
+  creada_en  timestamptz
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select e.id, p.nombre, p.apellido, p.telefono, e.estrellas, e.comentario, e.creado_en
+  from public.encuestas e
+  join public.perfiles p on p.id = e.alumna_id
+  where public.recordatorios_activos()
+    and e.estado = 'respondida'
+    and e.estrellas <= 3
+    and e.avisada_en is null;
+$$;
+
+create or replace function public.marcar_opiniones_avisadas(p_ids uuid[])
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.encuestas set avisada_en = now() where id = any(p_ids);
+$$;
+
+revoke execute on function public.opiniones_bajas_pendientes() from public, anon, authenticated;
+revoke execute on function public.marcar_opiniones_avisadas(uuid[]) from public, anon, authenticated;
+grant execute on function public.opiniones_bajas_pendientes() to service_role;
+grant execute on function public.marcar_opiniones_avisadas(uuid[]) to service_role;
+
+-- --- Referidos: interruptor, mi código y listas ---------------------------------------
+-- Mientras el interruptor esté apagado (por defecto), la app no muestra nada de
+-- referidos a las alumnas. Se enciende desde Clientes → Referidos.
+create or replace function public.referidos_activos()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select c.valor = 'true'::jsonb from public.configuracion c where c.clave = 'referidos_activos'),
+    false
+  );
+$$;
+
+create or replace function public.cambiar_referidos(p_activos boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede cambiar esto.';
+  end if;
+  insert into public.configuracion (clave, valor, actualizado_por)
+  values ('referidos_activos', to_jsonb(p_activos), auth.uid())
+  on conflict (clave) do update
+    set valor = excluded.valor, actualizado_en = now(), actualizado_por = auth.uid();
+end;
+$$;
+
+create or replace function public.mi_codigo_referido()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p.codigo_referido from public.perfiles p where p.id = auth.uid() and p.rol = 'alumno';
+$$;
+
+-- Las amigas que se registraron con mi código: solo el primer nombre y cómo van.
+create or replace function public.mis_referidos()
+returns table (nombre text, estado text, creado_en timestamptz)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select split_part(btrim(p.nombre), ' ', 1),
+         case
+           when exists (select 1 from public.pagos_clientes pc where pc.alumna_id = p.id) then 'pago'
+           when exists (
+             select 1 from public.reservas r
+             join public.turnos t on t.id = r.turno_id
+             where r.alumno_id = p.id and r.estado = 'reservada' and not t.cancelado
+               and (t.fecha + t.hora) < (now() at time zone 'America/Argentina/Buenos_Aires')
+               and r.asistencia is distinct from 'ausente'
+           ) then 'vino'
+           else 'registrada'
+         end,
+         p.creado_en
+  from public.perfiles p
+  where p.referida_por = auth.uid()
+  order by p.creado_en desc;
+$$;
+
+-- Lista completa para el staff.
+create or replace function public.referidos_lista()
+returns table (
+  referida_id        uuid,
+  referida_nombre    text,
+  referida_telefono  text,
+  referente_id       uuid,
+  referente_nombre   text,
+  referente_telefono text,
+  creada_en          timestamptz,
+  clases             bigint,
+  pagos              bigint,
+  beneficio_en       timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede ver los referidos.';
+  end if;
+
+  return query
+  select p.id,
+         btrim(p.nombre || ' ' || p.apellido),
+         p.telefono,
+         r.id,
+         btrim(r.nombre || ' ' || r.apellido),
+         r.telefono,
+         p.creado_en,
+         (select count(*) from public.reservas rv
+            join public.turnos t on t.id = rv.turno_id
+           where rv.alumno_id = p.id and rv.estado = 'reservada' and not t.cancelado
+             and (t.fecha + t.hora) < (now() at time zone 'America/Argentina/Buenos_Aires')
+             and rv.asistencia is distinct from 'ausente'),
+         (select count(*) from public.pagos_clientes pc where pc.alumna_id = p.id),
+         p.referido_beneficio_en
+  from public.perfiles p
+  join public.perfiles r on r.id = p.referida_por
+  order by p.creado_en desc;
+end;
+$$;
+
+create or replace function public.marcar_beneficio_referido(p_referida_id uuid, p_entregado boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede hacer esto.';
+  end if;
+  update public.perfiles
+    set referido_beneficio_en = case when p_entregado then now() else null end
+  where id = p_referida_id and referida_por is not null;
+end;
+$$;
+
+grant execute on function public.encuesta_pendiente() to authenticated;
+grant execute on function public.referidos_activos() to anon, authenticated;
+grant execute on function public.cambiar_referidos(boolean) to authenticated;
+grant execute on function public.mi_codigo_referido() to authenticated;
+grant execute on function public.mis_referidos() to authenticated;
+grant execute on function public.referidos_lista() to authenticated;
+grant execute on function public.marcar_beneficio_referido(uuid, boolean) to authenticated;
 
 -- Permisos de ejecución (authenticated ya puede ejecutar funciones public
 -- por defecto en Supabase, pero lo dejamos explícito).

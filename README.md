@@ -316,6 +316,14 @@ La alumna elige qué paga (clase suelta o abono de 1, 2 o 3 veces por semana) y 
 - **Revisar avisos:** en el SQL Editor, `select creado_en, payment_id, tipo, firma_valida, resultado, detalle from public.mp_eventos order by creado_en desc limit 20;`
 - **Pruebas:** primero con las credenciales de prueba y cuentas de prueba de Mercado Pago; recién después se cambia `MP_ACCESS_TOKEN` por el de producción.
 
+## Encuesta, reseñas y referidos
+
+**Encuesta de satisfacción.** A la alumna que hizo al menos 3 clases (sin contar las que faltó), vino en los últimos 30 días y no respondió hace menos de 60 (o dijo "Ahora no" hace menos de 14) se le muestra, arriba de su pantalla, "¿Cómo venís con tus clases?" con 1 a 5 estrellas y un comentario opcional (`encuesta_pendiente`, tabla `encuestas`). Con 4 o 5 estrellas y el link de Google cargado en `src/config/resenias.ts` (`GOOGLE_RESENIAS_URL`), se le sugiere dejar una reseña; si está vacío, solo se le agradece. Con 3 o menos, el comentario le llega por mail a la administradora (`MAIL_ADMIN`, función `enviar-recordatorios`) y queda marcado en **Administración → Más → Opiniones**, que también muestra el promedio y permite escribirle a la alumna por WhatsApp. El Resumen avisa cuántas opiniones bajas están sin revisar.
+
+**Referidos ("traé una amiga").** Cada perfil tiene un código (`perfiles.codigo_referido`). Quien se registra con el link `/app/?ref=CODIGO` (o escribe el código) queda anotada como referida (`referida_por`). El programa viene **apagado**: se lanza desde **Clientes → Referidos** (interruptor `referidos_activos` en `configuracion`); apagado, las alumnas no ven nada. Prendido, **Mi cuenta → Traé a una amiga** muestra su código y su link, botones para compartir por WhatsApp o copiar, y cómo van sus amigas. En **Clientes → Referidos** el staff ve quién trajo a quién y si ya vino a clase o pagó, y entrega el beneficio a mano: "Regalar clase" abre el cobro manual con monto 0 (queda en la ficha) y se puede marcar "beneficio entregado". El texto del beneficio que ven las alumnas se cambia en `src/config/referidos.ts`.
+
+**Crédito de la web.** La página principal y la app muestran al pie "Desarrollado por Quickinvest" con el logo de WhatsApp, que abre un chat con Quickinvest (`src/componentes/PieQuickinvest.tsx` y el pie de `index.html`).
+
 ## Pendiente (fuera del MVP)
 
 - Bonos / paquetes de clases con vencimiento (por ahora el estado de cuenta es binario: al día o debe, sin "cuántas clases le quedan").

@@ -20,7 +20,7 @@ function Comparacion({ actual, anterior, plata = false }: { actual: number; ante
 }
 
 // Tablero de Administración: lo que hay que mirar todos los días, en una pantalla.
-export default function Resumen({ onIr }: { onIr: (seccion: 'clientes' | 'reactivar' | 'cobros' | 'egresos' | 'estadisticas') => void }) {
+export default function Resumen({ onIr }: { onIr: (seccion: 'clientes' | 'reactivar' | 'cobros' | 'egresos' | 'estadisticas' | 'opiniones') => void }) {
   const [r, setR] = useState<ResumenTipo | null>(null)
   const [error, setError] = useState('')
 
@@ -38,7 +38,7 @@ export default function Resumen({ onIr }: { onIr: (seccion: 'clientes' | 'reacti
   const ocupacion = r.cupo_30d > 0 ? Math.round((r.reservas_30d / r.cupo_30d) * 100) : null
   const mes = nombreMes(hoyIso())
 
-  const alertas: { texto: string; ir: 'clientes' | 'reactivar' | 'egresos' }[] = []
+  const alertas: { texto: string; ir: 'clientes' | 'reactivar' | 'egresos' | 'opiniones' }[] = []
   if (r.comprobantes_pendientes > 0) {
     alertas.push({
       texto: `${r.comprobantes_pendientes} comprobante${r.comprobantes_pendientes === 1 ? '' : 's'} esperando que lo${r.comprobantes_pendientes === 1 ? '' : 's'} confirmes`,
@@ -61,6 +61,12 @@ export default function Resumen({ onIr }: { onIr: (seccion: 'clientes' | 'reacti
     alertas.push({
       texto: `${r.topes_superados} categoría${r.topes_superados === 1 ? '' : 's'} de gasto pasó el tope de este mes`,
       ir: 'egresos',
+    })
+  }
+  if (r.opiniones_bajas > 0) {
+    alertas.push({
+      texto: `${r.opiniones_bajas} opinión${r.opiniones_bajas === 1 ? '' : 'es'} de alumnas para atender (3 estrellas o menos)`,
+      ir: 'opiniones',
     })
   }
   if (r.para_reactivar > 0) {

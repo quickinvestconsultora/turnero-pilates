@@ -2429,3 +2429,96 @@ label {
   flex-wrap: wrap;
   gap: 6px;
 }
+
+/* ---- Encuesta, opiniones y referidos ---- */
+.encuesta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-left: 4px solid var(--acento);
+  border-radius: var(--radio);
+  font-size: 14px;
+}
+
+.encuesta p {
+  margin: 0;
+}
+
+.encuesta-estrellas {
+  display: flex;
+  gap: 2px;
+}
+
+.estrella {
+  padding: 0 4px;
+  background: transparent;
+  color: var(--borde);
+  font-size: 32px;
+  line-height: 1;
+}
+
+.estrella--llena {
+  color: #d9a21b;
+}
+
+.opinion-estrellas {
+  color: #d9a21b;
+  letter-spacing: 1px;
+}
+
+.opinion-estrellas--vacias {
+  color: var(--borde);
+}
+
+.opinion-comentario {
+  margin: 4px 0 0;
+  font-size: 14px;
+  white-space: pre-line;
+}
+
+.invitar-codigo {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.invitar-codigo strong {
+  letter-spacing: 0.12em;
+}
+
+/* ---- Crédito de Quickinvest ---- */
+.pie-quickinvest {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px 16px 28px;
+  font-size: 12px;
+  color: var(--texto-suave);
+}
+
+.pie-quickinvest strong {
+  color: var(--texto);
+}
+
+.pie-quickinvest a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: #1f9d55;
+  border-radius: 50%;
+}
+
+.pie-quickinvest a:hover {
+  background: var(--borde);
+}
+
+.pie-quickinvest svg {
+  width: 18px;
+  height: 18px;
+}

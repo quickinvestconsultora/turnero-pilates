@@ -28,6 +28,7 @@ import AvisoPromocion from './AvisoPromocion'
 import CartelAnuncios from './CartelAnuncios'
 import UltimoPago from './UltimoPago'
 import RetornoPago from './RetornoPago'
+import EncuestaClase from './EncuestaClase'
 import EstadoAbono from './EstadoAbono'
 import InstalarApp from './InstalarApp'
 import { TarjetaNotificaciones } from './Notificaciones'
@@ -228,6 +229,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
 
       <CartelAnuncios />
       <RetornoPago perfil={perfil} onPerfilActualizado={onPerfilActualizado} />
+      <EncuestaClase />
       <AvisoPromocion turnos={promovidas} onEntendido={entenderPromociones} />
       <AvisoPago perfil={perfil} onComprobante={cargarComprobantes} />
       {comprobantePendiente && (

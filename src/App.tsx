@@ -11,6 +11,7 @@ import AdminApp from './componentes/AdminApp'
 import InstructoraApp from './componentes/InstructoraApp'
 import Cargando from './componentes/Cargando'
 import BannerPrueba from './componentes/BannerPrueba'
+import PieQuickinvest from './componentes/PieQuickinvest'
 
 type EstadoPerfil =
   | { estado: 'cargando' }
@@ -23,6 +24,7 @@ export default function App() {
     <>
       <BannerPrueba />
       <Contenido />
+      <PieQuickinvest />
     </>
   )
 }
