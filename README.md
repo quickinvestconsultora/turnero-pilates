@@ -324,6 +324,12 @@ La alumna elige qué paga (clase suelta o abono de 1, 2 o 3 veces por semana) y 
 
 **Crédito de la web.** La página principal y la app muestran al pie "Desarrollado por Quickinvest" con el logo de WhatsApp, que abre un chat con Quickinvest (`src/componentes/PieQuickinvest.tsx` y el pie de `index.html`).
 
+## Turnos fijos para siempre y alumnas fijas
+
+**Publicación automática.** Los turnos fijos (plantillas) activos se publican solos todos los días a las 00:10 (hora argentina) con `generar_turnos_automaticos()`, desde hoy hasta el fin del mes que viene. La tarea diaria `turnos-fijos-diario` la programa `schema.sql` con pg_cron (si pg_cron no está, se puede seguir publicando a mano con "Este mes" y "Mes que viene"). Para que un horario deje de repetirse, se desactiva o se borra el turno fijo. Para sacar una fecha puntual hay que **cancelar** ese turno desde la Agenda: si se borra, se volvería a publicar.
+
+**Alumnas fijas.** Una alumna con el abono al día puede tocar **"Quedarme fija en este horario"** en un turno que sale de un turno fijo (o el estudio la agrega desde **Turnos fijos → Alumnas fijas**). Desde ese momento se anota sola en cada turno nuevo de ese día y horario (`inscripciones_fijas`, `asignar_fijas`), siempre que su abono cubra la fecha y haya lugar. Si cancela una fecha, no se la vuelve a anotar en esa fecha. Cuando renueva o extiende el abono, se la anota en los turnos ya publicados que ahora quedan cubiertos. Queda así para siempre hasta que ella ("Mis turnos → Mis horarios fijos → Dejar de ser fija") o el estudio la saquen; las reservas ya hechas se mantienen.
+
 ## Pendiente (fuera del MVP)
 
 - Bonos / paquetes de clases con vencimiento (por ahora el estado de cuenta es binario: al día o debe, sin "cuántas clases le quedan").

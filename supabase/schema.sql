@@ -3557,6 +3557,285 @@ grant execute on function public.mis_referidos() to authenticated;
 grant execute on function public.referidos_lista() to authenticated;
 grant execute on function public.marcar_beneficio_referido(uuid, boolean) to authenticated;
 
+-- --- Turnos fijos para siempre: publicación automática y alumnas fijas ------------------
+-- 1) Los turnos fijos (plantillas activas) se publican solos todos los días, hasta
+--    el fin del mes que viene (lo mismo que ven las alumnas). Para que un turno deje
+--    de repetirse, se desactiva o se borra el turno fijo. Para sacar una fecha
+--    puntual, se cancela ese turno (no se borra, porque se volvería a publicar).
+-- 2) Una alumna puede quedar "fija" en un horario: se anota sola en cada turno nuevo
+--    de ese día y horario (mientras su abono lo cubra y haya lugar) hasta que ella o
+--    el estudio la saquen. Si cancela una fecha, no se la vuelve a anotar en esa fecha.
+create table if not exists public.inscripciones_fijas (
+  alumna_id   uuid not null references public.perfiles (id) on delete cascade,
+  plantilla_id uuid not null references public.plantillas_turno (id) on delete cascade,
+  creada_en   timestamptz not null default now(),
+  creada_por  uuid references auth.users (id) on delete set null default auth.uid(),
+  primary key (alumna_id, plantilla_id)
+);
+
+create index if not exists inscripciones_fijas_plantilla_idx on public.inscripciones_fijas (plantilla_id);
+
+alter table public.inscripciones_fijas enable row level security;
+
+drop policy if exists fijas_ver on public.inscripciones_fijas;
+create policy fijas_ver on public.inscripciones_fijas
+  for select using (alumna_id = auth.uid() or public.es_staff());
+
+drop policy if exists fijas_staff on public.inscripciones_fijas;
+create policy fijas_staff on public.inscripciones_fijas
+  for all using (public.es_staff()) with check (public.es_staff());
+
+-- Anota a las alumnas fijas en los turnos futuros que les corresponden. Se puede
+-- acotar a una alumna y/o a un turno. Solo anota si su abono está al día y cubre la
+-- fecha, si hay lugar, y si no tiene ya una fila de reserva para ese turno (así no
+-- vuelve a anotarla donde ella canceló). Devuelve cuántas reservas creó. Interna.
+create or replace function public.asignar_fijas(p_alumna uuid default null, p_turno uuid default null)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  r       record;
+  v_n     integer := 0;
+  v_ahora timestamp := now() at time zone 'America/Argentina/Buenos_Aires';
+  v_cupo  integer;
+begin
+  for r in
+    select t.id as turno_id, f.alumna_id
+    from public.inscripciones_fijas f
+    join public.plantillas_turno pl on pl.id = f.plantilla_id and pl.activa
+    join public.turnos t on t.plantilla_id = f.plantilla_id
+    join public.perfiles p on p.id = f.alumna_id
+    where (p_alumna is null or f.alumna_id = p_alumna)
+      and (p_turno is null or t.id = p_turno)
+      and not t.cancelado
+      and (t.fecha + t.hora) >= v_ahora
+      and p.rol = 'alumno'
+      and p.estado_cuenta = 'al_dia'
+      and (p.al_dia_hasta is null or t.fecha <= p.al_dia_hasta)
+      and not exists (
+        select 1 from public.reservas x
+        where x.turno_id = t.id and x.alumno_id = f.alumna_id
+      )
+    order by t.fecha, t.hora, f.creada_en
+  loop
+    begin
+      select cupo into v_cupo from public.turnos where id = r.turno_id for update;
+      if public.ocupados_turno(r.turno_id) < v_cupo then
+        insert into public.reservas (turno_id, alumno_id, estado)
+        values (r.turno_id, r.alumna_id, 'reservada')
+        on conflict (turno_id, alumno_id) do nothing;
+        if found then
+          v_n := v_n + 1;
+        end if;
+      end if;
+    exception when others then
+      null; -- un problema con una reserva no frena a las demás
+    end;
+  end loop;
+
+  return v_n;
+end;
+$$;
+
+-- Cada turno nuevo que sale de un turno fijo: se anotan las alumnas fijas.
+create or replace function public.trg_asignar_fijas_turno()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.plantilla_id is not null then
+    begin
+      perform public.asignar_fijas(null, new.id);
+    exception when others then
+      null;
+    end;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists asignar_fijas_turno on public.turnos;
+create trigger asignar_fijas_turno
+  after insert on public.turnos
+  for each row execute function public.trg_asignar_fijas_turno();
+
+-- Cuando el abono de una alumna fija se renueva o se extiende, se la anota en los
+-- turnos que ya estaban publicados y ahora quedan cubiertos.
+create or replace function public.trg_asignar_fijas_cobertura()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.estado_cuenta = 'al_dia'
+     and (old.estado_cuenta is distinct from new.estado_cuenta
+          or old.al_dia_hasta is distinct from new.al_dia_hasta) then
+    begin
+      perform public.asignar_fijas(new.id, null);
+    exception when others then
+      null;
+    end;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists asignar_fijas_cobertura on public.perfiles;
+create trigger asignar_fijas_cobertura
+  after update of estado_cuenta, al_dia_hasta on public.perfiles
+  for each row execute function public.trg_asignar_fijas_cobertura();
+
+-- Una alumna queda fija en un horario (o el staff la deja fija). Devuelve a cuántos
+-- turnos ya publicados la anotó. Ella necesita tener el abono al día.
+create or replace function public.fijar_alumna(p_alumna_id uuid, p_plantilla_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_hoy date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
+  v_perfil public.perfiles;
+begin
+  if auth.uid() is null then
+    raise exception 'Necesitás iniciar sesión.';
+  end if;
+  if not (public.es_staff() or auth.uid() = p_alumna_id) then
+    raise exception 'No tenés permiso para hacer esto.';
+  end if;
+
+  select * into v_perfil from public.perfiles where id = p_alumna_id and rol = 'alumno';
+  if not found then
+    raise exception 'No encontramos a esa alumna.';
+  end if;
+  if not exists (select 1 from public.plantillas_turno where id = p_plantilla_id and activa) then
+    raise exception 'Ese turno fijo no existe o está desactivado.';
+  end if;
+
+  if not public.es_staff() then
+    if v_perfil.estado_cuenta <> 'al_dia'
+       or (v_perfil.al_dia_hasta is not null and v_perfil.al_dia_hasta < v_hoy) then
+      raise exception 'PAGO_REQUERIDO';
+    end if;
+  end if;
+
+  insert into public.inscripciones_fijas (alumna_id, plantilla_id)
+  values (p_alumna_id, p_plantilla_id)
+  on conflict do nothing;
+
+  return public.asignar_fijas(p_alumna_id, null);
+end;
+$$;
+
+-- Deja de ser fija en ese horario. Las reservas que ya tiene se mantienen.
+create or replace function public.dejar_fija(p_alumna_id uuid, p_plantilla_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Necesitás iniciar sesión.';
+  end if;
+  if not (public.es_staff() or auth.uid() = p_alumna_id) then
+    raise exception 'No tenés permiso para hacer esto.';
+  end if;
+  delete from public.inscripciones_fijas
+  where alumna_id = p_alumna_id and plantilla_id = p_plantilla_id;
+end;
+$$;
+
+-- Mis horarios fijos (alumna).
+create or replace function public.mis_fijas()
+returns table (plantilla_id uuid, dia_semana smallint, hora time, instructor text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select pl.id, pl.dia_semana, pl.hora, pl.instructor
+  from public.inscripciones_fijas f
+  join public.plantillas_turno pl on pl.id = f.plantilla_id
+  where f.alumna_id = auth.uid()
+  order by pl.dia_semana, pl.hora;
+$$;
+
+-- Alumnas fijas de un turno fijo (staff).
+create or replace function public.fijas_de_plantilla(p_plantilla_id uuid)
+returns table (alumna_id uuid, nombre text, apellido text, telefono text, creada_en timestamptz)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede ver esto.';
+  end if;
+  return query
+  select p.id, p.nombre, p.apellido, p.telefono, f.creada_en
+  from public.inscripciones_fijas f
+  join public.perfiles p on p.id = f.alumna_id
+  where f.plantilla_id = p_plantilla_id
+  order by p.nombre, p.apellido;
+end;
+$$;
+
+-- Publica los turnos fijos activos desde hoy hasta el fin del mes que viene. No
+-- repite los que ya existen (ni los que se cancelaron). La corre la tarea diaria.
+create or replace function public.generar_turnos_automaticos()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_hoy date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
+  v_fin date := (date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires') + interval '2 months - 1 day')::date;
+  v_n   integer;
+begin
+  insert into public.turnos (fecha, hora, duracion_min, cupo, instructor, instructora_id, plantilla_id)
+  select d::date, pl.hora, pl.duracion_min, pl.cupo, pl.instructor, pl.instructora_id, pl.id
+  from public.plantillas_turno pl
+  cross join generate_series(v_hoy::timestamp, v_fin::timestamp, interval '1 day') d
+  where pl.activa
+    and extract(dow from d) = pl.dia_semana
+  on conflict (fecha, hora) do nothing;
+
+  get diagnostics v_n = row_count;
+  return v_n;
+end;
+$$;
+
+revoke execute on function public.asignar_fijas(uuid, uuid) from public, anon, authenticated;
+revoke execute on function public.generar_turnos_automaticos() from public, anon, authenticated;
+grant execute on function public.generar_turnos_automaticos() to service_role;
+grant execute on function public.fijar_alumna(uuid, uuid) to authenticated;
+grant execute on function public.dejar_fija(uuid, uuid) to authenticated;
+grant execute on function public.mis_fijas() to authenticated;
+grant execute on function public.fijas_de_plantilla(uuid) to authenticated;
+
+-- Tarea diaria (00:10 hora argentina): publicar los turnos fijos. Si pg_cron no está
+-- disponible, el resto igual funciona y se puede publicar a mano como siempre. Además
+-- se publica una vez ahora.
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.schedule('turnos-fijos-diario', '10 3 * * *', 'select public.generar_turnos_automaticos()');
+  end if;
+exception when others then
+  raise notice 'No se pudo programar la tarea diaria de turnos fijos: %', sqlerrm;
+end
+$$;
+
+select public.generar_turnos_automaticos();
+
 -- Permisos de ejecución (authenticated ya puede ejecutar funciones public
 -- por defecto en Supabase, pero lo dejamos explícito).
 grant execute on function public.reservar_turno(uuid)          to authenticated;

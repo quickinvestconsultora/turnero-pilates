@@ -15,6 +15,7 @@ import {
 import {
   diaSemanaPlural,
   encabezadoDiaCorto,
+  NOMBRE_DIA,
   faltanMenosDe,
   horaCorta,
   nombreMes,
@@ -34,6 +35,8 @@ import InstalarApp from './InstalarApp'
 import { TarjetaNotificaciones } from './Notificaciones'
 import AgregarAlCalendario from './AgregarAlCalendario'
 import { descargarIcs } from '../calendario'
+import { dejarFija, fijarAlumna, misFijas } from '../servicios/fijas'
+import type { Fija } from '../servicios/fijas'
 import AvisoPrimeraClase from './AvisoPrimeraClase'
 import MiCuenta from './MiCuenta'
 import ModalPago from './ModalPago'
@@ -75,6 +78,20 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   useEffect(() => {
     cargarComprobantes()
   }, [cargarComprobantes])
+
+  // Horarios en los que quedó "fija": se anota sola en los turnos nuevos.
+  const [fijas, setFijas] = useState<Fija[]>([])
+  const cargarFijas = useCallback(async () => {
+    try {
+      setFijas(await misFijas())
+    } catch {
+      setFijas([])
+    }
+  }, [])
+
+  useEffect(() => {
+    cargarFijas()
+  }, [cargarFijas])
 
   useEffect(() => {
     // Si falla, el nombre de la profesora se ve igual, solo que sin ficha.
@@ -148,6 +165,50 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       else setError(mensaje)
     } finally {
       setOcupadoId(null)
+    }
+  }
+
+  const fijarme = async (turno: TurnoDisponible) => {
+    if (!turno.plantilla_id) return
+    const dia = diaSemanaPlural(turno.fecha)
+    if (
+      !window.confirm(
+        `¿Quedarte fija todos los ${dia} a las ${horaCorta(turno.hora)}?` +
+          `\n\nTe anotamos sola en cada turno nuevo de ese día y horario, mientras tu abono lo cubra y haya lugar. ` +
+          `Si un día no podés venir, cancelás ese turno. Para dejar de ser fija, lo sacás desde "Mis turnos".`,
+      )
+    ) {
+      return
+    }
+    setOcupadoId(turno.id)
+    setError('')
+    setAviso('')
+    try {
+      const n = await fijarAlumna(perfil.id, turno.plantilla_id)
+      setAviso(
+        `Listo: quedaste fija los ${dia} a las ${horaCorta(turno.hora)}. ` +
+          (n > 0 ? `Te anotamos en ${n} turno${n === 1 ? '' : 's'} más.` : 'Desde ahora te anotamos sola en cada turno nuevo.'),
+      )
+      await cargar()
+      await cargarFijas()
+    } catch (e) {
+      const mensaje = e instanceof Error ? e.message : 'No se pudo completar la acción.'
+      if (mensaje === 'PAGO_REQUERIDO') setPagoRequerido(true)
+      else setError(mensaje)
+    } finally {
+      setOcupadoId(null)
+    }
+  }
+
+  const sacarFija = async (f: Fija) => {
+    if (!window.confirm(`¿Dejar de ser fija los ${NOMBRE_DIA[f.dia_semana].toLowerCase()} a las ${horaCorta(f.hora)}? Tus reservas ya hechas se mantienen.`)) return
+    setError('')
+    setAviso('')
+    try {
+      await dejarFija(perfil.id, f.plantilla_id)
+      await cargarFijas()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo completar la acción.')
     }
   }
 
@@ -262,6 +323,25 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       <main className="contenido">
         {error && <p className="mensaje-error">{error}</p>}
         {aviso && <p className="mensaje-ok">{aviso}</p>}
+        {vista === 'mios' && fijas.length > 0 && (
+          <div className="mis-fijas">
+            <strong>Mis horarios fijos</strong>
+            <span className="ayuda">Me anotan sola en cada turno nuevo de estos horarios.</span>
+            <ul className="ficha-historial">
+              {fijas.map((f) => (
+                <li key={f.plantilla_id}>
+                  <span>
+                    {NOMBRE_DIA[f.dia_semana]} {horaCorta(f.hora)}
+                    {f.instructor && <span className="ayuda"> · {f.instructor}</span>}
+                  </span>
+                  <button type="button" className="link-secundario" onClick={() => sacarFija(f)}>
+                    Dejar de ser fija
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {vista === 'mios' && mios.some((t) => t.mi_estado === 'reservada') && (
           <button
             type="button"
@@ -288,6 +368,9 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
             onVerProfesora={setProfesoraAbierta}
             seriePorTurno={seriePorTurno}
             esPrueba={perfil.estado_cuenta === 'prueba'}
+            fijas={new Set(fijas.map((f) => f.plantilla_id))}
+            puedeFijar={puedeSerie}
+            onFijar={fijarme}
             onReservarSerie={accionSerie}
             onReservar={(t) => accion(t, 'reservar')}
             onCancelar={(t) => accion(t, 'cancelar')}
@@ -338,6 +421,9 @@ function ListaTurnos({
   onVerProfesora,
   seriePorTurno,
   esPrueba,
+  fijas,
+  puedeFijar,
+  onFijar,
   onReservarSerie,
   onReservar,
   onCancelar,
@@ -348,10 +434,25 @@ function ListaTurnos({
   onVerProfesora: (p: Profesora) => void
   seriePorTurno: Map<string, number>
   esPrueba: boolean
+  fijas: Set<string>
+  puedeFijar: boolean
+  onFijar: (t: TurnoDisponible) => void
   onReservarSerie: (t: TurnoDisponible) => void
   onReservar: (t: TurnoDisponible) => void
   onCancelar: (t: TurnoDisponible) => void
 }) {
+  // "Quedarme fija": solo en turnos que salen de un turno fijo y en los que ya estoy anotada.
+  const controlFija = (t: TurnoDisponible, ocupado: boolean) => {
+    if (t.mi_estado !== 'reservada' || !t.plantilla_id) return null
+    if (fijas.has(t.plantilla_id)) return <span className="etiqueta-fija">Horario fijo</span>
+    if (!puedeFijar) return null
+    return (
+      <button type="button" className="link-secundario" disabled={ocupado} onClick={() => onFijar(t)}>
+        Quedarme fija en este horario
+      </button>
+    )
+  }
+
   // Agrupamos por día para encabezar cada bloque.
   const porDia = new Map<string, TurnoDisponible[]>()
   for (const t of turnos) {
@@ -410,6 +511,7 @@ function ListaTurnos({
                         (faltan menos de {HORAS_LIMITE_CANCELAR} h)
                       </span>
                       <AgregarAlCalendario turno={t} />
+                      {controlFija(t, ocupado)}
                     </div>
                   ) : t.mi_estado ? (
                     <div className="turno-acciones">
@@ -422,6 +524,7 @@ function ListaTurnos({
                         {ocupado ? '...' : 'Cancelar'}
                       </button>
                       {t.mi_estado === 'reservada' && <AgregarAlCalendario turno={t} />}
+                      {controlFija(t, ocupado)}
                     </div>
                   ) : (
                     <div className="turno-acciones">

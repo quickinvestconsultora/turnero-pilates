@@ -10,6 +10,7 @@ import {
 } from '../servicios/agenda'
 import { NOMBRE_DIA, horaCorta } from '../fechas'
 import CampoProfesora from './CampoProfesora'
+import AlumnasFijas from './AlumnasFijas'
 import type { ValorProfesora } from './CampoProfesora'
 
 // instructoraId: cuando la usa una profesora, solo ve y crea sus turnos fijos.
@@ -53,9 +54,12 @@ export default function PlantillasStaff({ instructoraId }: { instructoraId?: str
     <div>
       <h2>Turnos fijos semanales</h2>
       <p className="ayuda">
-        Definí acá los turnos que se repiten todas las semanas. Después publicalos en la
-        agenda con <em>Este mes</em> (de hoy hasta fin de mes) o <em>Mes que viene</em> (el mes
-        entero). Si lo volvés a tocar, no duplica los que ya estaban.
+        Definí acá los turnos que se repiten todas las semanas. <strong>Quedan fijos para siempre</strong>: se
+        publican solos en la agenda todos los días, hasta el fin del mes que viene, hasta que los desactives o los
+        borres. Para sacar una fecha puntual (un feriado, por ejemplo), cancelá ese turno desde la Agenda; no lo
+        borres, porque se volvería a publicar. Los botones <em>Este mes</em> y <em>Mes que viene</em> siguen
+        sirviendo para publicarlos en el momento. Las <strong>alumnas fijas</strong> de cada horario se anotan solas
+        en cada turno nuevo.
       </p>
 
       <FormAltaPlantilla onCreada={cargar} instructoraId={instructoraId} />
@@ -126,6 +130,7 @@ export default function PlantillasStaff({ instructoraId }: { instructoraId?: str
                   Borrar
                 </button>
               </div>
+              {!instructoraId && <AlumnasFijas plantillaId={p.id} />}
             </li>
           ))}
         </ul>
