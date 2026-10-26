@@ -130,7 +130,7 @@ export default function PlantillasStaff({ instructoraId }: { instructoraId?: str
                   Borrar
                 </button>
               </div>
-              {!instructoraId && <AlumnasFijas plantillaId={p.id} />}
+              {!instructoraId && <AlumnasFijas plantillaId={p.id} plantillas={plantillas} />}
             </li>
           ))}
         </ul>

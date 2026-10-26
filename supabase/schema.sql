@@ -3813,11 +3813,63 @@ begin
 end;
 $$;
 
+-- Mueve a una alumna fija de un horario a otro (staff). Cancela sus reservas futuras
+-- en el horario viejo (sin contarlo como cancelación suya) y la anota en los turnos ya
+-- publicados del horario nuevo que su abono cubra. Desde ahí queda fija en el nuevo.
+create or replace function public.mover_fija(p_alumna_id uuid, p_desde uuid, p_hasta uuid)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ahora    timestamp := now() at time zone 'America/Argentina/Buenos_Aires';
+  v_anuladas integer;
+  v_anotadas integer;
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede mover un turno fijo.';
+  end if;
+  if p_desde = p_hasta then
+    raise exception 'Elegí un horario distinto.';
+  end if;
+  if not exists (
+    select 1 from public.inscripciones_fijas where alumna_id = p_alumna_id and plantilla_id = p_desde
+  ) then
+    raise exception 'Esa alumna no es fija en ese horario.';
+  end if;
+  if not exists (select 1 from public.plantillas_turno where id = p_hasta and activa) then
+    raise exception 'El horario nuevo no existe o está desactivado.';
+  end if;
+
+  update public.reservas r
+    set estado = 'cancelada', cancelada_por_alumna = false
+  from public.turnos t
+  where t.id = r.turno_id
+    and t.plantilla_id = p_desde
+    and r.alumno_id = p_alumna_id
+    and r.estado in ('reservada', 'lista_espera')
+    and not t.cancelado
+    and (t.fecha + t.hora) >= v_ahora;
+  get diagnostics v_anuladas = row_count;
+
+  delete from public.inscripciones_fijas where alumna_id = p_alumna_id and plantilla_id = p_desde;
+  insert into public.inscripciones_fijas (alumna_id, plantilla_id)
+  values (p_alumna_id, p_hasta)
+  on conflict do nothing;
+
+  v_anotadas := public.asignar_fijas(p_alumna_id, null);
+
+  return json_build_object('anuladas', v_anuladas, 'anotadas', v_anotadas);
+end;
+$$;
+
 revoke execute on function public.asignar_fijas(uuid, uuid) from public, anon, authenticated;
 revoke execute on function public.generar_turnos_automaticos() from public, anon, authenticated;
 grant execute on function public.generar_turnos_automaticos() to service_role;
 grant execute on function public.fijar_alumna(uuid, uuid) to authenticated;
 grant execute on function public.dejar_fija(uuid, uuid) to authenticated;
+grant execute on function public.mover_fija(uuid, uuid, uuid) to authenticated;
 grant execute on function public.mis_fijas() to authenticated;
 grant execute on function public.fijas_de_plantilla(uuid) to authenticated;
 

@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Perfil } from '../tipos'
+import type { PlantillaTurno, Perfil } from '../tipos'
 import { listarClientes } from '../servicios/clientes'
-import { dejarFija, fijarAlumna, fijasDePlantilla } from '../servicios/fijas'
+import { dejarFija, fijarAlumna, fijasDePlantilla, moverFija } from '../servicios/fijas'
 import type { FijaDePlantilla } from '../servicios/fijas'
 import { nombreCompleto } from '../personas'
+import { NOMBRE_DIA, horaCorta } from '../fechas'
 
 // Alumnas fijas de un turno fijo: se anotan solas en cada turno nuevo de ese día y
 // horario, mientras su abono lo cubra y haya lugar, hasta que alguien las saque.
-export default function AlumnasFijas({ plantillaId }: { plantillaId: string }) {
+export default function AlumnasFijas({
+  plantillaId,
+  plantillas,
+}: {
+  plantillaId: string
+  plantillas: PlantillaTurno[]
+}) {
   const [abierto, setAbierto] = useState(false)
   const [lista, setLista] = useState<FijaDePlantilla[] | null>(null)
   const [clientes, setClientes] = useState<Perfil[]>([])
@@ -15,6 +22,8 @@ export default function AlumnasFijas({ plantillaId }: { plantillaId: string }) {
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [ocupado, setOcupado] = useState(false)
+  const [moviendo, setMoviendo] = useState<string | null>(null)
+  const [destino, setDestino] = useState('')
 
   const cargar = useCallback(async () => {
     try {
@@ -67,6 +76,39 @@ export default function AlumnasFijas({ plantillaId }: { plantillaId: string }) {
     }
   }
 
+  const otrosHorarios = plantillas.filter((p) => p.id !== plantillaId && p.activa)
+
+  const mover = async (f: FijaDePlantilla) => {
+    if (!destino) return
+    const nuevo = otrosHorarios.find((p) => p.id === destino)
+    if (!nuevo) return
+    if (
+      !window.confirm(
+        `¿Mover a ${f.nombre} ${f.apellido} al horario fijo de los ${NOMBRE_DIA[nuevo.dia_semana].toLowerCase()} ${horaCorta(nuevo.hora)}?` +
+          `\n\nSe cancelan sus reservas futuras de este horario (sin contarlas como cancelación suya) y se la anota en los turnos ya publicados del nuevo.`,
+      )
+    ) {
+      return
+    }
+    setError('')
+    setAviso('')
+    setOcupado(true)
+    try {
+      const r = await moverFija(f.alumna_id, plantillaId, destino)
+      setAviso(
+        `Listo: ${f.nombre} ahora es fija los ${NOMBRE_DIA[nuevo.dia_semana].toLowerCase()} ${horaCorta(nuevo.hora)}. ` +
+          `Se anularon ${r.anuladas} reserva${r.anuladas === 1 ? '' : 's'} del horario anterior y se la anotó en ${r.anotadas} turno${r.anotadas === 1 ? '' : 's'} del nuevo.`,
+      )
+      setMoviendo(null)
+      setDestino('')
+      await cargar()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo mover.')
+    } finally {
+      setOcupado(false)
+    }
+  }
+
   const quitar = async (f: FijaDePlantilla) => {
     if (!window.confirm(`¿Sacar a ${f.nombre} ${f.apellido} de este horario fijo? Sus reservas ya hechas se mantienen.`)) return
     setError('')
@@ -102,12 +144,58 @@ export default function AlumnasFijas({ plantillaId }: { plantillaId: string }) {
                   <span>
                     {f.nombre} {f.apellido}
                   </span>
-                  <button type="button" className="link-secundario" onClick={() => quitar(f)}>
-                    Sacar
-                  </button>
+                  <span className="acciones-pago">
+                    {otrosHorarios.length > 0 && (
+                      <button
+                        type="button"
+                        className="link-secundario"
+                        onClick={() => {
+                          setMoviendo(moviendo === f.alumna_id ? null : f.alumna_id)
+                          setDestino('')
+                        }}
+                      >
+                        Mover a otro horario
+                      </button>
+                    )}
+                    <button type="button" className="link-secundario" onClick={() => quitar(f)}>
+                      Sacar
+                    </button>
+                  </span>
                 </li>
               ))}
             </ul>
+          )}
+
+          {moviendo && lista && (
+            <div className="form-caja">
+              <label htmlFor={'fija-destino-' + plantillaId}>
+                Mover a {lista.find((x) => x.alumna_id === moviendo)?.nombre} a este horario:
+              </label>
+              <select id={'fija-destino-' + plantillaId} value={destino} onChange={(e) => setDestino(e.target.value)}>
+                <option value="">Elegí un horario fijo</option>
+                {otrosHorarios.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {NOMBRE_DIA[p.dia_semana]} {horaCorta(p.hora)}
+                    {p.instructor ? ` · ${p.instructor}` : ''}
+                  </option>
+                ))}
+              </select>
+              <div className="barra-acciones">
+                <button
+                  type="button"
+                  disabled={!destino || ocupado}
+                  onClick={() => {
+                    const f = lista.find((x) => x.alumna_id === moviendo)
+                    if (f) mover(f)
+                  }}
+                >
+                  {ocupado ? 'Moviendo...' : 'Mover'}
+                </button>
+                <button type="button" className="link-secundario" onClick={() => setMoviendo(null)}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
           )}
 
           <label htmlFor={'fija-busqueda-' + plantillaId}>Sumar una alumna</label>

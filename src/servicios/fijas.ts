@@ -43,3 +43,20 @@ export async function fijasDePlantilla(plantillaId: string): Promise<FijaDePlant
   if (error) throw new Error(error.message)
   return (data ?? []) as FijaDePlantilla[]
 }
+
+// Staff: mueve a una alumna fija de un horario a otro. Devuelve cuántas reservas
+// del horario viejo se anularon y a cuántos turnos del nuevo se la anotó.
+export async function moverFija(
+  alumnaId: string,
+  desdePlantillaId: string,
+  haciaPlantillaId: string,
+): Promise<{ anuladas: number; anotadas: number }> {
+  const { data, error } = await supabase.rpc('mover_fija', {
+    p_alumna_id: alumnaId,
+    p_desde: desdePlantillaId,
+    p_hasta: haciaPlantillaId,
+  })
+  if (error) throw new Error(error.message)
+  const r = (data ?? {}) as { anuladas?: number; anotadas?: number }
+  return { anuladas: Number(r.anuladas ?? 0), anotadas: Number(r.anotadas ?? 0) }
+}
