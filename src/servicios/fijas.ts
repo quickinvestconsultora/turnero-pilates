@@ -60,3 +60,14 @@ export async function moverFija(
   const r = (data ?? {}) as { anuladas?: number; anotadas?: number }
   return { anuladas: Number(r.anuladas ?? 0), anotadas: Number(r.anotadas ?? 0) }
 }
+
+// Staff: cuántas alumnas fijas tiene cada turno fijo (por id de turno fijo).
+export async function contarFijasPorPlantilla(): Promise<Record<string, number>> {
+  const { data, error } = await supabase.from('inscripciones_fijas').select('plantilla_id')
+  if (error) throw new Error(error.message)
+  const cuenta: Record<string, number> = {}
+  for (const f of (data ?? []) as { plantilla_id: string }[]) {
+    cuenta[f.plantilla_id] = (cuenta[f.plantilla_id] ?? 0) + 1
+  }
+  return cuenta
+}

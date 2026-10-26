@@ -2550,3 +2550,106 @@ label {
   border-radius: var(--radio);
   font-size: 14px;
 }
+
+/* ---- Turnos fijos como listado ---- */
+.ayuda-plegable {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.ayuda-plegable summary {
+  cursor: pointer;
+  color: var(--texto-suave);
+  font-weight: 600;
+}
+
+.lista-fijos {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 6px;
+}
+
+.grupo-fijo h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--texto-suave);
+}
+
+.grupo-fijo ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fila-fijo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--superficie);
+  color: var(--texto);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-align: left;
+}
+
+.fila-fijo:hover {
+  border-color: var(--acento);
+}
+
+.fila-fijo--inactivo {
+  opacity: 0.6;
+}
+
+.fila-fijo-hora {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.fila-fijo-datos {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.fila-fijo-flecha {
+  font-size: 22px;
+  color: var(--texto-suave);
+}
+
+.lista-proximos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lista-proximos details {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.lista-proximos summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+}

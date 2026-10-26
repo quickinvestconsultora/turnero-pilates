@@ -11,11 +11,13 @@ import { NOMBRE_DIA, horaCorta } from '../fechas'
 export default function AlumnasFijas({
   plantillaId,
   plantillas,
+  abiertaDesdeElPrincipio = false,
 }: {
   plantillaId: string
   plantillas: PlantillaTurno[]
+  abiertaDesdeElPrincipio?: boolean
 }) {
-  const [abierto, setAbierto] = useState(false)
+  const [abierto, setAbierto] = useState(abiertaDesdeElPrincipio)
   const [lista, setLista] = useState<FijaDePlantilla[] | null>(null)
   const [clientes, setClientes] = useState<Perfil[]>([])
   const [busqueda, setBusqueda] = useState('')
@@ -123,9 +125,11 @@ export default function AlumnasFijas({
 
   return (
     <div className="fijas-bloque">
-      <button type="button" className="link-secundario" onClick={() => setAbierto((v) => !v)}>
-        {abierto ? 'Ocultar alumnas fijas' : `Alumnas fijas (${lista === null ? '…' : lista.length})`}
-      </button>
+      {!abiertaDesdeElPrincipio && (
+        <button type="button" className="link-secundario" onClick={() => setAbierto((v) => !v)}>
+          {abierto ? 'Ocultar alumnas fijas' : `Alumnas fijas (${lista === null ? '…' : lista.length})`}
+        </button>
+      )}
 
       {abierto && (
         <div className="form-caja">
