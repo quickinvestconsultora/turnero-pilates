@@ -3705,7 +3705,14 @@ begin
   if auth.uid() is null then
     raise exception 'Necesitás iniciar sesión.';
   end if;
-  if not (public.es_staff() or auth.uid() = p_alumna_id) then
+  if not (
+    public.es_staff()
+    or auth.uid() = p_alumna_id
+    or (public.es_instructora() and exists (
+      select 1 from public.plantillas_turno pl
+      where pl.id = p_plantilla_id and pl.instructora_id = auth.uid()
+    ))
+  ) then
     raise exception 'No tenés permiso para hacer esto.';
   end if;
 
@@ -3717,7 +3724,7 @@ begin
     raise exception 'Ese turno fijo no existe o está desactivado.';
   end if;
 
-  if not public.es_staff() then
+  if auth.uid() = p_alumna_id and not public.es_staff() then
     if v_perfil.estado_cuenta <> 'al_dia'
        or (v_perfil.al_dia_hasta is not null and v_perfil.al_dia_hasta < v_hoy) then
       raise exception 'PAGO_REQUERIDO';
@@ -3743,7 +3750,14 @@ begin
   if auth.uid() is null then
     raise exception 'Necesitás iniciar sesión.';
   end if;
-  if not (public.es_staff() or auth.uid() = p_alumna_id) then
+  if not (
+    public.es_staff()
+    or auth.uid() = p_alumna_id
+    or (public.es_instructora() and exists (
+      select 1 from public.plantillas_turno pl
+      where pl.id = p_plantilla_id and pl.instructora_id = auth.uid()
+    ))
+  ) then
     raise exception 'No tenés permiso para hacer esto.';
   end if;
   delete from public.inscripciones_fijas

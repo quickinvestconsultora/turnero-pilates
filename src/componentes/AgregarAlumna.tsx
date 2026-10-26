@@ -3,6 +3,8 @@ import type { FormEvent } from 'react'
 import type { Perfil } from '../tipos'
 import { agregarAlumnaATurno, agregarInvitadaATurno } from '../servicios/agenda'
 import { listarClientes } from '../servicios/clientes'
+import { fijarAlumna } from '../servicios/fijas'
+import { diaSemanaPlural, horaCorta } from '../fechas'
 import { nombreCompleto } from '../personas'
 
 type Modo = 'registrada' | 'nueva'
@@ -13,12 +15,21 @@ type Modo = 'registrada' | 'nueva'
 export default function AgregarAlumna({
   turnoId,
   paraProfesora,
+  plantillaId,
+  fecha,
+  hora,
   onAgregada,
+  onAviso,
   onCerrar,
 }: {
   turnoId: string
   paraProfesora: boolean
+  // Si el turno sale de un turno fijo, se puede dejar a la alumna fija en ese horario.
+  plantillaId?: string | null
+  fecha: string
+  hora: string
   onAgregada: () => void
+  onAviso?: (mensaje: string) => void
   onCerrar: () => void
 }) {
   const [modo, setModo] = useState<Modo>('registrada')
@@ -28,6 +39,7 @@ export default function AgregarAlumna({
   const [apellido, setApellido] = useState('')
   const [telefono, setTelefono] = useState('')
   const [email, setEmail] = useState('')
+  const [fija, setFija] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
 
@@ -54,6 +66,24 @@ export default function AgregarAlumna({
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo agregar.')
       setEnviando(false)
+    }
+  }
+
+  // Anota a la alumna en este turno y, si se pidió, la deja fija en el horario.
+  const agregarRegistrada = async (c: Perfil) => {
+    await agregarAlumnaATurno(turnoId, c.id)
+    if (fija && plantillaId) {
+      try {
+        const n = await fijarAlumna(c.id, plantillaId)
+        onAviso?.(
+          `${nombreCompleto(c)} quedó fija los ${diaSemanaPlural(fecha)} a las ${horaCorta(hora)}` +
+            (n > 0 ? ` y se la anotó en ${n} turno${n === 1 ? '' : 's'} más.` : '.'),
+        )
+      } catch (e) {
+        onAviso?.(
+          `Se agregó a ${nombreCompleto(c)} al turno, pero no pudo quedar fija: ${e instanceof Error ? e.message : 'error desconocido'}`,
+        )
+      }
     }
   }
 
@@ -90,6 +120,15 @@ export default function AgregarAlumna({
             aria-label="Buscar alumna"
             autoFocus
           />
+          {plantillaId && (
+            <label className="deslinde-check">
+              <input type="checkbox" checked={fija} onChange={(e) => setFija(e.target.checked)} />
+              <span>
+                Dejarla fija todos los {diaSemanaPlural(fecha)} a las {horaCorta(hora)}: se anota sola en cada
+                turno nuevo de este horario
+              </span>
+            </label>
+          )}
           {busqueda.trim().length >= 2 && coincidencias.length === 0 && (
             <p className="ayuda">
               No hay nadie con ese dato. Si todavía no se registró, usá la otra pestaña.
@@ -105,7 +144,7 @@ export default function AgregarAlumna({
                 <button
                   type="button"
                   disabled={enviando}
-                  onClick={() => void conManejo(() => agregarAlumnaATurno(turnoId, c.id))}
+                  onClick={() => void conManejo(() => agregarRegistrada(c))}
                 >
                   Agregar
                 </button>

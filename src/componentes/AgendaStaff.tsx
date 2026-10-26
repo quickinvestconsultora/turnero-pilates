@@ -37,6 +37,7 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
   const [turnos, setTurnos] = useState<TurnoConReservas[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  const [avisoFija, setAvisoFija] = useState('')
   const [mostrarAlta, setMostrarAlta] = useState(false)
   const [verPasados, setVerPasados] = useState(false)
   const [soloMios, setSoloMios] = useState(false)
@@ -151,6 +152,7 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
       )}
 
       {error && <p className="mensaje-error">{error}</p>}
+      {avisoFija && <p className="mensaje-ok">{avisoFija}</p>}
 
       {avisoDia && (
         <div className="aviso-cancelacion">
@@ -223,6 +225,7 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
                   miId={instructoraId}
                   onCambio={cargar}
                   onError={setError}
+                  onAviso={setAvisoFija}
                 />
               ))}
             </section>
@@ -238,11 +241,13 @@ function TurnoStaff({
   miId,
   onCambio,
   onError,
+  onAviso,
 }: {
   turno: TurnoConReservas
   miId?: string
   onCambio: () => void
   onError: (m: string) => void
+  onAviso: (m: string) => void
 }) {
   // Una profesora ve los turnos de las demás pero no los toca ni ve sus anotadas.
   const soloLectura = Boolean(miId) && turno.instructora_id !== miId
@@ -497,6 +502,10 @@ function TurnoStaff({
           <AgregarAlumna
             turnoId={turno.id}
             paraProfesora={Boolean(miId)}
+            plantillaId={turno.plantilla_id}
+            fecha={turno.fecha}
+            hora={turno.hora}
+            onAviso={onAviso}
             onAgregada={() => {
               setAgregando(false)
               onCambio()
