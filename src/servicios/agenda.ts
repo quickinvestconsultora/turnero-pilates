@@ -27,6 +27,9 @@ export async function listarTurnosStaff(opciones?: {
     )
     .gte('fecha', desde)
     .lte('fecha', hasta)
+    // Los turnos cancelados no se muestran: quedan en la base para que la
+    // publicación automática no los vuelva a crear.
+    .eq('cancelado', false)
   if (opciones?.instructoraId) consulta = consulta.eq('instructora_id', opciones.instructoraId)
 
   const { data, error } = await consulta
@@ -46,6 +49,8 @@ export async function crearTurno(datos: {
   instructoraId?: string
   nota?: string
 }): Promise<void> {
+  // Un turno cancelado ya no se ve; si ocupaba ese horario, se descarta para poder crear el nuevo.
+  await supabase.from('turnos').delete().eq('fecha', datos.fecha).eq('hora', datos.hora).eq('cancelado', true)
   const { error } = await supabase.from('turnos').insert({
     fecha: datos.fecha,
     hora: datos.hora,
