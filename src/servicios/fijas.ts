@@ -71,3 +71,14 @@ export async function contarFijasPorPlantilla(): Promise<Record<string, number>>
   }
   return cuenta
 }
+
+// Staff: qué alumnas son fijas de qué turno fijo, como "plantilla|alumna".
+export async function listarFijasStaff(): Promise<Set<string>> {
+  const { data, error } = await supabase.from('inscripciones_fijas').select('plantilla_id, alumna_id')
+  if (error) throw new Error(error.message)
+  return new Set(
+    ((data ?? []) as { plantilla_id: string; alumna_id: string }[]).map(
+      (f) => `${f.plantilla_id}|${f.alumna_id}`,
+    ),
+  )
+}

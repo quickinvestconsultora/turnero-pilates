@@ -116,6 +116,7 @@ export type TurnoConReservas = {
   reservas_invitadas: Invitada[]
   reservas: {
     id: string
+    alumno_id: string
     estado: EstadoReserva
     creado_en: string
     asistencia: EstadoAsistencia | null

@@ -1,19 +1,31 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import type { TurnoConReservas } from '../tipos'
+import type { Profesora, TurnoConReservas } from '../tipos'
 import {
   actualizarTurno,
   cancelarTurno,
   cancelarTurnos,
   crearTurno,
+  editarTurno,
   listarTurnosStaff,
   marcarAsistencia,
   marcarAsistenciaInvitada,
   quitarInvitada,
   quitarReserva,
 } from '../servicios/agenda'
-import { encabezadoDia, encabezadoDiaCorto, horaCorta, hoyIso, sumarDias, yaPaso } from '../fechas'
+import {
+  diaSemanaPlural,
+  encabezadoDia,
+  encabezadoDiaCorto,
+  horaCorta,
+  hoyIso,
+  sumarDias,
+  yaPaso,
+} from '../fechas'
 import { nombreCompleto } from '../personas'
+import { dejarFija, fijarAlumna, listarFijasStaff } from '../servicios/fijas'
+import { listarProfesoras } from '../servicios/profesoras'
+
 import AgregarAlumna from './AgregarAlumna'
 import EditarTurno from './EditarTurno'
 import EnlaceWhatsApp from './EnlaceWhatsApp'
@@ -42,6 +54,50 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
   const [verPasados, setVerPasados] = useState(false)
   const [soloMios, setSoloMios] = useState(false)
   const [avisoDia, setAvisoDia] = useState<AvisoDia | null>(null)
+  // Quiénes son fijas de qué turno fijo (solo lo ve el staff; null = no se pudo cargar).
+  const [fijas, setFijas] = useState<Set<string> | null>(null)
+  // Profesoras para asignar desde el listado (solo el staff).
+  const [profesoras, setProfesoras] = useState<Profesora[]>([])
+
+  useEffect(() => {
+    if (instructoraId) return
+    listarProfesoras()
+      .then(setProfesoras)
+      .catch(() => setProfesoras([]))
+  }, [instructoraId])
+
+  const asignarProfesora = async (t: TurnoConReservas, instructoraIdNueva: string) => {
+    if (!instructoraIdNueva) return
+    const aSerie =
+      Boolean(t.plantilla_id) &&
+      confirm(
+        `¿Asignarla a todos los ${diaSemanaPlural(t.fecha)} de este horario, desde hoy en adelante?\n\n` +
+          'Aceptar = todos esos turnos. Cancelar = solo este turno.',
+      )
+    setError('')
+    try {
+      await editarTurno(t, { profesora: { instructoraId: instructoraIdNueva } }, aSerie)
+      await cargar()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo asignar la profesora.')
+    }
+  }
+  const [vista, setVista] = useState<'listado' | 'tarjetas'>(() => {
+    try {
+      return localStorage.getItem('agenda-vista') === 'tarjetas' ? 'tarjetas' : 'listado'
+    } catch {
+      return 'listado'
+    }
+  })
+
+  const cambiarVista = (v: 'listado' | 'tarjetas') => {
+    setVista(v)
+    try {
+      localStorage.setItem('agenda-vista', v)
+    } catch {
+      // sin almacenamiento: se usa solo en esta sesión
+    }
+  }
 
   const cancelarDia = async (fecha: string, delDia: TurnoConReservas[]) => {
     const aCancelar = delDia.filter((t) => !t.cancelado && !yaPaso(t.fecha, t.hora))
@@ -95,6 +151,13 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
       setTurnos(
         await listarTurnosStaff({ ...periodo, instructoraId: soloMios ? instructoraId : undefined }),
       )
+      if (!instructoraId) {
+        try {
+          setFijas(await listarFijasStaff())
+        } catch {
+          setFijas(null)
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo cargar la agenda.')
     } finally {
@@ -125,6 +188,13 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
             onClick={() => setVerPasados((v) => !v)}
           >
             {verPasados ? 'Ver próximos' : 'Cargar asistencia'}
+          </button>
+          <button
+            type="button"
+            className="link-secundario"
+            onClick={() => cambiarVista(vista === 'listado' ? 'tarjetas' : 'listado')}
+          >
+            {vista === 'listado' ? 'Ver en tarjetas' : 'Ver en listado'}
           </button>
           {instructoraId && (
             <button
@@ -203,7 +273,7 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
           No hay turnos en la agenda. Creá un turno suelto o generá desde un turno fijo.
         </p>
       ) : (
-        <div className="grupos-dia grupos-dia--agenda">
+        <div className={vista === 'listado' ? 'grupos-dia grupos-dia--listado' : 'grupos-dia grupos-dia--agenda'}>
           {[...porDia.entries()].map(([fecha, delDia]) => (
             <section key={fecha} className="grupo-dia">
               <div className="fila-dia">
@@ -218,16 +288,63 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
                   </button>
                 )}
               </div>
-              {delDia.map((t) => (
-                <TurnoStaff
-                  key={t.id}
-                  turno={t}
-                  miId={instructoraId}
-                  onCambio={cargar}
-                  onError={setError}
-                  onAviso={setAvisoFija}
-                />
-              ))}
+              {delDia.map((t) => {
+                const tarjeta = (
+                  <TurnoStaff
+                    key={t.id}
+                    turno={t}
+                    miId={instructoraId}
+                    fijas={fijas}
+                    onCambio={cargar}
+                    onError={setError}
+                    onAviso={setAvisoFija}
+                  />
+                )
+                if (vista === 'tarjetas') return tarjeta
+                const anotadas = t.reservas.filter((r) => r.estado === 'reservada')
+                const nombres = [
+                  ...anotadas.map((r) => ({
+                    texto: r.perfiles ? r.perfiles.nombre : 'Sin nombre',
+                    fija: Boolean(t.plantilla_id && fijas?.has(`${t.plantilla_id}|${r.alumno_id}`)),
+                  })),
+                  ...(t.reservas_invitadas ?? []).map((i) => ({ texto: i.nombre, fija: false })),
+                ]
+                return (
+                  <details key={t.id} className="fila-agenda">
+                    <summary>
+                      <span className="turno-hora">{horaCorta(t.hora)}</span>
+                      <span className="fila-agenda-datos">
+                        <span className="fila-agenda-cupo">
+                          {nombres.length}/{t.cupo}
+                          {t.instructor ? ` · ${t.instructor}` : ' · sin profesora'}
+                        </span>
+                        <span className="fila-agenda-nombres">
+                          {nombres.length === 0
+                            ? 'Nadie anotado'
+                            : nombres.map((n) => (n.fija ? `${n.texto} (fija)` : n.texto)).join(', ')}
+                        </span>
+                      </span>
+                      {!instructoraId && profesoras.length > 0 && !yaPaso(t.fecha, t.hora) && (
+                        <select
+                          className="fila-agenda-profe"
+                          aria-label={`Asignar profesora al turno de las ${horaCorta(t.hora)}`}
+                          value=""
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => void asignarProfesora(t, e.target.value)}
+                        >
+                          <option value="">{t.instructor ? 'Cambiar profe' : 'Asignar profe'}</option>
+                          {profesoras.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.nombre || 'Sin nombre todavía'}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </summary>
+                    {tarjeta}
+                  </details>
+                )
+              })}
             </section>
           ))}
         </div>
@@ -239,12 +356,14 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
 function TurnoStaff({
   turno,
   miId,
+  fijas,
   onCambio,
   onError,
   onAviso,
 }: {
   turno: TurnoConReservas
   miId?: string
+  fijas: Set<string> | null
   onCambio: () => void
   onError: (m: string) => void
   onAviso: (m: string) => void
@@ -383,6 +502,18 @@ function TurnoStaff({
                     </button>
                   </div>
                 ) : (
+                  <div className="barra-acciones">
+                    {turno.plantilla_id && fijas && (
+                      <BotonFija
+                        turno={turno}
+                        alumnaId={r.alumno_id}
+                        nombre={r.perfiles ? nombreCompleto(r.perfiles) : 'esta persona'}
+                        esFija={fijas.has(`${turno.plantilla_id}|${r.alumno_id}`)}
+                        deshabilitado={ocupado}
+                        conManejo={conManejo}
+                        onAviso={onAviso}
+                      />
+                    )}
                   <button
                     type="button"
                     className="link-peligro"
@@ -396,6 +527,7 @@ function TurnoStaff({
                   >
                     Sacar
                   </button>
+                  </div>
                 )}
               </div>
               {r.perfiles?.lesiones && (
@@ -518,6 +650,55 @@ function TurnoStaff({
           </button>
         ))}
     </div>
+  )
+}
+
+// Deja fija a una alumna ya anotada en este horario, o le saca lo fijo (sigue anotada
+// en los turnos que ya tiene).
+function BotonFija({
+  turno,
+  alumnaId,
+  nombre,
+  esFija,
+  deshabilitado,
+  conManejo,
+  onAviso,
+}: {
+  turno: TurnoConReservas
+  alumnaId: string
+  nombre: string
+  esFija: boolean
+  deshabilitado: boolean
+  conManejo: (fn: () => Promise<void>) => Promise<void>
+  onAviso: (m: string) => void
+}) {
+  const plantillaId = turno.plantilla_id as string
+  return (
+    <button
+      type="button"
+      className={esFija ? 'boton-mini boton-fija boton-fija--si' : 'boton-mini boton-fija'}
+      disabled={deshabilitado}
+      title={esFija ? 'Es fija en este horario: tocá para sacarle lo fijo' : 'Dejarla fija en este horario'}
+      onClick={() => {
+        if (esFija) {
+          if (!confirm(`¿Sacarle lo fijo a ${nombre}? Sigue anotada en los turnos que ya tiene.`)) return
+          void conManejo(async () => {
+            await dejarFija(alumnaId, plantillaId)
+            onAviso(`${nombre} ya no es fija en este horario.`)
+          })
+          return
+        }
+        void conManejo(async () => {
+          const n = await fijarAlumna(alumnaId, plantillaId)
+          onAviso(
+            `${nombre} quedó fija en este horario` +
+              (n > 0 ? ` y se la anotó en ${n} turno${n === 1 ? '' : 's'} más.` : '.'),
+          )
+        })
+      }}
+    >
+      {esFija ? 'Fija ✓' : 'Dejar fija'}
+    </button>
   )
 }
 

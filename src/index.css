@@ -2653,3 +2653,77 @@ label {
   gap: 10px;
   cursor: pointer;
 }
+
+/* ---- Agenda en listado ---- */
+.grupos-dia--listado .grupo-dia h2 {
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+
+.fila-agenda {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  margin-bottom: 6px;
+}
+
+.fila-agenda > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.fila-agenda > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fila-agenda[open] > summary {
+  border-bottom: 1px solid var(--borde);
+}
+
+.fila-agenda .turno-hora {
+  font-size: 18px;
+}
+
+.fila-agenda-datos {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.fila-agenda-cupo {
+  color: var(--texto-suave);
+}
+
+.fila-agenda-nombres {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fila-agenda[open] .fila-agenda-nombres {
+  white-space: normal;
+}
+
+.fila-agenda > .turno-staff {
+  border: 0;
+  margin: 0;
+  border-radius: 0 0 var(--radio) var(--radio);
+}
+
+.boton-fija--si {
+  background: var(--ok);
+  color: #fff;
+}
+
+.fila-agenda-profe {
+  width: auto;
+  max-width: 130px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
