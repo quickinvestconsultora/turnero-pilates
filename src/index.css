@@ -2727,3 +2727,9 @@ label {
   padding: 4px 6px;
   font-size: 12px;
 }
+
+.lista-fijas-ficha {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  font-size: 14px;
+}

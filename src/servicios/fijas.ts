@@ -82,3 +82,56 @@ export async function listarFijasStaff(): Promise<Set<string>> {
     ),
   )
 }
+
+// Staff: los horarios fijos de una alumna.
+export type FijaDeAlumna = { plantilla_id: string; dia_semana: number; hora: string; instructor: string | null }
+
+export async function fijasDeAlumna(alumnaId: string): Promise<FijaDeAlumna[]> {
+  const { data, error } = await supabase
+    .from('inscripciones_fijas')
+    .select('plantilla_id, plantillas_turno ( dia_semana, hora, instructor )')
+    .eq('alumna_id', alumnaId)
+  if (error) throw new Error(error.message)
+  type Fila = {
+    plantilla_id: string
+    plantillas_turno: { dia_semana: number; hora: string; instructor: string | null } | null
+  }
+  return ((data ?? []) as unknown as Fila[])
+    .flatMap((f) => (f.plantillas_turno ? [{ plantilla_id: f.plantilla_id, ...f.plantillas_turno }] : []))
+    .sort((a, b) => ((a.dia_semana + 6) % 7) - ((b.dia_semana + 6) % 7) || a.hora.localeCompare(b.hora))
+}
+
+// Staff: le saca a la alumna todos sus horarios fijos de una vez. Con `tambienTurnos`
+// también la baja de los turnos ya publicados (de hoy en adelante) de esos horarios.
+// Devuelve cuántos horarios fijos le sacó y de cuántos turnos la bajó.
+export async function sacarTodasLasFijas(
+  alumnaId: string,
+  tambienTurnos: boolean,
+): Promise<{ fijas: number; turnos: number }> {
+  const lista = await fijasDeAlumna(alumnaId)
+  for (const f of lista) await dejarFija(alumnaId, f.plantilla_id)
+  let turnos = 0
+  if (tambienTurnos && lista.length > 0) {
+    const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" })
+    const { data: futuros, error: e1 } = await supabase
+      .from('turnos')
+      .select('id')
+      .in('plantilla_id', lista.map((f) => f.plantilla_id))
+      .eq('cancelado', false)
+      .gte('fecha', hoy)
+    if (e1) throw new Error(e1.message)
+    const ids = ((futuros ?? []) as { id: string }[]).map((t) => t.id)
+    if (ids.length > 0) {
+      const { data: bajadas, error: e2 } = await supabase
+        .from('reservas')
+        .update({ estado: 'cancelada' })
+        .eq('alumno_id', alumnaId)
+        .eq('estado', 'reservada')
+        .in('turno_id', ids)
+        .select('id')
+      if (e2) throw new Error(e2.message)
+      turnos = (bajadas ?? []).length
+    }
+  }
+  return { fijas: lista.length, turnos }
+}

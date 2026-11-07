@@ -20,7 +20,9 @@ import PagoManual from './PagoManual'
 import BotonRecibo from './BotonRecibo'
 import { proximoCumple } from '../cumple'
 import FotoAlumna from './FotoAlumna'
-import { fechaCorta, horaCorta } from '../fechas'
+import { fechaCorta, horaCorta, NOMBRE_DIA } from '../fechas'
+import { fijasDeAlumna, sacarTodasLasFijas } from '../servicios/fijas'
+import type { FijaDeAlumna } from '../servicios/fijas'
 
 const formatoPesos = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
@@ -62,6 +64,9 @@ export default function FichaCliente({
   const [texto, setTexto] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
+  const [fijas, setFijas] = useState<FijaDeAlumna[] | null>(null)
+  const [avisoFijas, setAvisoFijas] = useState('')
+  const [sacandoFijas, setSacandoFijas] = useState(false)
 
   const cargar = useCallback(async () => {
     try {
@@ -91,6 +96,36 @@ export default function FichaCliente({
       .then(setPagos)
       .catch((e) => setError(e instanceof Error ? e.message : 'No se pudieron cargar los pagos.'))
   }, [cliente.id, paraProfesora, cliente.al_dia_hasta])
+
+  useEffect(() => {
+    if (paraProfesora) return
+    fijasDeAlumna(cliente.id)
+      .then(setFijas)
+      .catch(() => setFijas(null))
+  }, [cliente.id, paraProfesora])
+
+  const quitarTodasLasFijas = async () => {
+    const nombre = `${cliente.nombre} ${cliente.apellido}`.trim()
+    if (!window.confirm(`¿Sacarle a ${nombre} todos sus turnos fijos? Dejan de anotarla solos.`)) return
+    const tambien = window.confirm(
+      'También se la puede bajar de los turnos que ya tiene anotados en esos horarios (de hoy en adelante).\n\nAceptar = bajarla de esos turnos. Cancelar = dejarle los turnos que ya tiene.',
+    )
+    setError('')
+    setAvisoFijas('')
+    setSacandoFijas(true)
+    try {
+      const r = await sacarTodasLasFijas(cliente.id, tambien)
+      setAvisoFijas(
+        `Se le sacaron ${r.fijas} turno${r.fijas === 1 ? '' : 's'} fijo${r.fijas === 1 ? '' : 's'}` +
+          (tambien ? ` y se la bajó de ${r.turnos} turno${r.turnos === 1 ? '' : 's'} ya publicado${r.turnos === 1 ? '' : 's'}.` : '.'),
+      )
+      setFijas(await fijasDeAlumna(cliente.id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudieron sacar los turnos fijos.')
+    } finally {
+      setSacandoFijas(false)
+    }
+  }
 
   const recargarPagos = () => {
     listarPagos(cliente.id)
@@ -216,6 +251,30 @@ export default function FichaCliente({
             : 'Sin datos'}
         </dd>
       </dl>
+
+      {!paraProfesora && fijas !== null && (
+        <>
+          <h3>Turnos fijos</h3>
+          {fijas.length === 0 ? (
+            <p className="ayuda">No tiene turnos fijos.</p>
+          ) : (
+            <>
+              <ul className="lista-fijas-ficha">
+                {fijas.map((f) => (
+                  <li key={f.plantilla_id}>
+                    {NOMBRE_DIA[f.dia_semana]} {horaCorta(f.hora)}
+                    {f.instructor ? <span className="ayuda"> · {f.instructor}</span> : null}
+                  </li>
+                ))}
+              </ul>
+              <button type="button" className="link-peligro" disabled={sacandoFijas} onClick={() => void quitarTodasLasFijas()}>
+                {sacandoFijas ? 'Sacando...' : 'Sacarle todos los turnos fijos'}
+              </button>
+            </>
+          )}
+          {avisoFijas && <p className="mensaje-ok">{avisoFijas}</p>}
+        </>
+      )}
 
       <h3>Documentos</h3>
       <DocumentosAlumna alumnaId={cliente.id} puedeEditar={!paraProfesora} />
