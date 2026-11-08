@@ -58,7 +58,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   const [ocupadoId, setOcupadoId] = useState<string | null>(null)
   const [editandoPerfil, setEditandoPerfil] = useState(false)
   const [mostrandoCuenta, setMostrandoCuenta] = useState(false)
-  const [pagoRequerido, setPagoRequerido] = useState(false)
+  const [pagoRequerido, setPagoRequerido] = useState<false | 'turno' | 'mes'>(false)
   const [avisoPrimeraClase, setAvisoPrimeraClase] = useState(false)
   const [profesoras, setProfesoras] = useState<Profesora[]>([])
   const [profesoraAbierta, setProfesoraAbierta] = useState<Profesora | null>(null)
@@ -140,7 +140,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       await cargar()
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : 'No se pudo completar la acción.'
-      if (mensaje === 'PAGO_REQUERIDO') setPagoRequerido(true)
+      if (mensaje === 'PAGO_REQUERIDO') setPagoRequerido('mes')
       else setError(mensaje)
     } finally {
       setOcupadoId(null)
@@ -161,7 +161,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       await cargar()
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : 'No se pudo completar la acción.'
-      if (mensaje === 'PAGO_REQUERIDO') setPagoRequerido(true)
+      if (mensaje === 'PAGO_REQUERIDO') setPagoRequerido('turno')
       else setError(mensaje)
     } finally {
       setOcupadoId(null)
@@ -193,7 +193,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       await cargarFijas()
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : 'No se pudo completar la acción.'
-      if (mensaje === 'PAGO_REQUERIDO') setPagoRequerido(true)
+      if (mensaje === 'PAGO_REQUERIDO') setPagoRequerido('turno')
       else setError(mensaje)
     } finally {
       setOcupadoId(null)
@@ -394,6 +394,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       {pagoRequerido && (
         <ModalPago
           perfil={perfil}
+          motivo={pagoRequerido}
           onCerrar={() => setPagoRequerido(false)}
           onComprobante={cargarComprobantes}
         />

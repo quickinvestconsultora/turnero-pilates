@@ -140,6 +140,9 @@ Pestaña **Clientes** (staff): lista todas las alumnas registradas, con su nivel
 **Regla de reserva ligada al estado de cuenta** (la aplica `reservar_turno` en el servidor, no se puede saltear desde el navegador):
 
 - `Prueba`: la **primera** reserva (la que sea) es gratis. De la segunda en adelante, se bloquea y le aparece una ventana pidiendo que abone.
+  **Hoy la clase de prueba está apagada** (interruptor `clase_prueba_activa` en la tabla `configuracion`): se pide pago desde la primera reserva. Para volver a ofrecerla: `update public.configuracion set valor = 'true'::jsonb where clave = 'clase_prueba_activa';`.
+- **Cambios de turno por mes:** una alumna puede cancelar/cambiar hasta 3 turnos confirmados por mes (cuenta por el mes del turno); después ve "Superaste el límite de 3 cambios de turno por mes". Se cambia con la clave `cambios_por_mes` de `configuracion`. Dejar la lista de espera no cuenta.
+- Si una alumna sin el mes abonado toca "reservar todo el mes", ve la ventana de pago (alias o Mercado Pago) con el motivo explicado.
 - `Debe`: siempre bloqueada, misma ventana.
 - `Al día`: reserva turnos **hasta la fecha en que vence su abono** (por defecto, el fin del mes en que se la marcó). Un turno posterior a esa fecha le muestra el cartel de pago. En los turnos que vienen de un turno fijo, además de "Reservar" ve **"Reservar los N lunes de octubre"**: la anota de una vez en todos los del mismo horario y mes que tengan lugar y entren en su abono (`reservar_serie`). Si alguno está completo o queda fuera del abono, la anota en el resto y le avisa cuáles se saltearon (no la pone en lista de espera).
 

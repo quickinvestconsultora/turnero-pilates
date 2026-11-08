@@ -86,7 +86,7 @@ export function mensajeReactivar(
   }
   if (motivo === 'sin_empezar') {
     return (
-      `${hola}vimos que te registraste pero todavía no reservaste tu primera clase (es gratis 💛). ` +
+      `${hola}vimos que te registraste pero todavía no reservaste tu primera clase 💛. ` +
       `¿Querés que te ayudemos a elegir un horario? También podés reservar directo en ${app}`
     )
   }

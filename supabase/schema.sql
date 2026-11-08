@@ -450,6 +450,20 @@ insert into public.configuracion (clave, valor)
 values ('avisos_desde', to_jsonb(now()))
 on conflict (clave) do nothing;
 
+-- Interruptor de la clase de prueba gratis. Apagada (false): hay que abonar desde la
+-- primera reserva. Para volver a ofrecerla:
+--   update public.configuracion set valor = 'true'::jsonb where clave = 'clase_prueba_activa';
+insert into public.configuracion (clave, valor)
+values ('clase_prueba_activa', 'false'::jsonb)
+on conflict (clave) do nothing;
+
+-- Cuántos turnos puede cancelar o cambiar una alumna por mes (cuenta por el mes del
+-- turno). Se cambia con:
+--   update public.configuracion set valor = '4'::jsonb where clave = 'cambios_por_mes';
+insert into public.configuracion (clave, valor)
+values ('cambios_por_mes', '3'::jsonb)
+on conflict (clave) do nothing;
+
 -- Documentos de la alumna (certificado médico, estudios, etc.): los sube ella o
 -- el estudio. Los archivos están en el bucket privado "fichas".
 create table if not exists public.documentos_alumnas (
@@ -1059,6 +1073,14 @@ begin
     end if;
 
     if v_estado_cuenta = 'prueba' then
+      -- Con la clase de prueba apagada hay que abonar desde la primera reserva.
+      if not coalesce(
+        (select c.valor = 'true'::jsonb from public.configuracion c where c.clave = 'clase_prueba_activa'),
+        false
+      ) then
+        raise exception 'PAGO_REQUERIDO';
+      end if;
+
       -- La clase de prueba se usa una sola vez: cuentan las reservas vigentes y
       -- también las que la propia alumna canceló estando confirmadas. No
       -- cuentan las de turnos que canceló el estudio, ni las de lista de espera,
@@ -1187,6 +1209,9 @@ as $$
 declare
   v_turno         public.turnos;
   v_estado_previo text;
+  v_rol           text;
+  v_limite        int;
+  v_cambios       int;
 begin
   if auth.uid() is null then
     raise exception 'Necesitás iniciar sesión.';
@@ -1214,6 +1239,27 @@ begin
      and (v_turno.fecha + v_turno.hora) - interval '2 hours'
          < (now() at time zone 'America/Argentina/Buenos_Aires') then
     raise exception 'Ya no se puede cancelar: faltan menos de 2 horas para el turno. Escribile al estudio.';
+  end if;
+
+  -- Tope de cambios por mes (solo alumnas, y solo por lugares confirmados: dejar la lista
+  -- de espera no cuenta). Cuentan los turnos que ya canceló del mismo mes que este.
+  select rol into v_rol from public.perfiles where id = auth.uid();
+  if v_rol = 'alumno' and v_estado_previo = 'reservada' then
+    v_limite := coalesce(
+      (select (c.valor #>> '{}')::int from public.configuracion c where c.clave = 'cambios_por_mes'),
+      3
+    );
+    select count(*) into v_cambios
+    from public.reservas r
+    join public.turnos t on t.id = r.turno_id
+    where r.alumno_id = auth.uid()
+      and r.estado = 'cancelada'
+      and r.cancelada_por_alumna
+      and r.turno_id <> p_turno_id
+      and date_trunc('month', t.fecha) = date_trunc('month', v_turno.fecha);
+    if v_cambios >= v_limite then
+      raise exception 'Superaste el límite de % cambios de turno por mes. Escribile al estudio si necesitás cambiar este.', v_limite;
+    end if;
   end if;
 
   -- Si liberó un lugar "de verdad", el trigger promover_lista_espera sube

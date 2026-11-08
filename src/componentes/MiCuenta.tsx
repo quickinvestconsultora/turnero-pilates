@@ -36,7 +36,7 @@ export default function MiCuenta({ perfil, onCerrar }: { perfil: Perfil; onCerra
 
   const estadoAbono = (() => {
     if (perfil.estado_cuenta === 'pendiente') return { texto: 'Tenés un pago pendiente.', ok: false }
-    if (perfil.estado_cuenta === 'prueba') return { texto: 'Estás en tu clase de prueba.', ok: true }
+    if (perfil.estado_cuenta === 'prueba') return { texto: 'Todavía no tenés un abono: para reservar tenés que pagar la clase o el mes.', ok: false }
     if (abonoVencido(perfil) && perfil.al_dia_hasta) {
       return { texto: `Tu abono venció el ${diaMes(perfil.al_dia_hasta)}.`, ok: false }
     }
