@@ -2733,3 +2733,28 @@ label {
   padding-left: 18px;
   font-size: 14px;
 }
+
+/* ---- Foto de precios ---- */
+.precios-foto {
+  margin: 8px 0 12px;
+  text-align: center;
+}
+
+.precios-foto img {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  border-radius: var(--radio);
+  border: 1px solid var(--borde);
+}
+
+.boton-archivo {
+  display: inline-block;
+  padding: 10px 16px;
+  background: var(--primario);
+  color: #fff;
+  border-radius: var(--radio);
+  cursor: pointer;
+  font-weight: 600;
+}

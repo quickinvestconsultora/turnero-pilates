@@ -19,11 +19,12 @@ import AnunciosStaff from './AnunciosStaff'
 import Solapas from './Solapas'
 import Referidos from './Referidos'
 import Opiniones from './Opiniones'
+import FotoPrecios from './FotoPrecios'
 
 type Vista = 'hoy' | 'agenda' | 'semana' | 'plantillas' | 'administracion'
 type Seccion = 'resumen' | 'clientes' | 'profesores' | 'finanzas' | 'mas'
 type SubClientes = 'lista' | 'reactivar' | 'referidos'
-type SubMas = 'estadisticas' | 'opiniones' | 'anuncios' | 'respaldo'
+type SubMas = 'estadisticas' | 'opiniones' | 'anuncios' | 'precios' | 'respaldo'
 
 // A dónde pueden llevar los atajos del Resumen.
 type Destino = 'clientes' | 'reactivar' | 'cobros' | 'egresos' | 'estadisticas' | 'opiniones'
@@ -154,12 +155,14 @@ export default function AdminApp({ perfil }: { perfil: Perfil }) {
                 { clave: 'estadisticas', etiqueta: 'Estadísticas' },
                 { clave: 'opiniones', etiqueta: 'Opiniones' },
                 { clave: 'anuncios', etiqueta: 'Anuncios' },
+                { clave: 'precios', etiqueta: 'Precios' },
                 { clave: 'respaldo', etiqueta: 'Respaldo' },
               ]}
             />
             {subMas === 'estadisticas' && <Estadisticas />}
             {subMas === 'opiniones' && <Opiniones />}
             {subMas === 'anuncios' && <AnunciosStaff />}
+            {subMas === 'precios' && <FotoPrecios />}
             {subMas === 'respaldo' && <Respaldo />}
           </>
         )}

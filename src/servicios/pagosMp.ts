@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase'
 
-export type PlanMp = 'clase' | 'mes-1' | 'mes-2' | 'mes-3'
+export type PlanMp = 'clase' | 'mes-1' | 'mes-2' | 'mes-3' | 'mes-4' | 'mes-5'
 
 // Pide al servidor un pago de Mercado Pago para el plan elegido y devuelve el
 // link donde se paga. El monto lo define el servidor, no el navegador.

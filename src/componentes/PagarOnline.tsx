@@ -14,7 +14,7 @@ export default function PagarOnline() {
       etiqueta: `Mes · ${p.clasesPorSemana} ${p.clasesPorSemana === 1 ? 'vez' : 'veces'} por semana`,
       precio: p.precio,
     })),
-    ...(PRECIO_CLASE_SUELTA ? [{ plan: 'clase' as PlanMp, etiqueta: 'Una clase suelta', precio: PRECIO_CLASE_SUELTA }] : []),
+    ...(PRECIO_CLASE_SUELTA ? [{ plan: 'clase' as PlanMp, etiqueta: 'Clase de prueba', precio: PRECIO_CLASE_SUELTA }] : []),
   ]
 
   const [plan, setPlan] = useState<PlanMp | null>(null)

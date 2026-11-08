@@ -2,7 +2,7 @@
 // alumna que tiene la sesión abierta y devuelve el link para pagar.
 //
 // La llama la app con el usuario logueado (esta función SI verifica el JWT:
-// dejá activada la opción "Verify JWT"). Cuerpo: {"plan": "clase" | "mes-1" | "mes-2" | "mes-3"}.
+// dejá activada la opción "Verify JWT"). Cuerpo: {"plan": "clase" | "mes-1" | "mes-2" | "mes-3" | "mes-4" | "mes-5"}.
 //
 // Los precios se definen ACA (el navegador no decide cuánto se cobra). Tienen que
 // coincidir con src/config/precios.ts; si cambian, actualizá los dos.
@@ -20,10 +20,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const PLANES: Record<string, { titulo: string; monto: number }> = {
-  clase: { titulo: 'FORTEVA Studio - Clase suelta', monto: 15000 },
-  'mes-1': { titulo: 'FORTEVA Studio - Abono mensual, 1 vez por semana', monto: 45000 },
-  'mes-2': { titulo: 'FORTEVA Studio - Abono mensual, 2 veces por semana', monto: 50000 },
-  'mes-3': { titulo: 'FORTEVA Studio - Abono mensual, 3 veces por semana', monto: 60000 },
+  clase: { titulo: 'FORTEVA Studio - Clase de prueba', monto: 15000 },
+  'mes-1': { titulo: 'FORTEVA Studio - Abono mensual, 1 vez por semana', monto: 42000 },
+  'mes-2': { titulo: 'FORTEVA Studio - Abono mensual, 2 veces por semana', monto: 52000 },
+  'mes-3': { titulo: 'FORTEVA Studio - Abono mensual, 3 veces por semana', monto: 63000 },
+  'mes-4': { titulo: 'FORTEVA Studio - Abono mensual, 4 veces por semana', monto: 70000 },
+  'mes-5': { titulo: 'FORTEVA Studio - Abono mensual, 5 veces por semana', monto: 75000 },
 }
 
 const CORS = {
