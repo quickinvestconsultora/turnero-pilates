@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { yaPaso } from '../fechas'
 
 export type Fija = { plantilla_id: string; dia_semana: number; hora: string; instructor: string | null }
 
@@ -134,4 +135,28 @@ export async function sacarTodasLasFijas(
     }
   }
   return { fijas: lista.length, turnos }
+}
+
+// Staff: da de baja a una alumna que ya no viene. Le saca todos los turnos fijos y la
+// baja de todos los turnos que todavía no pasaron (anotada o en lista de espera). Lo ya
+// dado (asistencia, pagos, ficha) no se toca. Devuelve cuántos fijos y cuántos turnos.
+export async function darDeBajaAlumna(alumnaId: string): Promise<{ fijas: number; turnos: number }> {
+  const lista = await fijasDeAlumna(alumnaId)
+  for (const f of lista) await dejarFija(alumnaId, f.plantilla_id)
+
+  const { data, error } = await supabase
+    .from('reservas')
+    .select('id, turnos!inner ( fecha, hora, cancelado )')
+    .eq('alumno_id', alumnaId)
+    .in('estado', ['reservada', 'lista_espera'])
+  if (error) throw new Error(error.message)
+  type Fila = { id: string; turnos: { fecha: string; hora: string; cancelado: boolean } }
+  const ids = ((data ?? []) as unknown as Fila[])
+    .filter((r) => !r.turnos.cancelado && !yaPaso(r.turnos.fecha, r.turnos.hora))
+    .map((r) => r.id)
+  if (ids.length > 0) {
+    const { error: e2 } = await supabase.from("reservas").update({ estado: "cancelada" }).in("id", ids)
+    if (e2) throw new Error(e2.message)
+  }
+  return { fijas: lista.length, turnos: ids.length }
 }

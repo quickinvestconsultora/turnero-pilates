@@ -21,7 +21,7 @@ import BotonRecibo from './BotonRecibo'
 import { proximoCumple } from '../cumple'
 import FotoAlumna from './FotoAlumna'
 import { fechaCorta, horaCorta, NOMBRE_DIA } from '../fechas'
-import { fijasDeAlumna, sacarTodasLasFijas } from '../servicios/fijas'
+import { darDeBajaAlumna, fijasDeAlumna, sacarTodasLasFijas } from '../servicios/fijas'
 import type { FijaDeAlumna } from '../servicios/fijas'
 
 const formatoPesos = (n: number) =>
@@ -122,6 +122,32 @@ export default function FichaCliente({
       setFijas(await fijasDeAlumna(cliente.id))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron sacar los turnos fijos.')
+    } finally {
+      setSacandoFijas(false)
+    }
+  }
+
+  const darDeBaja = async () => {
+    const nombre = `${cliente.nombre} ${cliente.apellido}`.trim()
+    if (
+      !window.confirm(
+        `¿Dar de baja a ${nombre}?\n\nSe le sacan todos los turnos fijos y se la baja de todos los turnos que todavía no pasaron (también de la lista de espera). Su ficha, pagos e historial quedan como están.`,
+      )
+    ) {
+      return
+    }
+    setError('')
+    setAvisoFijas('')
+    setSacandoFijas(true)
+    try {
+      const r = await darDeBajaAlumna(cliente.id)
+      setAvisoFijas(
+        `${nombre} quedó dada de baja: ${r.fijas} turno${r.fijas === 1 ? '' : 's'} fijo${r.fijas === 1 ? '' : 's'} sacado${r.fijas === 1 ? '' : 's'} y ${r.turnos} turno${r.turnos === 1 ? '' : 's'} liberado${r.turnos === 1 ? '' : 's'}.`,
+      )
+      setFijas(await fijasDeAlumna(cliente.id))
+      onCambio()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo dar de baja.')
     } finally {
       setSacandoFijas(false)
     }
@@ -272,6 +298,9 @@ export default function FichaCliente({
               </button>
             </>
           )}
+          <button type="button" className="link-peligro" disabled={sacandoFijas} onClick={() => void darDeBaja()}>
+            Dar de baja (ya no viene)
+          </button>
           {avisoFijas && <p className="mensaje-ok">{avisoFijas}</p>}
         </>
       )}
