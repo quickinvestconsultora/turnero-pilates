@@ -1081,6 +1081,12 @@ begin
     return json_build_object('estado', v_estado_actual, 'primera_clase', false);
   end if;
 
+  -- Un turno que salió de un turno fijo desactivado ya no se puede tomar.
+  if v_turno.plantilla_id is not null
+     and not exists (select 1 from public.plantillas_turno where id = v_turno.plantilla_id and activa) then
+    raise exception 'Ese horario ya no está disponible.';
+  end if;
+
   -- Regla de pago (solo alumnas): la primera reserva es gratis (prueba).
   -- De ahí en más, o el staff la pasó a "al_dia" o queda bloqueada hasta
   -- regularizar. "pendiente" siempre bloquea. El frontend reconoce el
@@ -1179,6 +1185,9 @@ begin
   end if;
   if v_ref.plantilla_id is null then
     raise exception 'Este turno no es parte de un turno fijo.';
+  end if;
+  if not exists (select 1 from public.plantillas_turno where id = v_ref.plantilla_id and activa) then
+    raise exception 'Ese horario ya no está disponible.';
   end if;
 
   select rol, estado_cuenta, al_dia_hasta into v_rol, v_estado_cuenta, v_hasta
@@ -1430,6 +1439,16 @@ as $$
   from public.turnos t
   where t.cancelado = false
     and t.fecha between p_desde and p_hasta
+    -- Los turnos de un turno fijo desactivado no se ofrecen (salvo que yo ya esté anotada).
+    and (
+      t.plantilla_id is null
+      or exists (select 1 from public.plantillas_turno pl where pl.id = t.plantilla_id and pl.activa)
+      or exists (
+        select 1 from public.reservas r
+        where r.turno_id = t.id and r.alumno_id = auth.uid()
+          and r.estado in ('reservada', 'lista_espera')
+      )
+    )
   order by t.fecha, t.hora;
 $$;
 
