@@ -41,6 +41,7 @@ import AvisoPrimeraClase from './AvisoPrimeraClase'
 import MiCuenta from './MiCuenta'
 import ModalPago from './ModalPago'
 import AvisoLimiteCambios from './AvisoLimiteCambios'
+import PreguntaFija from './PreguntaFija'
 import ModalProfesora from './ModalProfesora'
 
 type Vista = 'disponibles' | 'mios'
@@ -60,6 +61,8 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   const [editandoPerfil, setEditandoPerfil] = useState(false)
   const [mostrandoCuenta, setMostrandoCuenta] = useState(false)
   const [limiteCambios, setLimiteCambios] = useState(false)
+  // Turno recién reservado sobre el que se le ofrece quedarse fija.
+  const [ofrecerFija, setOfrecerFija] = useState<TurnoDisponible | null>(null)
   const [pagoRequerido, setPagoRequerido] = useState<false | 'turno' | 'mes'>(false)
   const [avisoPrimeraClase, setAvisoPrimeraClase] = useState(false)
   const [profesoras, setProfesoras] = useState<Profesora[]>([])
@@ -157,6 +160,14 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       if (quiere === 'reservar') {
         const resultado = await reservar(turno.id)
         if (resultado.primeraClase) setAvisoPrimeraClase(true)
+        else if (
+          resultado.estado === 'reservada' &&
+          turno.plantilla_id &&
+          puedeSerie &&
+          !fijas.some((f) => f.plantilla_id === turno.plantilla_id)
+        ) {
+          setOfrecerFija(turno)
+        }
       } else {
         await cancelar(turno.id)
       }
@@ -171,10 +182,11 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
     }
   }
 
-  const fijarme = async (turno: TurnoDisponible) => {
+  const fijarme = async (turno: TurnoDisponible, pedirConfirmacion = true) => {
     if (!turno.plantilla_id) return
     const dia = diaSemanaPlural(turno.fecha)
     if (
+      pedirConfirmacion &&
       !window.confirm(
         `¿Quedarte fija todos los ${dia} a las ${horaCorta(turno.hora)}?` +
           `\n\nTe anotamos sola en cada turno nuevo de ese día y horario, mientras tu abono lo cubra y haya lugar. ` +
@@ -405,6 +417,19 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
 
       {limiteCambios && <AvisoLimiteCambios onCerrar={() => setLimiteCambios(false)} />}
 
+      {ofrecerFija && (
+        <PreguntaFija
+          fecha={ofrecerFija.fecha}
+          hora={ofrecerFija.hora}
+          ocupada={ocupadoId === ofrecerFija.id}
+          onNo={() => setOfrecerFija(null)}
+          onSi={async () => {
+            await fijarme(ofrecerFija, false)
+            setOfrecerFija(null)
+          }}
+        />
+      )}
+
       {avisoPrimeraClase && (
         <AvisoPrimeraClase perfil={perfil} onCerrar={() => setAvisoPrimeraClase(false)} />
       )}
@@ -468,94 +493,91 @@ function ListaTurnos({
   }
 
   return (
-    <div className="grupos-dia grupos-dia--compacto">
-      {[...porDia.entries()].map(([fecha, delDia]) => (
-        <section key={fecha} className="grupo-dia">
-          <h2>{encabezadoDiaCorto(fecha)}</h2>
-          <ul className="lista-turnos">
-            {delDia.map((t) => {
-              const libres = Math.max(0, t.cupo - Number(t.ocupados))
-              const ocupado = ocupadoId === t.id
-              return (
-                <li key={t.id} className="turno">
-                  <div className="turno-info">
-                    <span className="turno-hora">{horaCorta(t.hora)}</span>
-                    <span className="turno-detalle">
-                      {t.mi_estado === 'lista_espera'
-                        ? 'En lista de espera'
-                        : libres > 0
-                          ? `${libres} lugar${libres === 1 ? '' : 'es'}`
-                          : 'Completo'}
-                    </span>
-                    {esPrueba && t.mi_estado === 'reservada' && (
-                      <span className="etiqueta-prueba">Clase de prueba</span>
-                    )}
-                    {t.instructor &&
-                      (() => {
-                        const ficha = profesoras.find((p) => p.id === t.instructora_id)
-                        return ficha ? (
-                          <button
-                            type="button"
-                            className="turno-profesora turno-profesora--ficha"
-                            onClick={() => onVerProfesora(ficha)}
-                          >
-                            Profesora: {t.instructor}
-                          </button>
-                        ) : (
-                          <span className="turno-profesora">Profesora: {t.instructor}</span>
-                        )
-                      })()}
-                    {t.nota && <span className="turno-nota">{t.nota}</span>}
-                  </div>
-
-                  {t.mi_estado === 'reservada' &&
-                  faltanMenosDe(t.fecha, t.hora, HORAS_LIMITE_CANCELAR) ? (
-                    <div className="turno-acciones">
-                      <span className="ayuda">
-                        No se puede cancelar
-                        <br />
-                        (faltan menos de {HORAS_LIMITE_CANCELAR} h)
+    <div className="dias-desplegables">
+      {[...porDia.entries()].map(([fecha, delDia], indice) => {
+        const mios = delDia.filter((t) => t.mi_estado === 'reservada' || t.mi_estado === 'lista_espera')
+        return (
+          <details key={fecha} className="dia-desplegable" open={indice === 0}>
+            <summary>
+              <span className="dia-desplegable-titulo">{encabezadoDiaCorto(fecha)}</span>
+              <span className="dia-desplegable-resumen">
+                {mios.length > 0 ? (
+                  <span className="etiqueta-fija">
+                    {mios.some((t) => t.mi_estado === 'reservada') ? 'Anotada' : 'En espera'}{' '}
+                    {mios.map((t) => horaCorta(t.hora)).join(', ')}
+                  </span>
+                ) : (
+                  `${delDia.length} horario${delDia.length === 1 ? '' : 's'}`
+                )}
+              </span>
+            </summary>
+            <ul className="lista-turnos">
+              {delDia.map((t) => {
+                const libres = Math.max(0, t.cupo - Number(t.ocupados))
+                const ocupado = ocupadoId === t.id
+                const sinTiempo = t.mi_estado === 'reservada' && faltanMenosDe(t.fecha, t.hora, HORAS_LIMITE_CANCELAR)
+                return (
+                  <li key={t.id} className="fila-turno">
+                    <div className="fila-turno-info">
+                      <span className="turno-hora">{horaCorta(t.hora)}</span>
+                      <span className="turno-detalle">
+                        {t.mi_estado === 'lista_espera'
+                          ? 'En lista de espera'
+                          : libres > 0
+                            ? `${libres} lugar${libres === 1 ? '' : 'es'}`
+                            : 'Completo'}
                       </span>
-                      <AgregarAlCalendario turno={t} />
-                      {controlFija(t, ocupado)}
+                      {esPrueba && t.mi_estado === 'reservada' && <span className="etiqueta-prueba">Clase de prueba</span>}
+                      {t.instructor &&
+                        (() => {
+                          const ficha = profesoras.find((p) => p.id === t.instructora_id)
+                          return ficha ? (
+                            <button
+                              type="button"
+                              className="turno-profesora turno-profesora--ficha"
+                              onClick={() => onVerProfesora(ficha)}
+                            >
+                              Profesora: {t.instructor}
+                            </button>
+                          ) : (
+                            <span className="turno-profesora">Profesora: {t.instructor}</span>
+                          )
+                        })()}
+                      {t.nota && <span className="turno-nota">{t.nota}</span>}
                     </div>
-                  ) : t.mi_estado ? (
-                    <div className="turno-acciones">
-                      <button
-                        type="button"
-                        className="btn-fantasma"
-                        disabled={ocupado}
-                        onClick={() => onCancelar(t)}
-                      >
-                        {ocupado ? '...' : 'Cancelar'}
-                      </button>
+
+                    <div className="fila-turno-acciones">
+                      {sinTiempo ? (
+                        <span className="ayuda">No se puede cancelar (faltan menos de {HORAS_LIMITE_CANCELAR} h)</span>
+                      ) : t.mi_estado ? (
+                        <button type="button" className="btn-fantasma" disabled={ocupado} onClick={() => onCancelar(t)}>
+                          {ocupado ? '...' : 'Cancelar'}
+                        </button>
+                      ) : (
+                        <button type="button" disabled={ocupado} onClick={() => onReservar(t)}>
+                          {ocupado ? '...' : libres > 0 ? 'Reservar' : 'Anotarme en espera'}
+                        </button>
+                      )}
                       {t.mi_estado === 'reservada' && <AgregarAlCalendario turno={t} />}
                       {controlFija(t, ocupado)}
-                    </div>
-                  ) : (
-                    <div className="turno-acciones">
-                      <button type="button" disabled={ocupado} onClick={() => onReservar(t)}>
-                        {ocupado ? '...' : libres > 0 ? 'Reservar' : 'Anotarme en espera'}
-                      </button>
-                      {(seriePorTurno.get(t.id) ?? 0) >= 2 && (
+                      {!t.mi_estado && (seriePorTurno.get(t.id) ?? 0) >= 2 && (
                         <button
                           type="button"
                           className="link-secundario"
                           disabled={ocupado}
                           onClick={() => onReservarSerie(t)}
                         >
-                          Reservar los {seriePorTurno.get(t.id)} {diaSemanaPlural(t.fecha)} de{' '}
-                          {nombreMes(t.fecha)}
+                          Reservar los {seriePorTurno.get(t.id)} {diaSemanaPlural(t.fecha)} de {nombreMes(t.fecha)}
                         </button>
                       )}
                     </div>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-      ))}
+                  </li>
+                )
+              })}
+            </ul>
+          </details>
+        )
+      })}
     </div>
   )
 }

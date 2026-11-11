@@ -2786,3 +2786,106 @@ label {
   color: var(--texto-suave);
   font-size: 11px;
 }
+
+/* ---- Turnos de la alumna: un desplegable por día ---- */
+.dias-desplegables {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dia-desplegable {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.dia-desplegable > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.dia-desplegable > summary::-webkit-details-marker {
+  display: none;
+}
+
+.dia-desplegable > summary::after {
+  content: '›';
+  font-size: 20px;
+  color: var(--texto-suave);
+  transition: transform 0.15s;
+}
+
+.dia-desplegable[open] > summary::after {
+  transform: rotate(90deg);
+}
+
+.dia-desplegable-titulo {
+  font-weight: 600;
+  flex: 1;
+}
+
+.dia-desplegable-resumen {
+  font-size: 13px;
+  color: var(--texto-suave);
+}
+
+.dia-desplegable .lista-turnos {
+  list-style: none;
+  margin: 0;
+  padding: 0 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fila-turno {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.fila-turno-info {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  min-width: 0;
+}
+
+.fila-turno-info .turno-hora {
+  font-size: 20px;
+}
+
+.fila-turno-info .turno-detalle,
+.fila-turno-info .turno-profesora,
+.fila-turno-info .turno-nota {
+  font-size: 12px;
+}
+
+.fila-turno-acciones {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.fila-turno-acciones button {
+  padding: 7px 14px;
+  font-size: 14px;
+}
+
+.fila-turno-acciones .link-secundario {
+  padding: 2px 0;
+  font-size: 12px;
+}
