@@ -20,7 +20,8 @@ import PagoManual from './PagoManual'
 import BotonRecibo from './BotonRecibo'
 import { proximoCumple } from '../cumple'
 import FotoAlumna from './FotoAlumna'
-import { fechaCorta, horaCorta, NOMBRE_DIA } from '../fechas'
+import { fechaCorta, horaCorta } from '../fechas'
+import TurnosDeAlumna from './TurnosDeAlumna'
 import { darDeBajaAlumna, fijasDeAlumna, sacarTodasLasFijas } from '../servicios/fijas'
 import type { FijaDeAlumna } from '../servicios/fijas'
 
@@ -67,6 +68,8 @@ export default function FichaCliente({
   const [fijas, setFijas] = useState<FijaDeAlumna[] | null>(null)
   const [avisoFijas, setAvisoFijas] = useState('')
   const [sacandoFijas, setSacandoFijas] = useState(false)
+  // Sube cuando una acción en bloque cambia los turnos, para que el resumen se vuelva a cargar.
+  const [versionTurnos, setVersionTurnos] = useState(0)
 
   const cargar = useCallback(async () => {
     try {
@@ -120,6 +123,7 @@ export default function FichaCliente({
           (tambien ? ` y se la bajó de ${r.turnos} turno${r.turnos === 1 ? '' : 's'} ya publicado${r.turnos === 1 ? '' : 's'}.` : '.'),
       )
       setFijas(await fijasDeAlumna(cliente.id))
+      setVersionTurnos((v) => v + 1)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron sacar los turnos fijos.')
     } finally {
@@ -145,6 +149,7 @@ export default function FichaCliente({
         `${nombre} quedó dada de baja: ${r.fijas} turno${r.fijas === 1 ? '' : 's'} fijo${r.fijas === 1 ? '' : 's'} sacado${r.fijas === 1 ? '' : 's'} y ${r.turnos} turno${r.turnos === 1 ? '' : 's'} liberado${r.turnos === 1 ? '' : 's'}.`,
       )
       setFijas(await fijasDeAlumna(cliente.id))
+      setVersionTurnos((v) => v + 1)
       onCambio()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo dar de baja.')
@@ -280,23 +285,20 @@ export default function FichaCliente({
 
       {!paraProfesora && fijas !== null && (
         <>
-          <h3>Turnos fijos</h3>
-          {fijas.length === 0 ? (
-            <p className="ayuda">No tiene turnos fijos.</p>
-          ) : (
-            <>
-              <ul className="lista-fijas-ficha">
-                {fijas.map((f) => (
-                  <li key={f.plantilla_id}>
-                    {NOMBRE_DIA[f.dia_semana]} {horaCorta(f.hora)}
-                    {f.instructor ? <span className="ayuda"> · {f.instructor}</span> : null}
-                  </li>
-                ))}
-              </ul>
-              <button type="button" className="link-peligro" disabled={sacandoFijas} onClick={() => void quitarTodasLasFijas()}>
-                {sacandoFijas ? 'Sacando...' : 'Sacarle todos los turnos fijos'}
-              </button>
-            </>
+          <TurnosDeAlumna
+            key={versionTurnos}
+            alumnaId={cliente.id}
+            fijas={fijas}
+            onFijasCambio={() => {
+              fijasDeAlumna(cliente.id)
+                .then(setFijas)
+                .catch(() => setFijas(null))
+            }}
+          />
+          {fijas.length > 0 && (
+            <button type="button" className="link-peligro" disabled={sacandoFijas} onClick={() => void quitarTodasLasFijas()}>
+              {sacandoFijas ? 'Sacando...' : 'Sacarle todos los turnos fijos'}
+            </button>
           )}
           <button type="button" className="link-peligro" disabled={sacandoFijas} onClick={() => void darDeBaja()}>
             Dar de baja (ya no viene)

@@ -2758,3 +2758,31 @@ label {
   cursor: pointer;
   font-weight: 600;
 }
+
+/* ---- Turnos asignados a una alumna (ficha) ---- */
+.lista-asignados {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fila-asignado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+.etiqueta-fija {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--borde);
+  color: var(--texto-suave);
+  font-size: 11px;
+}

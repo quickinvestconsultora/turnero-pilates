@@ -40,6 +40,7 @@ import type { Fija } from '../servicios/fijas'
 import AvisoPrimeraClase from './AvisoPrimeraClase'
 import MiCuenta from './MiCuenta'
 import ModalPago from './ModalPago'
+import AvisoLimiteCambios from './AvisoLimiteCambios'
 import ModalProfesora from './ModalProfesora'
 
 type Vista = 'disponibles' | 'mios'
@@ -58,6 +59,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   const [ocupadoId, setOcupadoId] = useState<string | null>(null)
   const [editandoPerfil, setEditandoPerfil] = useState(false)
   const [mostrandoCuenta, setMostrandoCuenta] = useState(false)
+  const [limiteCambios, setLimiteCambios] = useState(false)
   const [pagoRequerido, setPagoRequerido] = useState<false | 'turno' | 'mes'>(false)
   const [avisoPrimeraClase, setAvisoPrimeraClase] = useState(false)
   const [profesoras, setProfesoras] = useState<Profesora[]>([])
@@ -162,6 +164,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : 'No se pudo completar la acción.'
       if (mensaje === 'PAGO_REQUERIDO') setPagoRequerido('turno')
+      else if (mensaje.startsWith('Superaste el límite')) setLimiteCambios(true)
       else setError(mensaje)
     } finally {
       setOcupadoId(null)
@@ -399,6 +402,8 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
           onComprobante={cargarComprobantes}
         />
       )}
+
+      {limiteCambios && <AvisoLimiteCambios onCerrar={() => setLimiteCambios(false)} />}
 
       {avisoPrimeraClase && (
         <AvisoPrimeraClase perfil={perfil} onCerrar={() => setAvisoPrimeraClase(false)} />

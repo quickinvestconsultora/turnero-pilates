@@ -160,3 +160,40 @@ export async function darDeBajaAlumna(alumnaId: string): Promise<{ fijas: number
   }
   return { fijas: lista.length, turnos: ids.length }
 }
+
+// Staff: los turnos próximos en los que está anotada una alumna (anotada o en espera).
+export type TurnoDeAlumna = {
+  reserva_id: string
+  estado: 'reservada' | 'lista_espera'
+  turno_id: string
+  fecha: string
+  hora: string
+  instructor: string | null
+  plantilla_id: string | null
+}
+
+export async function turnosDeAlumna(alumnaId: string): Promise<TurnoDeAlumna[]> {
+  const { data, error } = await supabase
+    .from('reservas')
+    .select('id, estado, turnos!inner ( id, fecha, hora, instructor, plantilla_id, cancelado )')
+    .eq('alumno_id', alumnaId)
+    .in('estado', ['reservada', 'lista_espera'])
+  if (error) throw new Error(error.message)
+  type Fila = {
+    id: string
+    estado: 'reservada' | 'lista_espera'
+    turnos: { id: string; fecha: string; hora: string; instructor: string | null; plantilla_id: string | null; cancelado: boolean }
+  }
+  return ((data ?? []) as unknown as Fila[])
+    .filter((r) => !r.turnos.cancelado && !yaPaso(r.turnos.fecha, r.turnos.hora))
+    .map((r) => ({
+      reserva_id: r.id,
+      estado: r.estado,
+      turno_id: r.turnos.id,
+      fecha: r.turnos.fecha,
+      hora: r.turnos.hora,
+      instructor: r.turnos.instructor,
+      plantilla_id: r.turnos.plantilla_id,
+    }))
+    .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora))
+}
