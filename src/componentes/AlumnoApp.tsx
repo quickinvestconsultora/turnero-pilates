@@ -42,6 +42,7 @@ import MiCuenta from './MiCuenta'
 import ModalPago from './ModalPago'
 import AvisoLimiteCambios from './AvisoLimiteCambios'
 import PreguntaFija from './PreguntaFija'
+import TutorialAlumna from './TutorialAlumna'
 import ModalProfesora from './ModalProfesora'
 
 type Vista = 'disponibles' | 'mios'
@@ -61,7 +62,23 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   const [editandoPerfil, setEditandoPerfil] = useState(false)
   const [mostrandoCuenta, setMostrandoCuenta] = useState(false)
   const [limiteCambios, setLimiteCambios] = useState(false)
-  // Turno recién reservado sobre el que se le ofrece quedarse fija.
+  const [verTutorial, setVerTutorial] = useState(false)
+  // La tarjeta de bienvenida al tutorial se muestra hasta que la alumna la cierra o lo abre.
+  const [tarjetaTutorial, setTarjetaTutorial] = useState(() => {
+    try {
+      return localStorage.getItem('forteva-tutorial-visto') !== '1'
+    } catch {
+      return false
+    }
+  })
+  const cerrarTarjetaTutorial = () => {
+    setTarjetaTutorial(false)
+    try {
+      localStorage.setItem('forteva-tutorial-visto', '1')
+    } catch {
+      // sin almacenamiento: vuelve a aparecer la próxima vez
+    }
+  }  // Turno recién reservado sobre el que se le ofrece quedarse fija.
   const [ofrecerFija, setOfrecerFija] = useState<TurnoDisponible | null>(null)
   const [pagoRequerido, setPagoRequerido] = useState<false | 'turno' | 'mes'>(false)
   const [avisoPrimeraClase, setAvisoPrimeraClase] = useState(false)
@@ -294,6 +311,9 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
         titulo={<strong>Hola, {perfil.nombre || 'alumno'}</strong>}
         acciones={
           <>
+            <button type="button" className="link-secundario" onClick={() => setVerTutorial(true)}>
+              Ayuda
+            </button>
             <button
               type="button"
               className="link-secundario"
@@ -316,6 +336,25 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       />
 
       <CartelAnuncios />
+      {tarjetaTutorial && (
+        <div className="tarjeta-tutorial">
+          <span>¿Primera vez? Mirá en un minuto cómo reservar y dejar tus turnos fijos.</span>
+          <span className="barra-acciones">
+            <button
+              type="button"
+              onClick={() => {
+                cerrarTarjetaTutorial()
+                setVerTutorial(true)
+              }}
+            >
+              Ver cómo funciona
+            </button>
+            <button type="button" className="link-secundario" onClick={cerrarTarjetaTutorial}>
+              Ahora no
+            </button>
+          </span>
+        </div>
+      )}
       <RetornoPago perfil={perfil} onPerfilActualizado={onPerfilActualizado} />
       <EncuestaClase />
       <AvisoPromocion turnos={promovidas} onEntendido={entenderPromociones} />
@@ -428,6 +467,8 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       )}
 
       {limiteCambios && <AvisoLimiteCambios onCerrar={() => setLimiteCambios(false)} />}
+
+      {verTutorial && <TutorialAlumna onCerrar={() => setVerTutorial(false)} />}
 
       {ofrecerFija && (
         <PreguntaFija

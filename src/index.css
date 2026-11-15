@@ -2906,3 +2906,48 @@ label {
 .fila-turno--cancelado .turno-hora {
   text-decoration: line-through;
 }
+
+/* ---- Tutorial de la alumna ---- */
+.tarjeta-tutorial {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  background: var(--superficie);
+  border: 1px solid var(--acento);
+  border-radius: var(--radio);
+  font-size: 14px;
+}
+
+.modal.tutorial {
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.tutorial-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.tutorial-apartado {
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 8px 12px;
+}
+
+.tutorial-apartado summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.tutorial-apartado ol {
+  margin: 8px 0 2px;
+  padding-left: 20px;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
