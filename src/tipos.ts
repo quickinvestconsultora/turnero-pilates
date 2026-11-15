@@ -70,6 +70,8 @@ export type TurnoDisponible = {
   ocupados: number
   mi_estado: EstadoReserva | null
   promovida_sin_ver: boolean | null // subió de la lista de espera y todavía no vio el aviso
+  cancelado: boolean // el estudio lo canceló (feriado, etc.): se muestra pero no se puede reservar
+  motivo_cancelacion: string | null
 }
 
 export type PlantillaTurno = {

@@ -2889,3 +2889,20 @@ label {
   padding: 2px 0;
   font-size: 12px;
 }
+
+.etiqueta-feriado {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--error);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fila-turno--cancelado {
+  opacity: 0.7;
+}
+
+.fila-turno--cancelado .turno-hora {
+  text-decoration: line-through;
+}

@@ -232,11 +232,22 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
     [turnos],
   )
   const mios = useMemo(
-    () => disponibles.filter((t) => t.mi_estado === 'reservada' || t.mi_estado === 'lista_espera'),
+    () =>
+      disponibles.filter(
+        (t) => !t.cancelado && (t.mi_estado === 'reservada' || t.mi_estado === 'lista_espera'),
+      ),
+    [disponibles],
+  )
+  // Sus turnos que el estudio canceló (feriado, etc.): se muestran avisando, sin acciones.
+  const miosCancelados = useMemo(
+    () => disponibles.filter((t) => t.cancelado && t.mi_estado === 'reservada'),
     [disponibles],
   )
 
-  const lista = vista === 'disponibles' ? disponibles : mios
+  const lista =
+    vista === 'disponibles'
+      ? disponibles
+      : [...mios, ...miosCancelados].sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora))
 
   // Turnos en los que la base la subió desde la lista de espera y todavía no
   // vio el aviso. Al tocar "Entendido" quedan marcados como vistos.
@@ -263,6 +274,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
     const reservables = disponibles.filter(
       (t) =>
         t.plantilla_id &&
+        !t.cancelado &&
         !t.mi_estado &&
         Number(t.ocupados) < t.cupo &&
         (!hasta || t.fecha <= hasta),
@@ -495,13 +507,19 @@ function ListaTurnos({
   return (
     <div className="dias-desplegables">
       {[...porDia.entries()].map(([fecha, delDia], indice) => {
-        const mios = delDia.filter((t) => t.mi_estado === 'reservada' || t.mi_estado === 'lista_espera')
+        const mios = delDia.filter(
+          (t) => !t.cancelado && (t.mi_estado === 'reservada' || t.mi_estado === 'lista_espera'),
+        )
+        const todoCancelado = delDia.every((t) => t.cancelado)
+        const motivoDia = delDia.find((t) => t.motivo_cancelacion)?.motivo_cancelacion
         return (
           <details key={fecha} className="dia-desplegable" open={indice === 0}>
             <summary>
               <span className="dia-desplegable-titulo">{encabezadoDiaCorto(fecha)}</span>
               <span className="dia-desplegable-resumen">
-                {mios.length > 0 ? (
+                {todoCancelado ? (
+                  <span className="etiqueta-feriado">{motivoDia || 'Sin clases'}</span>
+                ) : mios.length > 0 ? (
                   <span className="etiqueta-fija">
                     {mios.some((t) => t.mi_estado === 'reservada') ? 'Anotada' : 'En espera'}{' '}
                     {mios.map((t) => horaCorta(t.hora)).join(', ')}
@@ -515,6 +533,19 @@ function ListaTurnos({
               {delDia.map((t) => {
                 const libres = Math.max(0, t.cupo - Number(t.ocupados))
                 const ocupado = ocupadoId === t.id
+                if (t.cancelado) {
+                  return (
+                    <li key={t.id} className="fila-turno fila-turno--cancelado">
+                      <div className="fila-turno-info">
+                        <span className="turno-hora">{horaCorta(t.hora)}</span>
+                        <span className="turno-detalle">
+                          {t.motivo_cancelacion || 'Sin clase'}
+                          {t.mi_estado === 'reservada' ? ' · tu turno quedó sin efecto' : ''}
+                        </span>
+                      </div>
+                    </li>
+                  )
+                }
                 const sinTiempo = t.mi_estado === 'reservada' && faltanMenosDe(t.fecha, t.hora, HORAS_LIMITE_CANCELAR)
                 return (
                   <li key={t.id} className="fila-turno">

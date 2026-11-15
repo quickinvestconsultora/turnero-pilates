@@ -1405,6 +1405,9 @@ $$;
 -- --- Listar turnos para el alumno -----------------------------------------
 -- Un turno por fila, con cuántos lugares hay ocupados y en qué estado está
 -- MI reserva (o null si no me anoté).
+-- Por qué se canceló un turno (por ejemplo "Feriado"): lo ven las alumnas en su lugar.
+alter table public.turnos add column if not exists motivo_cancelacion text;
+
 drop function if exists public.listar_turnos(date, date);
 create function public.listar_turnos(p_desde date, p_hasta date)
 returns table (
@@ -1419,7 +1422,9 @@ returns table (
   nota         text,
   ocupados     bigint,
   mi_estado    text,
-  promovida_sin_ver boolean
+  promovida_sin_ver boolean,
+  cancelado    boolean,
+  motivo_cancelacion text
 )
 language sql
 security definer
@@ -1435,10 +1440,12 @@ as $$
     coalesce((select r.promovida_en is not null and r.aviso_promocion_visto_en is null
        from public.reservas r
        where r.turno_id = t.id and r.alumno_id = auth.uid()
-       and r.estado = 'reservada'), false) as promovida_sin_ver
+       and r.estado = 'reservada'), false) as promovida_sin_ver,
+    t.cancelado,
+    t.motivo_cancelacion
   from public.turnos t
-  where t.cancelado = false
-    and t.fecha between p_desde and p_hasta
+  -- Los cancelados también se devuelven: la app los muestra como "Feriado" o "Sin clase".
+  where t.fecha between p_desde and p_hasta
     -- Los turnos de un turno fijo desactivado no se ofrecen (salvo que yo ya esté anotada).
     and (
       t.plantilla_id is null

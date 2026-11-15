@@ -136,7 +136,10 @@ export default function AgendaStaff({ instructoraId }: { instructoraId?: string 
 
     setError('')
     try {
-      await cancelarTurnos(aCancelar.map((t) => t.id))
+      await cancelarTurnos(
+        aCancelar.map((t) => t.id),
+        motivo,
+      )
       setAvisoDia({ fecha, motivo, cantidad: aCancelar.length, personas })
       await cargar()
     } catch (e) {
