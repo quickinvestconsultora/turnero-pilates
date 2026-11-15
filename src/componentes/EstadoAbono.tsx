@@ -1,8 +1,8 @@
 import type { Perfil } from '../tipos'
-import { abonoVencido, diaMes } from '../cuenta'
+import { abonoVencido } from '../cuenta'
 import { hoyIso, sumarDias } from '../fechas'
 
-// Renglón informativo para la alumna con abono al día: hasta cuándo cubre. Si
+// Renglón informativo para la alumna con abono al día. No dice hasta qué día cubre. Si
 // vence en una semana o menos, lo avisa con más énfasis (el cartel de pago
 // aparece recién cuando ya venció o intenta reservar fuera de lo que cubre).
 export default function EstadoAbono({ perfil }: { perfil: Perfil }) {
@@ -12,8 +12,7 @@ export default function EstadoAbono({ perfil }: { perfil: Perfil }) {
 
   return (
     <p className={pronto ? 'estado-abono estado-abono--pronto' : 'estado-abono'}>
-      Tu abono cubre turnos hasta el <strong>{diaMes(perfil.al_dia_hasta)}</strong>.
-      {pronto && ' Está por vencer: avisale al estudio cuando quieras renovarlo.'}
+      {pronto ? 'Tu abono está por vencer: avisale al estudio cuando quieras renovarlo.' : 'Tu abono está al día.'}
     </p>
   )
 }

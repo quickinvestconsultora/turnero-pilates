@@ -41,9 +41,7 @@ export default function MiCuenta({ perfil, onCerrar }: { perfil: Perfil; onCerra
       return { texto: `Tu abono venció el ${diaMes(perfil.al_dia_hasta)}.`, ok: false }
     }
     return {
-      texto: perfil.al_dia_hasta
-        ? `Estás al día: tu abono cubre turnos hasta el ${diaMes(perfil.al_dia_hasta)}.`
-        : 'Estás al día.',
+      texto: 'Estás al día.',
       ok: true,
     }
   })()
