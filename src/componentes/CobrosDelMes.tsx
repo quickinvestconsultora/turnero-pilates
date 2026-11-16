@@ -14,6 +14,7 @@ type Cobro = {
   abono_hasta: string | null
   creado_en: string
   perfiles: { nombre: string; apellido: string } | null
+  alumna_nombre: string | null // nombre guardado si la clienta fue borrada
 }
 
 const formatoPesos = (n: number) =>
@@ -39,7 +40,7 @@ export default function CobrosDelMes() {
       const hasta = new Date(y, m, 1).toISOString()
       const { data, error: err } = await supabase
         .from('pagos_clientes')
-        .select('id, alumna_id, monto, medio, abono_hasta, creado_en, perfiles ( nombre, apellido )')
+        .select('id, alumna_id, monto, medio, abono_hasta, creado_en, alumna_nombre, perfiles ( nombre, apellido )')
         .gte('creado_en', desde)
         .lt('creado_en', hasta)
         .order('creado_en', { ascending: false })
@@ -82,7 +83,7 @@ export default function CobrosDelMes() {
       ['Fecha', 'Alumna', 'Monto', 'Medio', 'Abono cubre hasta'],
       ...cobros.map((c) => [
         new Date(c.creado_en).toLocaleDateString('es-AR'),
-        c.perfiles ? nombreCompleto(c.perfiles) : '',
+        c.perfiles ? nombreCompleto(c.perfiles) : (c.alumna_nombre ?? 'Clienta eliminada'),
         c.monto,
         ETIQUETA_MEDIO[c.medio],
         c.abono_hasta ? c.abono_hasta.split('-').reverse().join('/') : '',
@@ -157,7 +158,7 @@ export default function CobrosDelMes() {
               <li key={c.id}>
                 <span>
                   {new Date(c.creado_en).toLocaleDateString('es-AR')} ·{' '}
-                  {c.perfiles ? nombreCompleto(c.perfiles) : 'Alumna'}
+                  {c.perfiles ? nombreCompleto(c.perfiles) : (c.alumna_nombre ?? 'Clienta eliminada')}
                   <span className="ayuda"> · {ETIQUETA_MEDIO[c.medio]}</span>
                 </span>
                 <strong>{c.monto === null ? 'Sin monto' : formatoPesos(c.monto)}</strong>

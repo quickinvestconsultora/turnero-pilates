@@ -728,6 +728,8 @@ begin
     new.codigo_referido := old.codigo_referido;
     new.referida_por := old.referida_por;
     new.referido_beneficio_en := old.referido_beneficio_en;
+    new.desactivada_en := old.desactivada_en;
+    new.desactivada_motivo := old.desactivada_motivo;
   end if;
   return new;
 end;
@@ -1096,6 +1098,10 @@ begin
   from public.perfiles where id = auth.uid();
 
   if v_rol = 'alumno' then
+    if exists (select 1 from public.perfiles where id = auth.uid() and desactivada_en is not null) then
+      raise exception 'Tu cuenta está desactivada. Escribile al estudio para reactivarla.';
+    end if;
+
     if v_estado_cuenta = 'pendiente' then
       raise exception 'PAGO_REQUERIDO';
     end if;
@@ -1195,6 +1201,9 @@ begin
 
   if v_rol <> 'alumno' then
     raise exception 'Solo las alumnas pueden reservar turnos.';
+  end if;
+  if exists (select 1 from public.perfiles where id = auth.uid() and desactivada_en is not null) then
+    raise exception 'Tu cuenta está desactivada. Escribile al estudio para reactivarla.';
   end if;
   if v_estado_cuenta <> 'al_dia' or v_hasta is null or v_hasta < v_ahora::date then
     raise exception 'PAGO_REQUERIDO';
@@ -1558,6 +1567,9 @@ begin
 
   if not exists (select 1 from public.perfiles where id = p_alumna_id and rol = 'alumno') then
     raise exception 'No encontramos a esa alumna.';
+  end if;
+  if exists (select 1 from public.perfiles where id = p_alumna_id and desactivada_en is not null) then
+    raise exception 'Esa alumna está desactivada. Reactivala primero desde Clientes.';
   end if;
 
   select estado into v_estado_actual
@@ -3822,6 +3834,9 @@ begin
   if not found then
     raise exception 'No encontramos a esa alumna.';
   end if;
+  if v_perfil.desactivada_en is not null then
+    raise exception 'La alumna está desactivada.';
+  end if;
   if not exists (select 1 from public.plantillas_turno where id = p_plantilla_id and activa) then
     raise exception 'Ese turno fijo no existe o está desactivado.';
   end if;
@@ -4064,3 +4079,226 @@ revoke execute on function public.anuncios_mail_pendientes() from public, anon, 
 revoke execute on function public.marcar_anuncios_enviados(uuid[], uuid[]) from public, anon, authenticated;
 grant execute on function public.anuncios_mail_pendientes() to service_role;
 grant execute on function public.marcar_anuncios_enviados(uuid[], uuid[]) to service_role;
+
+-- ============================================================================
+-- Clientas desactivadas
+-- ----------------------------------------------------------------------------
+-- Desactivar a una clienta la saca de todos los turnos (fijos y reservados) y le impide
+-- reservar hasta que el staff la reactive. Su ficha y sus pagos quedan. Una clienta que
+-- pasa 6 meses sin entrar a la app (y sin abono vigente) se desactiva sola; una
+-- desactivada que pasa 6 meses sin entrar se borra (la borra la función "limpiar-inactivas",
+-- que también limpia sus archivos): se van su cuenta, datos, ficha, documentos y
+-- reservas, y los pagos quedan en las finanzas con su nombre.
+alter table public.perfiles add column if not exists desactivada_en timestamptz;
+alter table public.perfiles add column if not exists desactivada_motivo text; -- 'manual' o 'inactividad'
+
+-- Los pagos sobreviven al borrado de la clienta: la fila queda sin clienta y con su nombre.
+alter table public.pagos_clientes add column if not exists alumna_nombre text;
+alter table public.pagos_clientes alter column alumna_id drop not null;
+
+do $$
+declare
+  r record;
+begin
+  for r in
+    select c.conname
+    from pg_constraint c
+    where c.conrelid = 'public.pagos_clientes'::regclass
+      and c.contype = 'f'
+      and c.confrelid = 'public.perfiles'::regclass
+  loop
+    execute format('alter table public.pagos_clientes drop constraint %I', r.conname);
+  end loop;
+  alter table public.pagos_clientes
+    add constraint pagos_clientes_alumna_id_fkey
+    foreign key (alumna_id) references public.perfiles (id) on delete set null;
+end
+$$;
+
+-- Interna: saca a la alumna de todo lo futuro. Devuelve cuántos turnos fijos y turnos.
+create or replace function public._sacar_de_todo(p_alumna uuid)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ahora  timestamp := now() at time zone 'America/Argentina/Buenos_Aires';
+  v_fijas  int;
+  v_turnos int;
+begin
+  delete from public.inscripciones_fijas where alumna_id = p_alumna;
+  get diagnostics v_fijas = row_count;
+
+  update public.reservas r
+    set estado = 'cancelada'
+  where r.alumno_id = p_alumna
+    and r.estado in ('reservada', 'lista_espera')
+    and exists (
+      select 1 from public.turnos t
+      where t.id = r.turno_id and not t.cancelado and (t.fecha + t.hora) >= v_ahora
+    );
+  get diagnostics v_turnos = row_count;
+
+  return json_build_object('fijas', v_fijas, 'turnos', v_turnos);
+end;
+$$;
+
+revoke execute on function public._sacar_de_todo(uuid) from public, anon, authenticated;
+
+-- Staff: desactiva a una clienta y la saca de todas las clases.
+create or replace function public.desactivar_alumna(p_alumna_id uuid)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede desactivar clientas.';
+  end if;
+  if not exists (select 1 from public.perfiles where id = p_alumna_id and rol = 'alumno') then
+    raise exception 'No encontramos a esa alumna.';
+  end if;
+
+  update public.perfiles
+    set desactivada_en = now(), desactivada_motivo = 'manual'
+  where id = p_alumna_id;
+
+  return public._sacar_de_todo(p_alumna_id);
+end;
+$$;
+
+-- Staff: vuelve a activar a una clienta desactivada.
+create or replace function public.reactivar_alumna(p_alumna_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede reactivar clientas.';
+  end if;
+  update public.perfiles
+    set desactivada_en = null, desactivada_motivo = null
+  where id = p_alumna_id and rol = 'alumno';
+end;
+$$;
+
+-- Staff: cuándo entró por última vez y, si está desactivada, cuándo se borra sola.
+create or replace function public.ingreso_de_alumna(p_alumna_id uuid)
+returns json
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_ultimo timestamptz;
+  v_desact timestamptz;
+begin
+  if not public.es_staff() then
+    raise exception 'Solo el staff puede ver esto.';
+  end if;
+  select u.last_sign_in_at, p.desactivada_en into v_ultimo, v_desact
+  from public.perfiles p join auth.users u on u.id = p.id
+  where p.id = p_alumna_id;
+  return json_build_object(
+    'ultimo_ingreso', v_ultimo,
+    'borrado_el', case when v_desact is null then null
+                  else greatest(v_desact, coalesce(v_ultimo, v_desact)) + interval '6 months' end
+  );
+end;
+$$;
+
+-- Tarea diaria: desactiva a las clientas que llevan 6 meses sin entrar a la app y no
+-- tienen un abono vigente. Devuelve cuántas desactivó.
+create or replace function public.desactivar_inactivas()
+returns integer
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_hoy date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
+  r     record;
+  n     integer := 0;
+begin
+  for r in
+    select p.id
+    from public.perfiles p
+    join auth.users u on u.id = p.id
+    where p.rol = 'alumno'
+      and p.desactivada_en is null
+      and coalesce(u.last_sign_in_at, p.creado_en) < now() - interval '6 months'
+      and not (p.estado_cuenta = 'al_dia' and p.al_dia_hasta is not null and p.al_dia_hasta >= v_hoy)
+  loop
+    update public.perfiles
+      set desactivada_en = now(), desactivada_motivo = 'inactividad'
+    where id = r.id;
+    perform public._sacar_de_todo(r.id);
+    n := n + 1;
+  end loop;
+  return n;
+end;
+$$;
+
+revoke execute on function public.desactivar_inactivas() from public, anon, authenticated;
+
+-- Solo la función programada "limpiar-inactivas" (service_role): las clientas desactivadas
+-- que llevan 6 meses sin entrar, tanto desde que se desactivaron como desde su último
+-- ingreso. Máximo 25 por corrida.
+create or replace function public.alumnas_a_borrar()
+returns table (id uuid, nombre text)
+language sql
+security definer
+set search_path = public, auth
+as $$
+  select p.id, btrim(p.nombre || ' ' || p.apellido)
+  from public.perfiles p
+  join auth.users u on u.id = p.id
+  where p.rol = 'alumno'
+    and p.desactivada_en is not null
+    and greatest(p.desactivada_en, coalesce(u.last_sign_in_at, p.desactivada_en)) < now() - interval '6 months'
+  order by p.desactivada_en
+  limit 25;
+$$;
+
+-- Antes de borrar a una clienta, deja su nombre escrito en sus pagos (así siguen
+-- identificables en las finanzas). Vuelve a comprobar que corresponda borrarla.
+create or replace function public.preparar_borrado_alumna(p_alumna_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  if not exists (select 1 from public.alumnas_a_borrar() a where a.id = p_alumna_id) then
+    raise exception 'Esa clienta no está para borrar.';
+  end if;
+
+  update public.pagos_clientes pc
+    set alumna_nombre = btrim(p.nombre || ' ' || p.apellido)
+  from public.perfiles p
+  where pc.alumna_id = p.id and p.id = p_alumna_id;
+end;
+$$;
+
+revoke execute on function public.alumnas_a_borrar() from public, anon, authenticated;
+revoke execute on function public.preparar_borrado_alumna(uuid) from public, anon, authenticated;
+grant execute on function public.alumnas_a_borrar() to service_role;
+grant execute on function public.preparar_borrado_alumna(uuid) to service_role;
+grant execute on function public.desactivar_alumna(uuid) to authenticated;
+grant execute on function public.reactivar_alumna(uuid) to authenticated;
+grant execute on function public.ingreso_de_alumna(uuid) to authenticated;
+
+-- Tarea diaria (00:30 hora argentina) que desactiva a las inactivas.
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.schedule('desactivar-inactivas-diario', '30 3 * * *', 'select public.desactivar_inactivas()');
+  end if;
+exception when others then
+  raise notice 'No se pudo programar la desactivación automática: %', sqlerrm;
+end
+$$;

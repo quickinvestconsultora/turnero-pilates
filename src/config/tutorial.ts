@@ -74,6 +74,7 @@ export const TUTORIAL: ApartadoTutorial[] = [
     pasos: [
       '"Mis datos" (arriba): completá tu ficha, objetivo, lesiones y contacto de emergencia, para que las profesoras te conozcan.',
       '"Mi cuenta": tu progreso, tus clases, tus pagos y las notificaciones.',
+      'Si pasan 6 meses sin que entres a la app y no tenés un abono vigente, tu cuenta se desactiva y te sacamos de los turnos. Si pasan otros 6 meses sin entrar, se borran tus datos. Para reactivarla, escribile al estudio.',
     ],
   },
 ]

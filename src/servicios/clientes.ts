@@ -228,3 +228,24 @@ export async function borrarPago(id: string): Promise<void> {
   const { error } = await supabase.from('pagos_clientes').delete().eq('id', id)
   if (error) throw new Error(error.message)
 }
+
+// Staff: desactiva a una clienta y la saca de todos sus turnos (fijos y reservados).
+export async function desactivarAlumna(id: string): Promise<{ fijas: number; turnos: number }> {
+  const { data, error } = await supabase.rpc('desactivar_alumna', { p_alumna_id: id })
+  if (error) throw new Error(error.message)
+  const r = (data ?? {}) as { fijas?: number; turnos?: number }
+  return { fijas: Number(r.fijas ?? 0), turnos: Number(r.turnos ?? 0) }
+}
+
+export async function reactivarAlumna(id: string): Promise<void> {
+  const { error } = await supabase.rpc('reactivar_alumna', { p_alumna_id: id })
+  if (error) throw new Error(error.message)
+}
+
+// Staff: cuándo entró por última vez y cuándo se borraría si está desactivada.
+export async function ingresoDeAlumna(id: string): Promise<{ ultimoIngreso: string | null; borradoEl: string | null }> {
+  const { data, error } = await supabase.rpc('ingreso_de_alumna', { p_alumna_id: id })
+  if (error) throw new Error(error.message)
+  const r = (data ?? {}) as { ultimo_ingreso?: string | null; borrado_el?: string | null }
+  return { ultimoIngreso: r.ultimo_ingreso ?? null, borradoEl: r.borrado_el ?? null }
+}

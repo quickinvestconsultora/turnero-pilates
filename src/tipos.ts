@@ -30,6 +30,8 @@ export type Perfil = {
   frase: string | null
   instagram: string | null
   creado_en: string
+  desactivada_en: string | null // el staff la desactivó (o pasó 6 meses sin entrar): no reserva
+  desactivada_motivo: string | null
 }
 
 // Perfil público de una profesora (lo que ven las alumnas).

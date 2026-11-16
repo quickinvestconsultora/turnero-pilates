@@ -331,6 +331,22 @@ La alumna elige qué paga (clase suelta o abono de 1, 2 o 3 veces por semana) y 
 
 **Pantalla.** **Turnos fijos** es un listado agrupado por día (lunes primero), con la hora, la profesora, el cupo y cuántas alumnas fijas tiene cada horario. Al tocar uno se entra a su detalle: publicar este mes o el que viene, activar o desactivar, borrar, las alumnas fijas (sumar, mover, sacar) y los próximos turnos publicados de ese horario, cada uno desplegable para ver quiénes están anotadas.
 
+**Clientas desactivadas.** En la ficha de una clienta (Clientes), **Desactivar clienta** la saca de todos los turnos (fijos y reservados) y le impide reservar hasta que se la **reactive**; su ficha, pagos e historial quedan. En Clientes hay un filtro **Desactivadas**. Reglas automáticas: una clienta que pasa **6 meses sin entrar a la app** y sin abono vigente se desactiva sola (tarea diaria `desactivar-inactivas-diario`, que programa `schema.sql`); una desactivada que pasa **6 meses sin entrar** (contados desde que se desactivó o desde su último ingreso) se **borra**: se van su cuenta, datos, ficha, documentos y reservas, y sus pagos quedan en las finanzas como "Clienta eliminada" o con el nombre guardado. El borrado lo hace la Edge Function `limpiar-inactivas` (usa CRON_SECRET, **sin** Verify JWT) y la programa pg_cron igual que los recordatorios:
+
+```sql
+select cron.schedule(
+  'limpiar-inactivas',
+  '0 4 * * *',
+  $$ select net.http_post(
+    url := 'https://<TU-PROYECTO>.supabase.co/functions/v1/limpiar-inactivas',
+    headers := jsonb_build_object('content-type', 'application/json', 'x-cron-secret', '<EL-MISMO-CRON_SECRET>'),
+    body := '{}'::jsonb
+  ) $$
+);
+```
+
+Probar sin borrar nada: en la pestaña Test de la función, con el encabezado `x-cron-secret` y cuerpo `{"prueba": true}`, devuelve a quién borraría hoy.
+
 **Publicación automática.** Los turnos fijos (plantillas) activos se publican solos todos los días a las 00:10 (hora argentina) con `generar_turnos_automaticos()`, desde hoy hasta el fin del mes que viene. La tarea diaria `turnos-fijos-diario` la programa `schema.sql` con pg_cron (si pg_cron no está, se puede seguir publicando a mano con "Este mes" y "Mes que viene"). Para que un horario deje de repetirse, se desactiva o se borra el turno fijo. Para sacar una fecha puntual hay que **cancelar** ese turno desde la Agenda: si se borra, se volvería a publicar.
 
 **Alumnas fijas.** Una alumna con el abono al día puede tocar **"Quedarme fija en este horario"** en un turno que sale de un turno fijo (o el estudio la agrega desde **Turnos fijos → Alumnas fijas**). Desde ese momento se anota sola en cada turno nuevo de ese día y horario (`inscripciones_fijas`, `asignar_fijas`), siempre que su abono cubra la fecha y haya lugar. Si cancela una fecha, no se la vuelve a anotar en esa fecha. Cuando renueva o extiende el abono, se la anota en los turnos ya publicados que ahora quedan cubiertos. Al **agregar una alumna a un turno** que sale de un turno fijo (Agenda → + Agregar alumna) hay una opción **"Dejarla fija todos los [día] a las [hora]"**; también la puede usar la profesora dueña de ese turno fijo. Desde Turnos fijos → Alumnas fijas el estudio también puede **mover** a una alumna de un horario fijo a otro (`mover_fija`): se cancelan sus reservas futuras del horario viejo sin contarlas como cancelación suya y se la anota en los turnos ya publicados del nuevo. Queda así para siempre hasta que ella ("Mis turnos → Mis horarios fijos → Dejar de ser fija") o el estudio la saquen; las reservas ya hechas se mantienen.

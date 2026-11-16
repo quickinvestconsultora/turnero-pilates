@@ -35,7 +35,7 @@ export async function descargarPaqueteContador(mes: string): Promise<{ comproban
     listarIngresosExtra(desde, hasta),
     supabase
       .from('pagos_clientes')
-      .select('creado_en, monto, medio, concepto, perfiles ( nombre, apellido )')
+      .select('creado_en, monto, medio, concepto, alumna_nombre, perfiles ( nombre, apellido )')
       .gte('creado_en', desdeTs)
       .lt('creado_en', hastaTs)
       .order('creado_en', { ascending: true }),
@@ -56,6 +56,7 @@ export async function descargarPaqueteContador(mes: string): Promise<{ comproban
     monto: string | null
     medio: MedioPago
     concepto: ConceptoPago
+    alumna_nombre: string | null
     perfiles: Persona
   }[]
   const pagosProfes = (pagosProfesRes.data ?? []) as unknown as {
@@ -94,7 +95,7 @@ export async function descargarPaqueteContador(mes: string): Promise<{ comproban
         ['Fecha', 'Alumna', 'Concepto', 'Medio', 'Monto'],
         ...cobros.map((c) => [
           new Date(c.creado_en).toLocaleDateString('es-AR'),
-          nombre(c.perfiles),
+          c.perfiles ? nombre(c.perfiles) : (c.alumna_nombre ?? 'Clienta eliminada'),
           ETIQUETA_CONCEPTO[c.concepto] ?? c.concepto,
           ETIQUETA_MEDIO[c.medio] ?? c.medio,
           c.monto === null ? '' : Number(c.monto),

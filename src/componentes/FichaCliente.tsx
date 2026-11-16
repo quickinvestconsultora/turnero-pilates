@@ -22,7 +22,8 @@ import { proximoCumple } from '../cumple'
 import FotoAlumna from './FotoAlumna'
 import { fechaCorta, horaCorta } from '../fechas'
 import TurnosDeAlumna from './TurnosDeAlumna'
-import { darDeBajaAlumna, fijasDeAlumna, sacarTodasLasFijas } from '../servicios/fijas'
+import { fijasDeAlumna, sacarTodasLasFijas } from '../servicios/fijas'
+import { desactivarAlumna, ingresoDeAlumna, reactivarAlumna } from '../servicios/clientes'
 import type { FijaDeAlumna } from '../servicios/fijas'
 
 const formatoPesos = (n: number) =>
@@ -70,6 +71,7 @@ export default function FichaCliente({
   const [sacandoFijas, setSacandoFijas] = useState(false)
   // Sube cuando una acción en bloque cambia los turnos, para que el resumen se vuelva a cargar.
   const [versionTurnos, setVersionTurnos] = useState(0)
+  const [ingreso, setIngreso] = useState<{ ultimoIngreso: string | null; borradoEl: string | null } | null>(null)
 
   const cargar = useCallback(async () => {
     try {
@@ -135,7 +137,7 @@ export default function FichaCliente({
     const nombre = `${cliente.nombre} ${cliente.apellido}`.trim()
     if (
       !window.confirm(
-        `¿Dar de baja a ${nombre}?\n\nSe le sacan todos los turnos fijos y se la baja de todos los turnos que todavía no pasaron (también de la lista de espera). Su ficha, pagos e historial quedan como están.`,
+        `¿Desactivar a ${nombre}?\n\nSe le sacan todos los turnos fijos y se la baja de todos los turnos que todavía no pasaron (también de la lista de espera), y no va a poder reservar hasta que la reactives. Su ficha, pagos e historial quedan como están.\n\nSi pasan 6 meses sin que entre a la app, su cuenta se borra sola (los pagos quedan en las finanzas).`,
       )
     ) {
       return
@@ -144,19 +146,41 @@ export default function FichaCliente({
     setAvisoFijas('')
     setSacandoFijas(true)
     try {
-      const r = await darDeBajaAlumna(cliente.id)
+      const r = await desactivarAlumna(cliente.id)
       setAvisoFijas(
-        `${nombre} quedó dada de baja: ${r.fijas} turno${r.fijas === 1 ? '' : 's'} fijo${r.fijas === 1 ? '' : 's'} sacado${r.fijas === 1 ? '' : 's'} y ${r.turnos} turno${r.turnos === 1 ? '' : 's'} liberado${r.turnos === 1 ? '' : 's'}.`,
+        `${nombre} quedó desactivada: ${r.fijas} turno${r.fijas === 1 ? '' : 's'} fijo${r.fijas === 1 ? '' : 's'} sacado${r.fijas === 1 ? '' : 's'} y ${r.turnos} turno${r.turnos === 1 ? '' : 's'} liberado${r.turnos === 1 ? '' : 's'}.`,
       )
       setFijas(await fijasDeAlumna(cliente.id))
       setVersionTurnos((v) => v + 1)
       onCambio()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo dar de baja.')
+      setError(err instanceof Error ? err.message : 'No se pudo desactivar.')
     } finally {
       setSacandoFijas(false)
     }
   }
+
+  const reactivar = async () => {
+    setError('')
+    setAvisoFijas('')
+    setSacandoFijas(true)
+    try {
+      await reactivarAlumna(cliente.id)
+      setAvisoFijas('Listo: la cuenta quedó activa de nuevo.')
+      onCambio()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo reactivar.')
+    } finally {
+      setSacandoFijas(false)
+    }
+  }
+
+  useEffect(() => {
+    if (paraProfesora) return
+    ingresoDeAlumna(cliente.id)
+      .then(setIngreso)
+      .catch(() => setIngreso(null))
+  }, [cliente.id, cliente.desactivada_en, paraProfesora])
 
   const recargarPagos = () => {
     listarPagos(cliente.id)
@@ -300,9 +324,24 @@ export default function FichaCliente({
               {sacandoFijas ? 'Sacando...' : 'Sacarle todos los turnos fijos'}
             </button>
           )}
-          <button type="button" className="link-peligro" disabled={sacandoFijas} onClick={() => void darDeBaja()}>
-            Dar de baja (ya no viene)
-          </button>
+          {cliente.desactivada_en ? (
+            <button type="button" disabled={sacandoFijas} onClick={() => void reactivar()}>
+              Reactivar cuenta
+            </button>
+          ) : (
+            <button type="button" className="link-peligro" disabled={sacandoFijas} onClick={() => void darDeBaja()}>
+              Desactivar clienta (ya no viene)
+            </button>
+          )}
+          {ingreso && (
+            <p className="ayuda">
+              Último ingreso a la app:{' '}
+              {ingreso.ultimoIngreso ? fechaCorta(ingreso.ultimoIngreso.slice(0, 10)) : 'nunca entró'}.
+              {cliente.desactivada_en && ingreso.borradoEl
+                ? ` Desactivada${cliente.desactivada_motivo === 'inactividad' ? ' por inactividad' : ''}: se borra sola el ${fechaCorta(ingreso.borradoEl.slice(0, 10))} si no vuelve a entrar.`
+                : ''}
+            </p>
+          )}
           {avisoFijas && <p className="mensaje-ok">{avisoFijas}</p>}
         </>
       )}

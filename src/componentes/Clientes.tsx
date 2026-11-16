@@ -20,7 +20,7 @@ const ETIQUETA_ESTADO: Record<EstadoCuenta, string> = {
   pendiente: 'Debe',
 }
 
-type Filtro = 'todas' | 'vencen' | 'vencidas' | 'debe' | 'prueba' | 'al_dia'
+type Filtro = 'todas' | 'vencen' | 'vencidas' | 'debe' | 'prueba' | 'al_dia' | 'desactivadas'
 
 const ETIQUETA_FILTRO: [Filtro, string][] = [
   ['todas', 'Todas'],
@@ -29,6 +29,7 @@ const ETIQUETA_FILTRO: [Filtro, string][] = [
   ['debe', 'Deben'],
   ['prueba', 'Prueba'],
   ['al_dia', 'Al día'],
+  ['desactivadas', 'Desactivadas'],
 ]
 
 const ETIQUETA_NIVEL: Record<string, string> = {
@@ -70,16 +71,18 @@ export default function Clientes({
   const resumen = useMemo(() => {
     const en7 = sumarDias(hoyIso(), 7)
     const cuenta: Record<Filtro, (c: Perfil) => boolean> = {
-      todas: () => true,
+      todas: (c) => !c.desactivada_en,
+      desactivadas: (c) => Boolean(c.desactivada_en),
       vencen: (c) =>
+        !c.desactivada_en &&
         c.estado_cuenta === 'al_dia' &&
         !abonoVencido(c) &&
         c.al_dia_hasta !== null &&
         c.al_dia_hasta <= en7,
-      vencidas: (c) => abonoVencido(c),
-      debe: (c) => c.estado_cuenta === 'pendiente',
-      prueba: (c) => c.estado_cuenta === 'prueba',
-      al_dia: (c) => c.estado_cuenta === 'al_dia' && !abonoVencido(c),
+      vencidas: (c) => !c.desactivada_en && abonoVencido(c),
+      debe: (c) => !c.desactivada_en && c.estado_cuenta === 'pendiente',
+      prueba: (c) => !c.desactivada_en && c.estado_cuenta === 'prueba',
+      al_dia: (c) => !c.desactivada_en && c.estado_cuenta === 'al_dia' && !abonoVencido(c),
     }
     const numeros = Object.fromEntries(
       (Object.keys(cuenta) as Filtro[]).map((f) => [f, clientes.filter(cuenta[f]).length]),
@@ -133,7 +136,7 @@ export default function Clientes({
       <div className="fila-titulo">
         <h2>Clientes</h2>
         <div className="barra-acciones">
-          <span className="turno-detalle">{clientes.length} en total</span>
+          <span className="turno-detalle">{resumen.numeros.todas} en total</span>
           {!paraProfesora && (
             <button type="button" className="link-secundario" onClick={exportar}>
               Descargar para Excel

@@ -336,6 +336,11 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       />
 
       <CartelAnuncios />
+      {perfil.desactivada_en && (
+        <p className="mensaje-error">
+          Tu cuenta está desactivada, por eso no podés reservar. Escribile al estudio para reactivarla.
+        </p>
+      )}
       {tarjetaTutorial && (
         <div className="tarjeta-tutorial">
           <span>¿Primera vez? Mirá en un minuto cómo reservar y dejar tus turnos fijos.</span>
