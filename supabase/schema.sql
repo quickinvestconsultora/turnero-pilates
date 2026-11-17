@@ -46,6 +46,13 @@ alter table public.perfiles
 alter table public.perfiles
   add column if not exists al_dia_hasta date;
 
+-- La fecha hasta la que cubre el abono la calcula la app sola (fin de mes). Solo cuando la
+-- administración la CARGA a propósito se marca como cargada, y recién ahí se le manda a la
+-- alumna el aviso de que el abono está por vencer (todavía no hay pantalla para cargarla:
+-- por ahora ningún aviso de vencimiento sale).
+alter table public.perfiles
+  add column if not exists abono_fecha_cargada boolean not null default false;
+
 -- Avisos automáticos por mail: para qué vencimiento ya se avisó que el abono
 -- está por vencer (así se avisa una sola vez por período), y cuándo se mandó el
 -- deslinde firmado a la administradora.
@@ -2119,8 +2126,8 @@ $$;
 -- Los usa la misma Edge Function de los recordatorios (clave de servicio). Todos
 -- respetan el interruptor de pausa de Clientes.
 
--- Abono por vencer: alumnas "al día" cuyo abono vence en los próximos 3 días y a
--- las que todavía no se les avisó por ese vencimiento.
+-- Abono por vencer: alumnas "al día" con la fecha de abono cargada por la administración,
+-- cuyo abono vence en los próximos 3 días y a las que todavía no se les avisó por ese vencimiento.
 create or replace function public.avisos_vencimiento_pendientes()
 returns table (alumna_id uuid, nombre text, email text, al_dia_hasta date)
 language sql
@@ -2135,6 +2142,7 @@ as $$
     and p.rol = 'alumno'
     and p.estado_cuenta = 'al_dia'
     and p.al_dia_hasta is not null
+    and p.abono_fecha_cargada
     and u.email is not null
     and p.al_dia_hasta >= (now() at time zone 'America/Argentina/Buenos_Aires')::date
     and p.al_dia_hasta <= (now() at time zone 'America/Argentina/Buenos_Aires')::date + 3
