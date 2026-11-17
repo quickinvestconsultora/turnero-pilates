@@ -4,6 +4,7 @@ import type { PlantillaTurno, TurnoConReservas } from '../tipos'
 import {
   borrarPlantilla,
   cambiarPlantillaActiva,
+  cancelarTurnos,
   crearPlantilla,
   generarTurnos,
   listarPlantillas,
@@ -12,6 +13,8 @@ import {
 import { contarFijasPorPlantilla } from '../servicios/fijas'
 import { NOMBRE_DIA, fechaCorta, horaCorta, hoyIso } from '../fechas'
 import { nombreCompleto } from '../personas'
+import { mensajeCancelacion } from '../whatsapp'
+import EnlaceWhatsApp from './EnlaceWhatsApp'
 import CampoProfesora from './CampoProfesora'
 import AlumnasFijas from './AlumnasFijas'
 import type { ValorProfesora } from './CampoProfesora'
@@ -167,6 +170,11 @@ function DetalleTurnoFijo({
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [proximos, setProximos] = useState<TurnoConReservas[] | null>(null)
+  // A quién avisar después de cancelar los próximos turnos de este horario.
+  const [avisoBaja, setAvisoBaja] = useState<{
+    cantidad: number
+    personas: { nombre: string; primerNombre: string; telefono: string; fecha: string; hora: string }[]
+  } | null>(null)
 
   const cargarProximos = useCallback(async () => {
     try {
@@ -197,6 +205,36 @@ function DetalleTurnoFijo({
     }
   }
 
+  // Cancela los turnos ya publicados de este horario (los que todavía no pasaron). Las alumnas
+  // anotadas los ven como "sin efecto"; los demás dejan de verlos. Arma la lista para avisarles.
+  const cancelarProximos = async () => {
+    const vigentes = (proximos ?? []).filter((t) => !t.cancelado)
+    const personas: NonNullable<typeof avisoBaja>['personas'] = []
+    for (const t of vigentes) {
+      for (const r of t.reservas.filter((x) => x.estado === 'reservada')) {
+        if (r.perfiles) {
+          personas.push({
+            nombre: nombreCompleto(r.perfiles),
+            primerNombre: r.perfiles.nombre,
+            telefono: r.perfiles.telefono,
+            fecha: t.fecha,
+            hora: t.hora,
+          })
+        }
+      }
+      for (const i of t.reservas_invitadas ?? []) {
+        personas.push({ nombre: nombreCompleto(i), primerNombre: i.nombre, telefono: i.telefono, fecha: t.fecha, hora: t.hora })
+      }
+    }
+    await cancelarTurnos(vigentes.map((t) => t.id))
+    setAvisoBaja({ cantidad: vigentes.length, personas })
+  }
+
+  const cantidadProximos = (proximos ?? []).filter((t) => !t.cancelado).length
+  const anotadasProximas = (proximos ?? [])
+    .filter((t) => !t.cancelado)
+    .reduce((n, t) => n + t.reservas.filter((r) => r.estado === 'reservada').length + (t.reservas_invitadas?.length ?? 0), 0)
+
   return (
     <div>
       <button type="button" className="link-secundario" onClick={onVolver}>
@@ -215,6 +253,40 @@ function DetalleTurnoFijo({
 
       {error && <p className="mensaje-error">{error}</p>}
       {aviso && <p className="mensaje-ok">{aviso}</p>}
+
+      {avisoBaja && (
+        <div className="aviso-cancelacion">
+          <p>
+            <strong>
+              Se cancelaron {avisoBaja.cantidad} turno{avisoBaja.cantidad === 1 ? '' : 's'} de este horario.
+            </strong>{' '}
+            {avisoBaja.personas.length > 0 ? 'Avisale a cada una por WhatsApp:' : 'No había nadie anotada, no hay a quién avisar.'}
+          </p>
+          {avisoBaja.personas.length > 0 && (
+            <ul>
+              {avisoBaja.personas.map((p, n) => (
+                <li key={n}>
+                  <span>
+                    {p.nombre} <span className="ayuda">· {fechaCorta(p.fecha)} {horaCorta(p.hora)}</span>
+                  </span>
+                  {p.telefono ? (
+                    <EnlaceWhatsApp
+                      telefono={p.telefono}
+                      mensaje={mensajeCancelacion(p.primerNombre, p.fecha, p.hora, 'Ese horario dejó de darse')}
+                      etiqueta="Avisar"
+                    />
+                  ) : (
+                    <span className="ayuda">sin celular</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <button type="button" className="link-secundario" onClick={() => setAvisoBaja(null)}>
+            Listo, cerrar
+          </button>
+        </div>
+      )}
 
       <div className="barra-acciones">
         {(['este-mes', 'mes-que-viene'] as const).map((periodo) => (
@@ -240,11 +312,34 @@ function DetalleTurnoFijo({
           type="button"
           className="link-secundario"
           disabled={ocupado}
-          onClick={() => conManejo(() => cambiarPlantillaActiva(plantilla.id, !plantilla.activa))}
+          onClick={() =>
+            conManejo(async () => {
+              await cambiarPlantillaActiva(plantilla.id, !plantilla.activa)
+              if (plantilla.activa && cantidadProximos > 0) {
+                const sacar = confirm(
+                  `Desactivaste este horario. Tiene ${cantidadProximos} turno${cantidadProximos === 1 ? '' : 's'} publicado${cantidadProximos === 1 ? '' : 's'} y ${anotadasProximas} alumna${anotadasProximas === 1 ? '' : 's'} anotada${anotadasProximas === 1 ? '' : 's'}.\n\n` +
+                    '¿Cancelar también esos turnos? Aceptar = se cancelan y te muestro a quién avisar. Cancelar = quedan como están (las alumnas anotadas los conservan y nadie más los puede reservar).',
+                )
+                if (sacar) await cancelarProximos()
+              }
+            })
+          }
         >
           {plantilla.activa ? 'Desactivar' : 'Activar'}
         </button>
-        <button
+        {!plantilla.activa && cantidadProximos > 0 && (
+          <button
+            type="button"
+            className="link-peligro"
+            disabled={ocupado}
+            onClick={() => {
+              if (!confirm(`¿Cancelar los ${cantidadProximos} turnos publicados de este horario? Las ${anotadasProximas} alumnas anotadas los ven como sin efecto y te muestro a quién avisar.`)) return
+              void conManejo(cancelarProximos)
+            }}
+          >
+            Cancelar sus próximos turnos ({cantidadProximos})
+          </button>
+        )}        <button
           type="button"
           className="link-peligro"
           disabled={ocupado}
