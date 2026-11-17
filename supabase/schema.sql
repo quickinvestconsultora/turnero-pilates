@@ -1453,8 +1453,17 @@ as $$
     t.cancelado,
     t.motivo_cancelacion
   from public.turnos t
-  -- Los cancelados también se devuelven: la app los muestra como "Feriado" o "Sin clase".
+  -- Los cancelados solo se devuelven si tienen un motivo ("Feriado", cancelar todo el día) o si yo
+  -- estaba anotada: así las alumnas ven los feriados pero no los turnos que el estudio dio de baja.
   where t.fecha between p_desde and p_hasta
+    and (
+      not t.cancelado
+      or t.motivo_cancelacion is not null
+      or exists (
+        select 1 from public.reservas r
+        where r.turno_id = t.id and r.alumno_id = auth.uid() and r.estado = 'reservada'
+      )
+    )
     -- Los turnos de un turno fijo desactivado no se ofrecen (salvo que yo ya esté anotada).
     and (
       t.plantilla_id is null
