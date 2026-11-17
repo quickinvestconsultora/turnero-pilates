@@ -117,7 +117,7 @@ export default function Clientes({
           ? 'Al día'
           : ETIQUETA_ESTADO[c.estado_cuenta]
     descargarCsv(`clientes-${hoyIso()}.csv`, [
-      ['Apellido', 'Nombre', 'DNI', 'Celular', 'Nivel', 'Estado de cuenta', 'Abono cubre hasta', 'Alta'],
+      ['Apellido', 'Nombre', 'DNI', 'Celular', 'Nivel', 'Estado de cuenta', 'Alta'],
       ...filtrados.map((c) => [
         c.apellido,
         c.nombre,
@@ -125,7 +125,6 @@ export default function Clientes({
         c.telefono,
         c.nivel ? ETIQUETA_NIVEL[c.nivel] : '',
         estadoTexto(c),
-        c.al_dia_hasta ? c.al_dia_hasta.split('-').reverse().join('/') : '',
         c.creado_en.slice(0, 10).split('-').reverse().join('/'),
       ]),
     ])

@@ -80,13 +80,12 @@ export default function CobrosDelMes() {
 
   const descargar = () =>
     descargarCsv('cobros-' + referencia.slice(0, 7) + '.csv', [
-      ['Fecha', 'Alumna', 'Monto', 'Medio', 'Abono cubre hasta'],
+      ['Fecha', 'Alumna', 'Monto', 'Medio'],
       ...cobros.map((c) => [
         new Date(c.creado_en).toLocaleDateString('es-AR'),
         c.perfiles ? nombreCompleto(c.perfiles) : (c.alumna_nombre ?? 'Clienta eliminada'),
         c.monto,
         ETIQUETA_MEDIO[c.medio],
-        c.abono_hasta ? c.abono_hasta.split('-').reverse().join('/') : '',
       ]),
     ])
 
