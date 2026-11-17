@@ -2,7 +2,6 @@ import type { Perfil } from '../tipos'
 import OpcionesPago from './OpcionesPago'
 import PreciosInfo from './PreciosInfo'
 import SubirComprobante from './SubirComprobante'
-import { diaMes } from '../cuenta'
 
 type Props = {
   perfil: Perfil
@@ -28,7 +27,7 @@ export default function ModalPago({ perfil, motivo = 'turno', onCerrar, onCompro
   const subtitulo = debe
     ? 'Para reservar más turnos primero hay que regularizarlo. Elegí cómo pagar:'
     : abonoCorto
-      ? `Tu abono cubre hasta el ${diaMes(perfil.al_dia_hasta!)}. Para reservar turnos de después, renovalo. Elegí cómo pagar:`
+      ? 'Para reservar este turno tenés que renovar tu abono. Elegí cómo pagar:'
       : motivo === 'mes'
         ? 'Reservar todos los turnos del mes es para quien ya pagó el mes. Pagá con transferencia al alias o con Mercado Pago y avisanos para que te lo habiliten:'
         : 'Abonás la clase o el mes y ya podés reservar. Elegí cómo pagar:'

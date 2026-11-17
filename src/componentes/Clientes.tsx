@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { EstadoCuenta, Perfil } from '../tipos'
 import { actualizarEstadoCuenta, listarClientes } from '../servicios/clientes'
 import { obtenerUrlDeslinde } from '../servicios/deslinde'
-import { abonoVencido, diaMes } from '../cuenta'
+import { abonoVencido } from '../cuenta'
 import { fechaCorta, hoyIso, sumarDias } from '../fechas'
 import { nombreCompleto } from '../personas'
 import { mensajeCliente } from '../whatsapp'
@@ -244,8 +244,8 @@ function ClienteItem({
   const etiquetaEstado =
     cliente.estado_cuenta === 'al_dia' && cliente.al_dia_hasta
       ? vencido
-        ? `Venció el ${diaMes(cliente.al_dia_hasta)}`
-        : `Al día hasta el ${diaMes(cliente.al_dia_hasta)}`
+        ? 'Abono vencido'
+        : 'Al día'
       : ETIQUETA_ESTADO[cliente.estado_cuenta]
 
   const verDeslinde = async () => {

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listarParaReactivar, marcarReactivacion } from '../servicios/reactivar'
 import type { AlumnaParaReactivar, MotivoReactivar } from '../servicios/reactivar'
-import { diaMes } from '../cuenta'
 import { fechaCorta } from '../fechas'
 import { nombreCompleto } from '../personas'
 import { mensajeReactivar } from '../whatsapp'
@@ -116,7 +115,6 @@ export default function Reactivar() {
                   <span className={`etiqueta-motivo etiqueta-motivo--${a.motivo}`}>
                     {ETIQUETA_MOTIVO[a.motivo]}
                   </span>
-                  {a.motivo === 'vencido' && a.al_dia_hasta && ` · venció el ${diaMes(a.al_dia_hasta)}`}
                   {a.avisada_en && ` · le escribiste hace ${diasDesde(a.avisada_en)} días`}
                 </span>
               </div>

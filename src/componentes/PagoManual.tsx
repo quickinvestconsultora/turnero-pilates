@@ -3,7 +3,6 @@ import type { FormEvent } from 'react'
 import { ETIQUETA_CONCEPTO, ETIQUETA_MEDIO, registrarPagoManual } from '../servicios/clientes'
 import type { ConceptoPago, MedioPago } from '../servicios/clientes'
 import { PRECIO_CLASE_SUELTA, PRECIOS_MENSUALES } from '../config/precios'
-import { diaMes } from '../cuenta'
 import { finDeMes, hoyIso } from '../fechas'
 
 // Los precios de config/precios.ts vienen como texto ("$45.000").
@@ -190,7 +189,6 @@ export default function PagoManual({
             onChange={(e) => setHasta(e.target.value)}
             required
           />
-          {hasta && <span className="ayuda"> Hasta el {diaMes(hasta)}.</span>}
         </div>
       )}
 

@@ -1,7 +1,7 @@
 import type { Perfil } from '../tipos'
 import OpcionesPago from './OpcionesPago'
 import SubirComprobante from './SubirComprobante'
-import { abonoVencido, diaMes } from '../cuenta'
+import { abonoVencido } from '../cuenta'
 
 // Cartel para la alumna cuando el staff la marcó como "pendiente" de pago o
 // cuando su abono mensual ya venció.
@@ -20,7 +20,7 @@ export default function AvisoPago({
       <p>
         {vencido && perfil.al_dia_hasta ? (
           <>
-            <strong>Tu abono venció el {diaMes(perfil.al_dia_hasta)}.</strong> Para reservar más
+            <strong>Tu abono venció.</strong> Para reservar más
             turnos, renovalo así:
           </>
         ) : (

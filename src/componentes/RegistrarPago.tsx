@@ -4,7 +4,6 @@ import type { Perfil } from '../tipos'
 import { ETIQUETA_MEDIO, registrarPago } from '../servicios/clientes'
 import type { MedioPago } from '../servicios/clientes'
 import { PRECIO_CLASE_SUELTA, PRECIOS_MENSUALES } from '../config/precios'
-import { diaMes } from '../cuenta'
 import { finDeMes, hoyIso } from '../fechas'
 
 export type ModoPago = 'este-mes' | 'sumar'
@@ -73,9 +72,7 @@ export default function RegistrarPago({
       <p>
         <strong>Registrar pago de {cliente.nombre.trim() || 'la alumna'}</strong>
         <br />
-        <span className="ayuda">
-          Queda al día y cubre turnos hasta el <strong>{diaMes(hasta)}</strong>.
-        </span>
+        <span className="ayuda">Queda al día.</span>
       </p>
 
       {atajos.length > 0 && (

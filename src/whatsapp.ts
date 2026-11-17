@@ -1,5 +1,5 @@
 import type { Perfil } from './tipos'
-import { abonoVencido, diaMes } from './cuenta'
+import { abonoVencido } from './cuenta'
 import { fechaLarga, horaCorta } from './fechas'
 import { LINK_MERCADO_PAGO, TRANSFERENCIA_ALIAS, TRANSFERENCIA_TITULAR } from './config/pagos'
 
@@ -55,7 +55,7 @@ export function mensajeCliente(
   const nombre = p.nombre.trim() || 'hola'
   if (abonoVencido(p) && p.al_dia_hasta) {
     return (
-      `Hola ${nombre}! Te escribimos de ${FIRMA}: tu abono venció el ${diaMes(p.al_dia_hasta)}. ` +
+      `Hola ${nombre}! Te escribimos de ${FIRMA}: tu abono venció. ` +
       `Si querés renovarlo para seguir reservando, te dejo los datos de pago.${datosDePago()}`
     )
   }
@@ -80,7 +80,7 @@ export function mensajeReactivar(
   const app = `${window.location.origin}/app/`
   if (motivo === 'vencido' && alDiaHasta) {
     return (
-      `${hola}hace un tiempo que no te vemos y tu abono venció el ${diaMes(alDiaHasta)}. ` +
+      `${hola}hace un tiempo que no te vemos y tu abono venció. ` +
       `¿Querés retomar? Si te sirve, te dejo los datos para renovarlo y ya reservás tus clases en ${app}${datosDePago()}`
     )
   }

@@ -13,7 +13,6 @@ import {
   listarPagos,
 } from '../servicios/clientes'
 import type { Pago } from '../servicios/clientes'
-import { diaMes } from '../cuenta'
 import DocumentosAlumna from './DocumentosAlumna'
 import EditarDatosAlumna from './EditarDatosAlumna'
 import PagoManual from './PagoManual'
@@ -414,7 +413,6 @@ export default function FichaCliente({
                     {new Date(p.creado_en).toLocaleDateString('es-AR')} ·{' '}
                     <strong>{p.monto === null ? 'Sin monto' : formatoPesos(p.monto)}</strong> ·{' '}
                     {ETIQUETA_MEDIO[p.medio]} · {ETIQUETA_CONCEPTO[p.concepto]}
-                    {p.abono_hasta && ` · cubre hasta el ${diaMes(p.abono_hasta)}`}
                     {p.nota && <span className="ayuda"> · {p.nota}</span>}
                   </span>
                   <span className="acciones-pago">

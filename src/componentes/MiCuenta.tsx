@@ -8,7 +8,7 @@ import BotonRecibo from './BotonRecibo'
 import { SeccionNotificaciones } from './Notificaciones'
 import InvitarAmiga from './InvitarAmiga'
 import { calcularProgreso, mensajeProgreso } from '../progreso'
-import { abonoVencido, diaMes } from '../cuenta'
+import { abonoVencido } from '../cuenta'
 import { fechaCorta, horaCorta } from '../fechas'
 
 const formatoPesos = (n: number) =>
@@ -38,7 +38,7 @@ export default function MiCuenta({ perfil, onCerrar }: { perfil: Perfil; onCerra
     if (perfil.estado_cuenta === 'pendiente') return { texto: 'Tenés un pago pendiente.', ok: false }
     if (perfil.estado_cuenta === 'prueba') return { texto: 'Todavía no tenés un abono: para reservar tenés que pagar la clase o el mes.', ok: false }
     if (abonoVencido(perfil) && perfil.al_dia_hasta) {
-      return { texto: `Tu abono venció el ${diaMes(perfil.al_dia_hasta)}.`, ok: false }
+      return { texto: 'Tu abono venció.', ok: false }
     }
     return {
       texto: 'Estás al día.',
@@ -116,7 +116,6 @@ export default function MiCuenta({ perfil, onCerrar }: { perfil: Perfil; onCerra
                   {new Date(p.fecha).toLocaleDateString('es-AR')} ·{' '}
                   <strong>{p.monto === null ? 'Sin monto' : formatoPesos(p.monto)}</strong> ·{' '}
                   {ETIQUETA_MEDIO[p.medio as MedioPago] ?? p.medio}
-                  {p.abono_hasta && ` · hasta el ${diaMes(p.abono_hasta)}`}
                 </span>
                 <BotonRecibo
                   datos={{

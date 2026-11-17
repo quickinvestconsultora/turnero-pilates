@@ -74,10 +74,6 @@ async function generarPdf(d: DatosRecibo): Promise<Blob> {
   if (d.dni) fila('DNI', d.dni)
   fila('Concepto', ETIQUETA_CONCEPTO[d.concepto] ?? d.concepto)
   fila('Medio de pago', ETIQUETA_MEDIO[d.medio] ?? d.medio)
-  if (d.abonoHasta) {
-    const [yy, mm, dd] = d.abonoHasta.split('-').map(Number)
-    fila('Cubre turnos hasta', `${dd}/${mm}/${yy}`)
-  }
 
   y += 4
   doc.setDrawColor(190)
