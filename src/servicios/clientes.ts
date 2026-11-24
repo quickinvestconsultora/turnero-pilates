@@ -229,6 +229,11 @@ export async function borrarPago(id: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+// Marca que la clienta abrió la app (el servidor lo cuenta como máximo una vez por hora).
+export async function registrarAcceso(): Promise<void> {
+  await supabase.rpc('registrar_acceso')
+}
+
 // Staff: desactiva a una clienta y la saca de todos sus turnos (fijos y reservados).
 export async function desactivarAlumna(id: string): Promise<{ fijas: number; turnos: number }> {
   const { data, error } = await supabase.rpc('desactivar_alumna', { p_alumna_id: id })

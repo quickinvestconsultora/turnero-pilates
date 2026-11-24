@@ -4107,6 +4107,11 @@ grant execute on function public.marcar_anuncios_enviados(uuid[], uuid[]) to ser
 -- que también limpia sus archivos): se van su cuenta, datos, ficha, documentos y
 -- reservas, y los pagos quedan en las finanzas con su nombre.
 alter table public.perfiles add column if not exists desactivada_en timestamptz;
+-- Última vez que la app se abrió con la sesión de la clienta. Hace falta porque last_sign_in_at de
+-- Supabase solo cambia cuando vuelve a iniciar sesión, y la sesión de la app dura meses: una clienta
+-- que usa la app todos los días puede figurar sin ingresar hace tiempo. Las que ya existían arrancan
+-- con la fecha de hoy.
+alter table public.perfiles add column if not exists ultimo_acceso_en timestamptz not null default now();
 alter table public.perfiles add column if not exists desactivada_motivo text; -- 'manual' o 'inactividad'
 
 -- Los pagos sobreviven al borrado de la clienta: la fila queda sin clienta y con su nombre.
@@ -4217,7 +4222,7 @@ begin
   if not public.es_staff() then
     raise exception 'Solo el staff puede ver esto.';
   end if;
-  select u.last_sign_in_at, p.desactivada_en into v_ultimo, v_desact
+  select greatest(u.last_sign_in_at, p.ultimo_acceso_en), p.desactivada_en into v_ultimo, v_desact
   from public.perfiles p join auth.users u on u.id = p.id
   where p.id = p_alumna_id;
   return json_build_object(
@@ -4247,7 +4252,7 @@ begin
     join auth.users u on u.id = p.id
     where p.rol = 'alumno'
       and p.desactivada_en is null
-      and coalesce(u.last_sign_in_at, p.creado_en) < now() - interval '6 months'
+      and greatest(coalesce(u.last_sign_in_at, p.creado_en), p.ultimo_acceso_en) < now() - interval '6 months'
       and not (p.estado_cuenta = 'al_dia' and p.al_dia_hasta is not null and p.al_dia_hasta >= v_hoy)
   loop
     update public.perfiles
@@ -4276,7 +4281,7 @@ as $$
   join auth.users u on u.id = p.id
   where p.rol = 'alumno'
     and p.desactivada_en is not null
-    and greatest(p.desactivada_en, coalesce(u.last_sign_in_at, p.desactivada_en)) < now() - interval '6 months'
+    and greatest(p.desactivada_en, u.last_sign_in_at, p.ultimo_acceso_en) < now() - interval '6 months'
   order by p.desactivada_en
   limit 25;
 $$;
@@ -4306,6 +4311,20 @@ revoke execute on function public.preparar_borrado_alumna(uuid) from public, ano
 grant execute on function public.alumnas_a_borrar() to service_role;
 grant execute on function public.preparar_borrado_alumna(uuid) to service_role;
 grant execute on function public.desactivar_alumna(uuid) to authenticated;
+
+-- La app lo llama al abrirse (como máximo una vez por hora): marca que la clienta está usando la app.
+create or replace function public.registrar_acceso()
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.perfiles
+    set ultimo_acceso_en = now()
+  where id = auth.uid() and ultimo_acceso_en < now() - interval '1 hour';
+$$;
+
+grant execute on function public.registrar_acceso() to authenticated;
 grant execute on function public.reactivar_alumna(uuid) to authenticated;
 grant execute on function public.ingreso_de_alumna(uuid) to authenticated;
 

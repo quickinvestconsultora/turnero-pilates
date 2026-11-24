@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Perfil, Profesora, TurnoDisponible } from '../tipos'
 import { cerrarSesion } from '../servicios/perfil'
+import { registrarAcceso } from '../servicios/clientes'
 import { listarFotosGaleria, listarProfesoras } from '../servicios/profesoras'
 import { listarMisComprobantes } from '../servicios/comprobantes'
 import type { FotoGaleria } from '../servicios/profesoras'
@@ -100,6 +101,11 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   useEffect(() => {
     cargarComprobantes()
   }, [cargarComprobantes])
+
+  // Avisa que la clienta está usando la app (evita que la tomemos por inactiva).
+  useEffect(() => {
+    void registrarAcceso().catch(() => undefined)
+  }, [])
 
   // Horarios en los que quedó "fija": se anota sola en los turnos nuevos.
   const [fijas, setFijas] = useState<Fija[]>([])
