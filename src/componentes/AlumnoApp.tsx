@@ -12,6 +12,7 @@ import {
   marcarPromocionVista,
   reservarSerie,
   HORAS_LIMITE_CANCELAR,
+  hastaDisponibles,
 } from '../servicios/turnos'
 import {
   diaSemanaPlural,
@@ -250,27 +251,38 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
     }
   }
 
-  const disponibles = useMemo(
-    () => turnos.filter((t) => !yaPaso(t.fecha, t.hora)),
-    [turnos],
-  )
+  // Todo lo que viene (90 días): de acá salen "Mis turnos". Para reservar se muestra hasta el fin
+  // del mes que viene.
+  const futuros = useMemo(() => turnos.filter((t) => !yaPaso(t.fecha, t.hora)), [turnos])
+  const disponibles = useMemo(() => {
+    const limite = hastaDisponibles()
+    return futuros.filter((t) => t.fecha <= limite)
+  }, [futuros])
   const mios = useMemo(
     () =>
-      disponibles.filter(
+      futuros.filter(
         (t) => !t.cancelado && (t.mi_estado === 'reservada' || t.mi_estado === 'lista_espera'),
       ),
-    [disponibles],
+    [futuros],
   )
   // Sus turnos que el estudio canceló (feriado, etc.): se muestran avisando, sin acciones.
   const miosCancelados = useMemo(
-    () => disponibles.filter((t) => t.cancelado && t.mi_estado === 'reservada'),
-    [disponibles],
+    () => futuros.filter((t) => t.cancelado && t.mi_estado === 'reservada'),
+    [futuros],
   )
+  // Turnos de sus horarios fijos en los que todavía no está anotada (por ejemplo, meses que no
+  // pagó): se le muestran igual, avisando que se confirman cuando abone.
+  const fijosPendientes = useMemo(() => {
+    const suyos = new Set(fijas.map((f) => f.plantilla_id))
+    return futuros.filter((t) => t.plantilla_id && suyos.has(t.plantilla_id) && !t.mi_estado && !t.cancelado)
+  }, [futuros, fijas])
 
   const lista =
     vista === 'disponibles'
       ? disponibles
-      : [...mios, ...miosCancelados].sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora))
+      : [...mios, ...miosCancelados, ...fijosPendientes].sort(
+          (a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora),
+        )
 
   // Turnos en los que la base la subió desde la lista de espera y todavía no
   // vio el aviso. Al tocar "Entendido" quedan marcados como vistos.
@@ -444,6 +456,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
             profesoras={profesoras}
             onVerProfesora={setProfesoraAbierta}
             seriePorTurno={seriePorTurno}
+            pendientesFijo={vista === 'mios' ? new Set(fijosPendientes.map((t) => t.id)) : new Set()}
             esPrueba={perfil.estado_cuenta === 'prueba'}
             fijas={new Set(fijas.map((f) => f.plantilla_id))}
             puedeFijar={puedeSerie}
@@ -515,6 +528,7 @@ function ListaTurnos({
   profesoras,
   onVerProfesora,
   seriePorTurno,
+  pendientesFijo,
   esPrueba,
   fijas,
   puedeFijar,
@@ -528,6 +542,8 @@ function ListaTurnos({
   profesoras: Profesora[]
   onVerProfesora: (p: Profesora) => void
   seriePorTurno: Map<string, number>
+  // Turnos de sus horarios fijos todavía sin confirmar (sin pago): se muestran sin acciones.
+  pendientesFijo: Set<string>
   esPrueba: boolean
   fijas: Set<string>
   puedeFijar: boolean
@@ -630,7 +646,9 @@ function ListaTurnos({
                     </div>
 
                     <div className="fila-turno-acciones">
-                      {sinTiempo ? (
+                      {pendientesFijo.has(t.id) ? (
+                        <span className="etiqueta-fija">Tu horario fijo · se confirma cuando abones</span>
+                      ) : sinTiempo ? (
                         <span className="ayuda">No se puede cancelar (faltan menos de {HORAS_LIMITE_CANCELAR} h)</span>
                       ) : t.mi_estado ? (
                         <button type="button" className="btn-fantasma" disabled={ocupado} onClick={() => onCancelar(t)}>

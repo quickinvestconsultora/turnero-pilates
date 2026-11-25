@@ -29,6 +29,7 @@ export const TUTORIAL: ApartadoTutorial[] = [
       'Apenas reservás un turno de un horario que se repite, te preguntamos si querés dejarlo fijo.',
       'Si decís que sí, te anotamos sola todas las semanas en ese día y horario, mientras tu abono lo cubra y haya lugar.',
       'Si un día no podés venir, cancelás solo ese turno y el resto sigue igual.',
+      'En "Mis turnos" ves tus turnos fijos de los próximos 90 días. Los de meses que todavía no abonaste dicen "se confirma cuando abones": al pagar, te anotamos sola.',
       'Para dejar de ser fija: Mis turnos → "Mis horarios fijos" → "Dejar de ser fija".',
       'También podés reservar todos los turnos del mes de un mismo horario con el botón "Reservar los ... de [mes]" (necesitás tener el mes abonado).',
     ],

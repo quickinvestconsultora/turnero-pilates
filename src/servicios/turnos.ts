@@ -1,11 +1,16 @@
 import { supabase } from '../lib/supabase'
 import type { TurnoDisponible } from '../tipos'
-import { finDeMes, hoyIso } from '../fechas'
+import { finDeMes, hoyIso, sumarDias } from '../fechas'
 
-// La alumna ve los turnos publicados hasta el fin del mes que viene (así, con
-// un abono mensual puede reservar el mes entero que paga, sin importar qué día
-// del mes actual sea).
+// Se traen los turnos de los próximos 90 días: en "Mis turnos" la alumna ve sus turnos fijos de
+// todo ese período (aunque todavía no haya pagado esos meses).
 export function hastaCuandoVeLaAlumna(): string {
+  return sumarDias(hoyIso(), 90)
+}
+
+// Para reservar, la lista de "Turnos disponibles" llega hasta el fin del mes que viene (así, con
+// un abono mensual puede reservar el mes entero que paga, sin importar qué día del mes sea).
+export function hastaDisponibles(): string {
   return finDeMes(hoyIso(), 1)
 }
 

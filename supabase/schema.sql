@@ -3945,7 +3945,12 @@ set search_path = public
 as $$
 declare
   v_hoy date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
-  v_fin date := (date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires') + interval '2 months - 1 day')::date;
+  -- Hasta el fin del mes que viene o 90 días, lo que quede más lejos: así cada alumna ve sus
+  -- turnos fijos de los próximos 90 días.
+  v_fin date := greatest(
+    (date_trunc('month', now() at time zone 'America/Argentina/Buenos_Aires') + interval '2 months - 1 day')::date,
+    (now() at time zone 'America/Argentina/Buenos_Aires')::date + 90
+  );
   v_n   integer;
 begin
   insert into public.turnos (fecha, hora, duracion_min, cupo, instructor, instructora_id, plantilla_id)
