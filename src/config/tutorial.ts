@@ -18,7 +18,6 @@ export const TUTORIAL: ApartadoTutorial[] = [
     pasos: [
       'En "Turnos disponibles" tocá el día para desplegarlo y ver sus horarios.',
       'Elegí el horario y tocá "Reservar".',
-      'Para reservar tenés que tener tu abono o clase abonados: si todavía no pagaste, te mostramos cómo hacerlo.',
       'Si el horario está completo, tocá "Anotarme en espera": si se libera un lugar, te anotamos sola y te avisamos.',
       'Tus reservas las ves en la solapa "Mis turnos".',
     ],
@@ -27,11 +26,11 @@ export const TUTORIAL: ApartadoTutorial[] = [
     titulo: 'Dejar un turno fijo',
     pasos: [
       'Apenas reservás un turno de un horario que se repite, te preguntamos si querés dejarlo fijo.',
-      'Si decís que sí, te anotamos sola todas las semanas en ese día y horario, mientras tu abono lo cubra y haya lugar.',
+      'Si decís que sí, te anotamos sola todas las semanas en ese día y horario, mientras haya lugar.',
       'Si un día no podés venir, cancelás solo ese turno y el resto sigue igual.',
-      'En "Mis turnos" ves tus turnos fijos de los próximos 90 días. Los de meses que todavía no abonaste dicen "se confirma cuando abones": al pagar, te anotamos sola.',
+      'En "Mis turnos" ves tus turnos fijos de los próximos 90 días.',
       'Para dejar de ser fija: Mis turnos → "Mis horarios fijos" → "Dejar de ser fija".',
-      'También podés reservar todos los turnos del mes de un mismo horario con el botón "Reservar los ... de [mes]" (necesitás tener el mes abonado).',
+      'También podés reservar todos los turnos del mes de un mismo horario con el botón "Reservar los ... de [mes]".',
     ],
   },
   {
@@ -50,7 +49,7 @@ export const TUTORIAL: ApartadoTutorial[] = [
       'Cuando tengas que pagar, la app te muestra los valores y las formas de pago.',
       'Podés pagar con transferencia al alias que ves en pantalla o con el link de Mercado Pago.',
       'Después de pagar, subí el comprobante desde la misma pantalla o avisale al estudio.',
-      'El estudio confirma tu pago y te habilita los turnos. Desde ese momento ves "Tu abono está al día".',
+      'El estudio confirma tu pago y desde ese momento ves "Tu abono está al día".',
       'Tus pagos y recibos quedan en "Mi cuenta" → "Mis pagos".',
     ],
   },

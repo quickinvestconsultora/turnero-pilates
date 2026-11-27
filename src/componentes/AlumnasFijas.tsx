@@ -7,7 +7,7 @@ import { nombreCompleto } from '../personas'
 import { NOMBRE_DIA, horaCorta } from '../fechas'
 
 // Alumnas fijas de un turno fijo: se anotan solas en cada turno nuevo de ese día y
-// horario, mientras su abono lo cubra y haya lugar, hasta que alguien las saque.
+// horario, mientras haya lugar, hasta que alguien las saque.
 export default function AlumnasFijas({
   plantillaId,
   plantillas,
@@ -134,7 +134,7 @@ export default function AlumnasFijas({
       {abierto && (
         <div className="form-caja">
           <p className="ayuda">
-            Las alumnas fijas se anotan solas en cada turno nuevo de este día y horario, mientras su abono lo cubra y
+            Las alumnas fijas se anotan solas en cada turno nuevo de este día y horario, mientras
             haya lugar. Si cancelan una fecha, no se las vuelve a anotar en esa fecha.
           </p>
           {error && <p className="mensaje-error">{error}</p>}

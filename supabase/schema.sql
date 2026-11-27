@@ -471,6 +471,24 @@ insert into public.configuracion (clave, valor)
 values ('cambios_por_mes', '3'::jsonb)
 on conflict (clave) do nothing;
 
+-- ¿Hace falta tener el pago al día para reservar? Hoy NO (false): las alumnas reservan, quedan
+-- fijas y se anotan solas sin importar si pagaron; el cobro lo controla el estudio. Para volver a
+-- exigirlo:
+--   update public.configuracion set valor = 'true'::jsonb where clave = 'pago_obligatorio';
+insert into public.configuracion (clave, valor)
+values ('pago_obligatorio', 'false'::jsonb)
+on conflict (clave) do nothing;
+
+create or replace function public.pago_obligatorio()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce((select c.valor = 'true'::jsonb from public.configuracion c where c.clave = 'pago_obligatorio'), false);
+$$;
+
 -- Documentos de la alumna (certificado médico, estudios, etc.): los sube ella o
 -- el estudio. Los archivos están en el bucket privado "fichas".
 create table if not exists public.documentos_alumnas (
@@ -1109,19 +1127,20 @@ begin
       raise exception 'Tu cuenta está desactivada. Escribile al estudio para reactivarla.';
     end if;
 
-    if v_estado_cuenta = 'pendiente' then
+    if public.pago_obligatorio() and v_estado_cuenta = 'pendiente' then
       raise exception 'PAGO_REQUERIDO';
     end if;
 
     -- "Al día" cubre turnos hasta al_dia_hasta; uno posterior necesita que el
     -- estudio confirme un nuevo pago (el abono no se renueva solo).
-    if v_estado_cuenta = 'al_dia'
+    if public.pago_obligatorio()
+       and v_estado_cuenta = 'al_dia'
        and v_al_dia_hasta is not null
        and v_turno.fecha > v_al_dia_hasta then
       raise exception 'PAGO_REQUERIDO';
     end if;
 
-    if v_estado_cuenta = 'prueba' then
+    if public.pago_obligatorio() and v_estado_cuenta = 'prueba' then
       -- Con la clase de prueba apagada hay que abonar desde la primera reserva.
       if not coalesce(
         (select c.valor = 'true'::jsonb from public.configuracion c where c.clave = 'clase_prueba_activa'),
@@ -1212,7 +1231,7 @@ begin
   if exists (select 1 from public.perfiles where id = auth.uid() and desactivada_en is not null) then
     raise exception 'Tu cuenta está desactivada. Escribile al estudio para reactivarla.';
   end if;
-  if v_estado_cuenta <> 'al_dia' or v_hasta is null or v_hasta < v_ahora::date then
+  if public.pago_obligatorio() and (v_estado_cuenta <> 'al_dia' or v_hasta is null or v_hasta < v_ahora::date) then
     raise exception 'PAGO_REQUERIDO';
   end if;
 
@@ -1231,7 +1250,7 @@ begin
 
     if v_estado_actual in ('reservada', 'lista_espera') then
       v_ya := v_ya + 1;
-    elsif t.fecha > v_hasta then
+    elsif public.pago_obligatorio() and t.fecha > v_hasta then
       v_sin_cobertura := v_sin_cobertura || t.fecha;
     elsif public.ocupados_turno(t.id) >= t.cupo then
       v_sin_lugar := v_sin_lugar || t.fecha;
@@ -3743,8 +3762,11 @@ begin
       and not t.cancelado
       and (t.fecha + t.hora) >= v_ahora
       and p.rol = 'alumno'
-      and p.estado_cuenta = 'al_dia'
-      and (p.al_dia_hasta is null or t.fecha <= p.al_dia_hasta)
+      and p.desactivada_en is null
+      and (
+        not public.pago_obligatorio()
+        or (p.estado_cuenta = 'al_dia' and (p.al_dia_hasta is null or t.fecha <= p.al_dia_hasta))
+      )
       and not exists (
         select 1 from public.reservas x
         where x.turno_id = t.id and x.alumno_id = f.alumna_id
@@ -3858,7 +3880,7 @@ begin
     raise exception 'Ese turno fijo no existe o está desactivado.';
   end if;
 
-  if auth.uid() = p_alumna_id and not public.es_staff() then
+  if public.pago_obligatorio() and auth.uid() = p_alumna_id and not public.es_staff() then
     if v_perfil.estado_cuenta <> 'al_dia'
        or (v_perfil.al_dia_hasta is not null and v_perfil.al_dia_hasta < v_hoy) then
       raise exception 'PAGO_REQUERIDO';
@@ -4343,3 +4365,7 @@ exception when others then
   raise notice 'No se pudo programar la desactivación automática: %', sqlerrm;
 end
 $$;
+
+-- Anota a las alumnas fijas en los turnos ya publicados que les correspondan (con el pago ya no
+-- obligatorio, entran también los de meses que todavía no pagaron). Se puede correr siempre.
+select public.asignar_fijas();

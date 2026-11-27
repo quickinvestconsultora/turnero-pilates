@@ -39,7 +39,7 @@ export default function SubirComprobante({
   if (enviado) {
     return (
       <p className="mensaje-ok">
-        ¡Listo! Recibimos tu comprobante. El estudio lo va a confirmar y te habilita los turnos.
+        ¡Listo! Recibimos tu comprobante. El estudio lo va a confirmar.
       </p>
     )
   }

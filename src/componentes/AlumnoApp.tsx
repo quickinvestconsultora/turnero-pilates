@@ -23,7 +23,7 @@ import {
   nombreMes,
   yaPaso,
 } from '../fechas'
-import { abonoVencido, diaMes } from '../cuenta'
+import { diaMes } from '../cuenta'
 import CabeceraApp from './CabeceraApp'
 import EditarPerfil from './EditarPerfil'
 import AvisoPago from './AvisoPago'
@@ -213,7 +213,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       pedirConfirmacion &&
       !window.confirm(
         `¿Quedarte fija todos los ${dia} a las ${horaCorta(turno.hora)}?` +
-          `\n\nTe anotamos sola en cada turno nuevo de ese día y horario, mientras tu abono lo cubra y haya lugar. ` +
+          `\n\nTe anotamos sola en cada turno nuevo de ese día y horario, mientras haya lugar. ` +
           `Si un día no podés venir, cancelás ese turno. Para dejar de ser fija, lo sacás desde "Mis turnos".`,
       )
     ) {
@@ -301,18 +301,17 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
   // "Reservar todo el mes": solo con abono al día. Para cada turno que viene de
   // un turno fijo, cuántos del mismo horario y mes podría sumar hoy (sin
   // reserva, con lugar y dentro de lo que cubre el abono).
-  const puedeSerie = perfil.estado_cuenta === 'al_dia' && !abonoVencido(perfil)
+  // Ya no hace falta tener el pago al día para reservar (lo controla el estudio).
+  const puedeSerie = true
   const seriePorTurno = useMemo(() => {
     const cuenta = new Map<string, number>()
     if (!puedeSerie) return cuenta
-    const hasta = perfil.al_dia_hasta
     const reservables = disponibles.filter(
       (t) =>
         t.plantilla_id &&
         !t.cancelado &&
         !t.mi_estado &&
-        Number(t.ocupados) < t.cupo &&
-        (!hasta || t.fecha <= hasta),
+        Number(t.ocupados) < t.cupo,
     )
     for (const t of reservables) {
       const n = reservables.filter(
@@ -321,7 +320,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       cuenta.set(t.id, n)
     }
     return cuenta
-  }, [disponibles, puedeSerie, perfil.al_dia_hasta])
+  }, [disponibles, puedeSerie])
 
   return (
     <div className="app">
@@ -384,7 +383,7 @@ export default function AlumnoApp({ perfil, onPerfilActualizado }: Props) {
       <AvisoPago perfil={perfil} onComprobante={cargarComprobantes} />
       {comprobantePendiente && (
         <p className="estado-abono estado-abono--pronto">
-          Mandaste un comprobante de pago: el estudio lo está revisando y te habilita los turnos.
+          Mandaste un comprobante de pago: el estudio lo está revisando.
         </p>
       )}
       <EstadoAbono perfil={perfil} />
@@ -647,7 +646,7 @@ function ListaTurnos({
 
                     <div className="fila-turno-acciones">
                       {pendientesFijo.has(t.id) ? (
-                        <span className="etiqueta-fija">Tu horario fijo · se confirma cuando abones</span>
+                        <span className="etiqueta-fija">Tu horario fijo · todavía sin lugar para vos</span>
                       ) : sinTiempo ? (
                         <span className="ayuda">No se puede cancelar (faltan menos de {HORAS_LIMITE_CANCELAR} h)</span>
                       ) : t.mi_estado ? (

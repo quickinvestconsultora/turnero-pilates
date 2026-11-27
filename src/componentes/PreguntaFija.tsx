@@ -23,7 +23,7 @@ export default function PreguntaFija({
           ¿Querés dejarlo <strong>fijo</strong> todos los {diaSemanaPlural(fecha)} a las {horaCorta(hora)}?
         </p>
         <p className="ayuda">
-          Te anotamos sola en cada turno nuevo de ese día y horario, mientras tu abono lo cubra y haya lugar.
+          Te anotamos sola en cada turno nuevo de ese día y horario, mientras haya lugar.
           Si un día no podés venir, cancelás ese turno. Lo podés sacar cuando quieras desde "Mis turnos".
         </p>
         <div className="modal-botones">
